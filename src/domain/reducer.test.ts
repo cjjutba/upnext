@@ -135,6 +135,13 @@ describe('games', () => {
     expect(s.games[1]?.pairs).toEqual(changed);
     expect(s.queue).toEqual(['c']); // c came off the court, e came on
   });
+
+  it('game-finished with an out of range winnerPair is a no-op, imported logs cannot crash replay', () => {
+    const s = replay([...base(), game(1, four), { ...finish(1), winnerPair: 2 } as unknown as SessionEvent]);
+    expect(s.games[1]?.pairs).toEqual(four);
+    expect(s.gamesPlayed).toEqual({});
+    expect(s.finishedGames).toHaveLength(0);
+  });
 });
 
 describe('courts', () => {

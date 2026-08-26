@@ -132,6 +132,8 @@ export function applyEvent(state: SessionState, e: SessionEvent): SessionState {
     case 'game-finished': {
       const active = state.games[e.court];
       if (!active) return state;
+      // imported logs are untyped at runtime: an out of range winnerPair must no-op, never crash replay
+      if (e.winnerPair !== undefined && e.winnerPair !== 0 && e.winnerPair !== 1) return state;
       const players = lineupPlayers(active.pairs);
       const games = { ...state.games };
       delete games[e.court];
