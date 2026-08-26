@@ -1,4 +1,4 @@
-export type RuleTemplate = 'all-off' | 'winners-stay' | 'winners-split';
+export type RuleTemplate = 'all-off' | 'winners-stay' | 'winners-split' | 'balanced' | 'social';
 
 export interface RuleConfig {
   template: RuleTemplate;
@@ -13,6 +13,8 @@ export interface Player {
   id: string; // UUID, never autoincrement
   name: string;
   level?: string;
+  /** 1 to 5 stars, absent = unrated. Balanced pairing treats unrated as 3. */
+  rating?: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -39,6 +41,7 @@ export type EventPayload =
   | { type: 'game-finished'; court: number; winnerPair?: 0 | 1; score?: string }
   | { type: 'court-closed'; court: number }
   | { type: 'court-reopened'; court: number }
+  | { type: 'court-added' }
   | { type: 'event-undone'; targetEventId: string }
   | { type: 'session-ended' };
 

@@ -153,7 +153,8 @@ export function applyEvent(state: SessionState, e: SessionEvent): SessionState {
         finishedGames: [...state.finishedGames, finished],
       };
       const rule = state.rule;
-      if (rule.template === 'all-off' || e.winnerPair === undefined) {
+      const winnersMode = rule.template === 'winners-stay' || rule.template === 'winners-split';
+      if (!winnersMode || e.winnerPair === undefined) {
         return {
           ...base,
           queue: [...state.queue, ...players],
@@ -210,6 +211,10 @@ export function applyEvent(state: SessionState, e: SessionEvent): SessionState {
     case 'court-reopened': {
       if (!state.closedCourts.includes(e.court)) return state;
       return { ...state, closedCourts: state.closedCourts.filter((c) => c !== e.court) };
+    }
+    case 'court-added': {
+      if (!state.started || state.ended) return state;
+      return { ...state, courtCount: state.courtCount + 1 };
     }
     case 'session-ended': {
       if (!state.started || state.ended) return state;
