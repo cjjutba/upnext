@@ -2,7 +2,7 @@ export type RuleTemplate = 'all-off' | 'winners-stay' | 'winners-split';
 
 export interface RuleConfig {
   template: RuleTemplate;
-  /** Consecutive wins before winners leave the court. Used by winners-stay only. */
+  /** Consecutive wins before winners leave the court. Read by winners-stay (pair caps together) and winners-split (each winner caps individually). */
   winCap: number;
 }
 
@@ -56,6 +56,7 @@ export interface FinishedGame {
   court: number;
   pairs: Pairs;
   winnerPair?: 0 | 1;
+  score?: string;
   startedAt: number;
   endedAt: number;
 }
@@ -68,7 +69,7 @@ export interface SessionState {
   endedAt: number | null;
   courtCount: number;
   rule: RuleConfig;
-  /** Player ids in check-in order. Membership set; departure removes. */
+  /** Player ids in check-in order. Grows only; departures are tracked in departed, not removed here. */
   checkedIn: string[];
   sittingOut: string[];
   departed: string[];

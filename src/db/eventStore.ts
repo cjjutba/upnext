@@ -30,7 +30,7 @@ export async function append(input: EventInput, db: UpnextDB = defaultDb, ts?: n
 /** Canonical replay order: ULID id ascending. */
 export async function loadSession(sessionId: string, db: UpnextDB = defaultDb): Promise<SessionEvent[]> {
   const events = await db.sessionEvents.where('sessionId').equals(sessionId).toArray();
-  return events.sort((a, b) => (a.id < b.id ? -1 : 1));
+  return events.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
 export interface SessionListing {
@@ -62,6 +62,7 @@ export interface SessionExport {
   players: Player[];
 }
 
+/** Includes the whole roster on purpose: device handoff doubles as roster sync (merge is by UUID, last write wins). */
 export async function exportSession(sessionId: string, db: UpnextDB = defaultDb): Promise<SessionExport> {
   return {
     format: 'upnext-session',
