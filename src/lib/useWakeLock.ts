@@ -6,10 +6,17 @@ export function useWakeLock(active: boolean) {
     if (!active) return;
     type Lock = { release?: () => Promise<void> } | null;
     let lock: Lock = null;
+    let cancelled = false;
     const request = async () => {
       try {
         const wl = (navigator as Navigator & { wakeLock?: { request: (t: 'screen') => Promise<NonNullable<Lock>> } }).wakeLock;
-        if (wl) lock = await wl.request('screen');
+        if (!wl) return;
+        const acquired = await wl.request('screen');
+        if (cancelled) {
+          void acquired.release?.(); // effect ended while the request was in flight
+        } else {
+          lock = acquired;
+        }
       } catch {
         // denied or unsupported: nothing to do
       }
@@ -20,6 +27,7 @@ export function useWakeLock(active: boolean) {
     void request();
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
+      cancelled = true;
       document.removeEventListener('visibilitychange', onVisibility);
       void lock?.release?.();
     };
