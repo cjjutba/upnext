@@ -20,4 +20,6 @@ form games of four, rotate by house rules, undo anything.
 - Optional score entry on game-finished
 - Hand-composed lineups (pull a chosen player onto a court)
 - Recent-frequency ordering for the check-in grid
+- Search on the check-in grid for the long tail of the roster
+- Player rename and level tags (the level field already exists on Player)
 - PNG apple-touch-icon for iOS home screens
