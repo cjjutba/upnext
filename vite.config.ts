@@ -7,6 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      includeManifestIcons: false,
       manifest: {
         name: 'upnext',
         short_name: 'upnext',
