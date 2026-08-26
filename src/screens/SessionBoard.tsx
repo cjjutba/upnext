@@ -52,7 +52,7 @@ export function SessionBoard({ state, players, undoLabel, onUndo, canRedo, onRed
 
   return (
     /* clearance so the fixed undo pill can never cover a court card's bottom action */
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: 'var(--space-4)', padding: 'var(--space-4)', alignItems: 'start', paddingBottom: undoLabel ? 'calc(var(--tap-primary) + var(--space-5))' : undefined }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: 'var(--space-4)', padding: 'var(--space-4)', alignItems: 'start', paddingBottom: (undoLabel || canRedo) ? 'calc(var(--tap-primary) + var(--space-5))' : undefined }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-3)' }}>
         {courts.map((n) => {
           const game = state.games[n];
@@ -94,9 +94,9 @@ export function SessionBoard({ state, players, undoLabel, onUndo, canRedo, onRed
           </div>
         </div>
       </div>
-      {undoLabel ? (
+      {undoLabel || canRedo ? (
         <div style={{ position: 'fixed', left: 'var(--space-4)', bottom: 'var(--space-4)', zIndex: 5, display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-          <UndoPill label={undoLabel} onUndo={onUndo} />
+          {undoLabel ? <UndoPill label={undoLabel} onUndo={onUndo} /> : null}
           {canRedo ? <Button variant="ghost" onClick={onRedo}>Redo</Button> : null}
         </div>
       ) : null}

@@ -65,7 +65,7 @@ export default function App() {
     const game = state.games[court];
     if (!game) return;
     const [[a, b], [c, d]] = game.pairs;
-    const next: Pairs = [[a, c], [b, d]]; // cycle: ab|cd to ac|bd to ad|cb and back
+    const next: Pairs = [[a, d], [b, c]]; // cycle: ab|cd to ad|bc to ac|bd and back
     void dispatch(cmd.changeLineup(state, court, next));
   };
 
