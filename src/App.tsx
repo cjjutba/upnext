@@ -18,6 +18,8 @@ const RULE_LABEL: Record<RuleTemplate, string> = {
   'all-off': 'All four off',
   'winners-stay': 'Winners stay',
   'winners-split': 'Winners split',
+  balanced: 'Balanced',
+  social: 'Social mix',
 };
 
 export default function App() {
@@ -74,10 +76,13 @@ export default function App() {
     void dispatch(cmd.changeLineup(state, court, next));
   };
 
+  // interim until the Task 8 mode menu replaces the cycle button entirely
   const nextTemplate: Record<RuleTemplate, RuleTemplate> = {
     'all-off': 'winners-stay',
     'winners-stay': 'winners-split',
     'winners-split': 'all-off',
+    balanced: 'social',
+    social: 'all-off',
   };
   const cycleRule = () => void dispatch(cmd.changeRule(state, nextTemplate[state.rule.template], state.rule.winCap));
 
