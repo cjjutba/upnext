@@ -125,4 +125,11 @@ describe('balanced and social pairing', () => {
     const players = [...pairs[0], ...pairs[1]].sort();
     expect(players).toEqual(['a', 'b', 'c', 'd']); // e and f wait their turn no matter their ratings
   });
+
+  it('exact ties rotate with pairingCycle so a closed four never oscillates', () => {
+    const four = { rule: { template: 'balanced' as const, winCap: 3 }, queue: ['a', 'b', 'c', 'd'] };
+    expect(nextLineup(state({ ...four, pairingCycle: 0 }), null, {})).toEqual([['a', 'c'], ['b', 'd']]);
+    expect(nextLineup(state({ ...four, pairingCycle: 1 }), null, {})).toEqual([['a', 'b'], ['c', 'd']]);
+    expect(nextLineup(state({ ...four, pairingCycle: 2 }), null, {})).toEqual([['a', 'd'], ['b', 'c']]);
+  });
 });

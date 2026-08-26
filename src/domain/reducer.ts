@@ -1,5 +1,5 @@
 import type { Pairs, SessionEvent, SessionState } from './types';
-import { emptyState } from './types';
+import { emptyState, isWinnersTemplate } from './types';
 
 const lineupPlayers = (pairs: Pairs): string[] => [pairs[0][0], pairs[0][1], pairs[1][0], pairs[1][1]];
 const without = (arr: string[], remove: string[]): string[] => arr.filter((x) => !remove.includes(x));
@@ -153,7 +153,7 @@ export function applyEvent(state: SessionState, e: SessionEvent): SessionState {
         finishedGames: [...state.finishedGames, finished],
       };
       const rule = state.rule;
-      const winnersMode = rule.template === 'winners-stay' || rule.template === 'winners-split';
+      const winnersMode = isWinnersTemplate(rule.template);
       if (!winnersMode || e.winnerPair === undefined) {
         return {
           ...base,

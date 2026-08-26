@@ -5,6 +5,7 @@ import { CheckinTile, type TileState } from '../components/CheckinTile';
 import { UndoPill } from '../components/UndoPill';
 import { Button } from '../components/Button';
 import type { Player, SessionState } from '../domain/types';
+import { isWinnersTemplate } from '../domain/types';
 import { isPlaying } from '../domain/reducer';
 
 // wall clock on purpose: timers derive from event ts so resume replays exactly; a mid-session OS clock change can jump timers, accepted trade-off
@@ -41,7 +42,7 @@ export function SessionBoard({ state, players, undoLabel, onUndo, canRedo, onRed
   }, []);
 
   const nameOf = (id: string) => players.find((p) => p.id === id)?.name ?? 'Unknown';
-  const needsWinner = state.rule.template !== 'all-off';
+  const needsWinner = isWinnersTemplate(state.rule.template);
   const courts = Array.from({ length: state.courtCount }, (_, i) => i + 1);
   const eligibleQueue = state.queue.filter((p) => !state.sittingOut.includes(p));
   const nextFour = new Set(eligibleQueue.slice(0, 4));

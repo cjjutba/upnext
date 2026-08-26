@@ -50,15 +50,18 @@ function pickPairing(state: SessionState, four: [string, string, string, string]
     return social ? [partnerRepeats, opponentRepeats, 0] : [imbalance, partnerRepeats, opponentRepeats];
   };
   const opts = partitions(...four);
+  const scores = opts.map(score);
+  const allEqual = scores.every((s) => s[0] === scores[0][0] && s[1] === scores[0][1] && s[2] === scores[0][2]);
+  if (allEqual) return opts[state.pairingCycle % 3];
   let best = opts[0];
-  let bestScore = score(opts[0]);
-  for (const o of opts.slice(1)) {
-    const s = score(o);
+  let bestScore = scores[0];
+  for (let i = 1; i < opts.length; i += 1) {
+    const s = scores[i];
     if (
       s[0] < bestScore[0] ||
       (s[0] === bestScore[0] && (s[1] < bestScore[1] || (s[1] === bestScore[1] && s[2] < bestScore[2])))
     ) {
-      best = o;
+      best = opts[i];
       bestScore = s;
     }
   }

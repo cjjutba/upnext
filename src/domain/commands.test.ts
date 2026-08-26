@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { replay } from './reducer';
 import {
   startSession, finishGame, checkInPlayer, sitOutPlayer, returnPlayer,
-  departPlayer, closeCourt, reopenCourt, changeRule, changeLineup, endSession,
+  departPlayer, closeCourt, reopenCourt, changeRule, changeLineup, endSession, addCourt,
   undoTarget, redoTarget, describeEvent, type CommandEvent,
 } from './commands';
-import type { SessionEvent, EventPayload, Pairs } from './types';
+import type { SessionEvent, EventPayload, Pairs, RuleTemplate } from './types';
 
 let n = 0;
 /** Give command events real looking envelopes so replay can consume them. */
@@ -16,7 +16,7 @@ function seal(events: CommandEvent[]): SessionEvent[] {
   });
 }
 
-const boot = (players: string[], template: 'all-off' | 'winners-stay' | 'winners-split' = 'all-off', courts = 1, winCap = 2) =>
+const boot = (players: string[], template: RuleTemplate = 'all-off', courts = 1, winCap = 2) =>
   seal(startSession({ courts, template, winCap }, players));
 
 describe('startSession', () => {
@@ -92,6 +92,45 @@ describe('finishGame', () => {
     s = replay(log);
     expect(s.games[2]?.pairs[0]).toEqual(winners); // the winning pair stayed on court 2
     expect(s.games[1]).toBeUndefined(); // court 1 did not steal the winner priority fill
+  });
+
+  it('balanced finishes with one tap and never records a winner', () => {
+    let log = boot(['a', 'b', 'c', 'd', 'e'], 'balanced', 1);
+    const events = finishGame(replay(log), 1);
+    expect(events).not.toBeNull();
+    const finish = events!.find((e) => e.type === 'game-finished')!;
+    expect(finish.type === 'game-finished' && finish.winnerPair !== undefined).toBe(false);
+    log = [...log, ...seal(events!)];
+    expect(replay(log).wins).toEqual({});
+  });
+});
+
+describe('addCourt', () => {
+  it('adds a court during a live session and fills it when players wait', () => {
+    let log = boot(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], 'all-off', 1);
+    let s = replay(log);
+    expect(s.games[2]).toBeUndefined();
+    log = [...log, ...seal(addCourt(s)!)];
+    s = replay(log);
+    expect(s.courtCount).toBe(2);
+    expect(s.games[2]?.pairs).toEqual([['e', 'g'], ['f', 'h']]);
+    expect(addCourt(replay(seal(startSession({ courts: 1, template: 'all-off', winCap: 3 }, []))))).not.toBeNull();
+  });
+
+  it('refuses before start and after end', () => {
+    let log = boot(['a', 'b', 'c', 'd'], 'all-off', 1);
+    log = [...log, ...seal(endSession(replay(log))!)];
+    expect(addCourt(replay(log))).toBeNull();
+  });
+});
+
+describe('ratings threading', () => {
+  it('finishGame under balanced uses ratings for the refill pairing', () => {
+    let log = boot(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], 'balanced', 1);
+    const ratings = { e: 5, f: 5, g: 1, h: 1 };
+    log = [...log, ...seal(finishGame(replay(log), 1, undefined, ratings)!)];
+    const s = replay(log);
+    expect(s.games[1]?.pairs).toEqual([['e', 'g'], ['f', 'h']]); // 5+1 vs 5+1, imbalance 0
   });
 });
 

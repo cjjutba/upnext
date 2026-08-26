@@ -1,5 +1,7 @@
 export type RuleTemplate = 'all-off' | 'winners-stay' | 'winners-split' | 'balanced' | 'social';
 
+export const isWinnersTemplate = (t: RuleTemplate): boolean => t === 'winners-stay' || t === 'winners-split';
+
 export interface RuleConfig {
   template: RuleTemplate;
   /** Consecutive wins before winners leave the court. Read by winners-stay (pair caps together) and winners-split (each winner caps individually). */

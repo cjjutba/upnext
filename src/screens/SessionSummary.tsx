@@ -1,13 +1,14 @@
 import { Button } from '../components/Button';
 import { TimerDisplay } from '../components/TimerDisplay';
 import type { Player, SessionState } from '../domain/types';
+import { isWinnersTemplate } from '../domain/types';
 import { fmt } from './SessionBoard';
 
 export function SessionSummary({ state, players, onExport, onDone }: {
   state: SessionState; players: Player[]; onExport: () => void; onDone: () => void;
 }) {
   const nameOf = (id: string) => players.find((p) => p.id === id)?.name ?? 'Unknown';
-  const trackWins = state.rule.template !== 'all-off';
+  const trackWins = isWinnersTemplate(state.rule.template);
   const rows = Object.keys(state.gamesPlayed).sort(
     (a, b) => (state.gamesPlayed[b] - state.gamesPlayed[a]) || nameOf(a).localeCompare(nameOf(b)),
   );
