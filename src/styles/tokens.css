@@ -1,0 +1,66 @@
+/* upnext tokens. Light mode only: monochrome, near-black on white. */
+:root {
+  --bg: #ffffff;
+  --bg-secondary: #fafafa;
+  --gray-100: #f2f2f2;
+  --gray-200: #ebebeb;
+  --gray-300: #e6e6e6;
+  --gray-500: #c9c9c9;
+  --gray-600: #a8a8a8;
+  --gray-700: #8f8f8f;
+  --gray-900: #4d4d4d;
+  --gray-1000: #171717;
+  /* borders come from black alpha, never gray fills */
+  --border: #00000014;
+  --border-hover: #00000036;
+  --border-active: #0000003d;
+  --text: #171717;
+  --text-secondary: #4d4d4d;
+  --text-tertiary: #8f8f8f;
+  /* interactive elements are monochrome */
+  --primary: #171717;
+  --primary-press: #383838;
+  --primary-fg: #ffffff;
+  /* blue is a state signal only: focus rings and text links */
+  --blue: #006bff;
+  --focus-ring: 0 0 0 2px #ffffff, 0 0 0 4px #006bff;
+  /* shadows exist only on menus and modals */
+  --shadow-menu: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --shadow-modal: 0 16px 48px rgba(0, 0, 0, 0.16);
+  /* status hues live only inside badges, always with the word */
+  --status-green-bg: #effbef;
+  --status-green-text: #297a3a;
+  --status-amber-bg: #fff6e5;
+  --status-amber-text: #a35200;
+  --status-red-bg: #ffeeef;
+  --status-red-text: #c33236;
+  --status-neutral-bg: #f2f2f2;
+  --status-neutral-text: #4d4d4d;
+  /* type */
+  --font-sans: 'Geist', 'Helvetica Neue', sans-serif;
+  --font-mono: 'Geist Mono', 'SFMono-Regular', monospace;
+  --text-timer-lg: 96px;
+  --text-timer: 64px;
+  --text-court-num: 36px;
+  --text-h1: 28px;
+  --text-h2: 24px;
+  --text-h3: 20px;
+  --text-queue: 18px;
+  --text-body: 16px;
+  --text-ui: 14px;
+  --text-label: 13px;
+  --tracking-tight: -0.02em;
+  /* spacing and shape */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 32px;
+  --space-6: 48px;
+  --radius-control: 6px;
+  --radius-card: 8px;
+  --radius-modal: 12px;
+  --radius-full: 9999px;
+  --tap-min: 48px;
+  --tap-primary: 56px;
+}
