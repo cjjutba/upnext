@@ -21,7 +21,7 @@ export function QueueRow({ position, name, games, sitOut, nextFour, nextUpLabel,
       {sitOut ? <StatusBadge status="neutral" label="Sitting out" /> : null}
       {nextUpLabel && !sitOut ? <span className="micro-label">Next up</span> : null}
       <CountBadge value={games} title="Games played" />
-      <Button variant="ghost" onClick={onToggleSit} style={{ padding: '0 var(--space-3)' }}>
+      <Button variant="ghost" onClick={onToggleSit} ariaLabel={(sitOut ? 'Return ' : 'Sit out ') + name} style={{ padding: '0 var(--space-3)' }}>
         {sitOut ? 'Return' : 'Sit out'}
       </Button>
     </div>

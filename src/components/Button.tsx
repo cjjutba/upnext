@@ -10,9 +10,10 @@ interface ButtonProps {
   onClick?: () => void;
   children: ReactNode;
   style?: CSSProperties; // must not set background, color, or border: those carry the pressed state
+  ariaLabel?: string;
 }
 
-export function Button({ variant = 'primary', size = 'md', icon, disabled, block, onClick, children, style }: ButtonProps) {
+export function Button({ variant = 'primary', size = 'md', icon, disabled, block, onClick, children, style, ariaLabel }: ButtonProps) {
   const [pressed, setPressed] = useState(false);
   const looks: Record<string, CSSProperties> = {
     primary: { background: pressed ? 'var(--primary-press)' : 'var(--primary)', color: 'var(--primary-fg)', border: '1px solid transparent' },
@@ -21,7 +22,7 @@ export function Button({ variant = 'primary', size = 'md', icon, disabled, block
   };
   return (
     <button
-      type="button" disabled={disabled} onClick={onClick}
+      type="button" disabled={disabled} onClick={onClick} aria-label={ariaLabel}
       onPointerDown={() => setPressed(true)} onPointerUp={() => setPressed(false)} onPointerLeave={() => setPressed(false)} onPointerCancel={() => setPressed(false)}
       style={{
         display: block ? 'flex' : 'inline-flex', width: block ? '100%' : undefined,

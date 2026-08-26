@@ -57,7 +57,10 @@ export function RosterSetup({ players, onAddPlayer, selected, onToggle, onStart,
             <span className="micro-label" style={{ flex: 1 }}>Session history</span>
             <label style={{ font: '500 14px var(--font-sans)', color: 'var(--blue)', cursor: 'pointer' }}>
               Import session
-              <input type="file" accept="application/json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = ''; }} />
+              <input
+                type="file" accept="application/json"
+                style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, overflow: 'hidden', clipPath: 'inset(50%)' }}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = ''; }} />
             </label>
           </div>
           {history.map((h) => (

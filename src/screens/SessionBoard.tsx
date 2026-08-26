@@ -6,6 +6,7 @@ import { UndoPill } from '../components/UndoPill';
 import type { Player, SessionState } from '../domain/types';
 import { isPlaying } from '../domain/reducer';
 
+// wall clock on purpose: timers derive from event ts so resume replays exactly; a mid-session OS clock change can jump timers, accepted trade-off
 const LONG_GAME_SECONDS = 900;
 
 const fmt = (totalSeconds: number): string => {
@@ -46,7 +47,8 @@ export function SessionBoard({ state, players, undoLabel, onUndo, onFinish, onWi
     isPlaying(state, p.id) ? 'playing' : state.sittingOut.includes(p.id) ? 'sitting' : state.queue.includes(p.id) ? 'in' : 'out';
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: 'var(--space-4)', padding: 'var(--space-4)', alignItems: 'start' }}>
+    /* clearance so the fixed undo pill can never cover a court card's bottom action */
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: 'var(--space-4)', padding: 'var(--space-4)', alignItems: 'start', paddingBottom: undoLabel ? 'calc(var(--tap-primary) + var(--space-5))' : undefined }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-3)' }}>
         {courts.map((n) => {
           const game = state.games[n];

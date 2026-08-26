@@ -26,9 +26,9 @@ export function CourtCard({ court, status, pairs, elapsed, needsWinner, onFinish
         <StatusBadge status={status} />
         <span style={{ flex: 1 }} />
         {closed ? (
-          <Button variant="ghost" onClick={onReopen}>Reopen</Button>
+          <Button variant="ghost" onClick={onReopen} ariaLabel={'Reopen court ' + court}>Reopen</Button>
         ) : (
-          <Button variant="ghost" onClick={onClose} icon="x">Close court</Button>
+          <Button variant="ghost" onClick={onClose} icon="x" ariaLabel={'Close court ' + court}>Close court</Button>
         )}
       </div>
       {closed || !pairs ? (

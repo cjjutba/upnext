@@ -15,12 +15,12 @@ export function CheckinTile({ name, state = 'out', games, onTap }: {
   const sub: Record<TileState, string | null> = { out: null, in: 'In', playing: 'Playing', sitting: 'Sitting out' };
   return (
     <button
-      type="button" onClick={onTap}
+      type="button" disabled={state === 'playing'} onClick={state === 'playing' ? undefined : onTap}
       onPointerDown={() => setPressed(true)} onPointerUp={() => setPressed(false)} onPointerLeave={() => setPressed(false)} onPointerCancel={() => setPressed(false)}
       style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-1)',
         minHeight: 'var(--tap-primary)', padding: '8px 12px', borderRadius: 'var(--radius-control)',
-        cursor: 'pointer', ...looks[state],
+        cursor: state === 'playing' ? 'default' : 'pointer', ...looks[state],
       }}>
       <span className="display" style={{ fontSize: '16px', lineHeight: 1 }}>{name}</span>
       {sub[state] ? (
