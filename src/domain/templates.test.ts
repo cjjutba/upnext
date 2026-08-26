@@ -77,3 +77,52 @@ describe('nextLineup', () => {
     expect(nextLineup(s, finished(0))).toBeNull();
   });
 });
+
+describe('balanced and social pairing', () => {
+  it('balanced picks the partition that minimizes rating imbalance', () => {
+    const s = state({ rule: { template: 'balanced', winCap: 3 }, queue: ['a', 'b', 'c', 'd'] });
+    const ratings = { a: 5, b: 5, c: 1, d: 1 };
+    // partitions: ac|bd imbalance 0, ab|cd imbalance 8, ad|bc imbalance 0; first minimal wins
+    expect(nextLineup(s, null, ratings)).toEqual([['a', 'c'], ['b', 'd']]);
+  });
+
+  it('balanced breaks rating ties by avoiding repeat partners', () => {
+    const s = state({
+      rule: { template: 'balanced', winCap: 3 },
+      queue: ['a', 'b', 'c', 'd'],
+      finishedGames: [{ court: 1, pairs: [['a', 'c'], ['b', 'd']], startedAt: 0, endedAt: 1 }],
+    });
+    // all unrated (3 each): every partition ties at 0 imbalance; ac and bd already partnered
+    expect(nextLineup(s, null, {})).toEqual([['a', 'b'], ['c', 'd']]);
+  });
+
+  it('social avoids repeat partners and ignores ratings', () => {
+    const s = state({
+      rule: { template: 'social', winCap: 3 },
+      queue: ['a', 'b', 'c', 'd'],
+      finishedGames: [
+        { court: 1, pairs: [['a', 'c'], ['b', 'd']], startedAt: 0, endedAt: 1 },
+        { court: 1, pairs: [['a', 'b'], ['c', 'd']], startedAt: 1, endedAt: 2 },
+      ],
+    });
+    const ratings = { a: 5, b: 1, c: 5, d: 1 }; // would push balanced elsewhere; social must not care
+    expect(nextLineup(s, null, ratings)).toEqual([['a', 'd'], ['b', 'c']]);
+  });
+
+  it('social counts active games as history too', () => {
+    const s = state({
+      rule: { template: 'social', winCap: 3 },
+      queue: ['a', 'b', 'c', 'd'],
+      games: { 2: { court: 2, pairs: [['x', 'y'], ['z', 'w']], startedAt: 0, startedEventId: 'e' } },
+    });
+    expect(nextLineup(s, null, {})).toEqual([['a', 'c'], ['b', 'd']]); // no relevant history: partition order wins
+  });
+
+  it('the four players are always the front four eligible, never cherry picked', () => {
+    const s = state({ rule: { template: 'balanced', winCap: 3 }, queue: ['a', 'b', 'c', 'd', 'e', 'f'] });
+    const ratings = { a: 1, b: 1, c: 1, d: 1, e: 5, f: 5 };
+    const pairs = nextLineup(s, null, ratings)!;
+    const players = [...pairs[0], ...pairs[1]].sort();
+    expect(players).toEqual(['a', 'b', 'c', 'd']); // e and f wait their turn no matter their ratings
+  });
+});
