@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { replay } from './reducer';
 import {
   startSession, finishGame, checkInPlayer, sitOutPlayer, returnPlayer,
-  departPlayer, closeCourt, reopenCourt, changeRule, endSession,
+  departPlayer, closeCourt, reopenCourt, changeRule, changeLineup, endSession,
   undoTarget, redoTarget, describeEvent, type CommandEvent,
 } from './commands';
-import type { SessionEvent, EventPayload } from './types';
+import type { SessionEvent, EventPayload, Pairs } from './types';
 
 let n = 0;
 /** Give command events real looking envelopes so replay can consume them. */
@@ -35,6 +35,13 @@ describe('startSession', () => {
     expect(s.games[1]).toBeDefined();
     expect(s.games[2]).toBeUndefined(); // only two waiting, never a game of three
   });
+
+  it('duplicate player ids check in once and never phantom-fill', () => {
+    const log = seal(startSession({ courts: 1, template: 'all-off', winCap: 3 }, ['a', 'a', 'b', 'c']));
+    const s = replay(log);
+    expect(s.checkedIn).toEqual(['a', 'b', 'c']);
+    expect(s.games[1]).toBeUndefined();
+  });
 });
 
 describe('finishGame', () => {
@@ -59,6 +66,14 @@ describe('finishGame', () => {
     log = [...log, ...seal(finishGame(replay(log), 1, 0)!)]; // a and c won
     const s = replay(log);
     expect(s.games[1]?.pairs).toEqual([['a', 'c'], ['e', 'f']]);
+    expect(s.queue).toEqual(['b', 'd']);
+  });
+
+  it('winners-split: each winner anchors a new pair with a challenger', () => {
+    let log = boot(['a', 'b', 'c', 'd', 'e', 'f'], 'winners-split', 1);
+    log = [...log, ...seal(finishGame(replay(log), 1, 0)!)]; // a and c won
+    const s = replay(log);
+    expect(s.games[1]?.pairs).toEqual([['a', 'e'], ['c', 'f']]);
     expect(s.queue).toEqual(['b', 'd']);
   });
 
@@ -116,6 +131,20 @@ describe('court commands', () => {
     expect(s.queue).toHaveLength(4);
     log = [...log, ...seal(reopenCourt(s, 1)!)];
     expect(replay(log).games[1]).toBeDefined();
+  });
+});
+
+describe('changeLineup', () => {
+  it('swaps pairs of an active game, refuses empty courts, and never fills', () => {
+    let log = boot(['a', 'b', 'c', 'd', 'e'], 'all-off', 1);
+    let s = replay(log);
+    expect(changeLineup(s, 2, s.games[1]!.pairs)).toBeNull();
+    const g = s.games[1]!.pairs;
+    const swapped: Pairs = [[g[0][0], g[1][0]], [g[0][1], g[1][1]]];
+    log = [...log, ...seal(changeLineup(s, 1, swapped)!)];
+    s = replay(log);
+    expect(s.games[1]?.pairs).toEqual(swapped);
+    expect(s.queue).toEqual(['e']);
   });
 });
 

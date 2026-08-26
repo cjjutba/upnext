@@ -6,6 +6,7 @@ import { nextLineup, type LastFinished } from './templates';
 /** A command's output: payload plus sessionId. The event store fills the envelope. */
 export type CommandEvent = EventPayload & { sessionId: string };
 
+// module level counter is a deliberate impurity: sim envelopes never leave this module, so it is unobservable in output
 let simCounter = 0;
 /** Simulate applying a not yet persisted event. Sim envelopes never leave this module. */
 function simulate(state: SessionState, e: CommandEvent): SessionState {
@@ -106,6 +107,7 @@ export function reopenCourt(state: SessionState, court: number): CommandEvent[] 
 export function changeRule(state: SessionState, template: RuleTemplate, winCap: number): CommandEvent[] | null {
   if (!state.sessionId || state.ended) return null;
   const e: CommandEvent = { type: 'rule-changed', template, config: { winCap }, sessionId: state.sessionId };
+  // defensive: every capacity increasing command already fills eagerly, so this is normally a no-op
   return [e, ...fillEvents(simulate(state, e))];
 }
 
