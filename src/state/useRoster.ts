@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { db } from '../db/db';
 import type { Player } from '../domain/types';
 
@@ -10,15 +10,41 @@ export function useRoster() {
     setPlayers(all);
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
-  const addPlayer = useCallback(async (name: string) => {
+  const addPlayer = useCallback(async (name: string): Promise<Player | null> => {
     const trimmed = name.trim();
-    if (!trimmed) return;
-    const all = await db.players.toArray();
+    if (!trimmed) return null;
     // names identify players on every screen, so duplicates would be indistinguishable
-    if (all.some((p) => p.name.toLowerCase() === trimmed.toLowerCase())) return;
+    const all = await db.players.toArray();
+    if (all.some((p) => p.name.toLowerCase() === trimmed.toLowerCase())) return null;
     const now = Date.now();
-    await db.players.put({ id: crypto.randomUUID(), name: trimmed, createdAt: now, updatedAt: now });
+    const player: Player = { id: crypto.randomUUID(), name: trimmed, createdAt: now, updatedAt: now };
+    await db.players.put(player);
+    await refresh();
+    return player;
+  }, [refresh]);
+
+  const updatePlayer = useCallback(async (id: string, changes: { name?: string; rating?: number }) => {
+    const existing = await db.players.get(id);
+    if (!existing) return;
+    const name = changes.name?.trim();
+    if (name && name.toLowerCase() !== existing.name.toLowerCase()) {
+      const all = await db.players.toArray();
+      if (all.some((p) => p.id !== id && p.name.toLowerCase() === name.toLowerCase())) return;
+    }
+    await db.players.put({
+      ...existing,
+      ...(name ? { name } : {}),
+      ...('rating' in changes ? { rating: changes.rating } : {}),
+      updatedAt: Date.now(),
+    });
     await refresh();
   }, [refresh]);
-  return { players, addPlayer, refresh };
+
+  const ratings = useMemo(() => {
+    const out: Record<string, number | undefined> = {};
+    for (const p of players) out[p.id] = p.rating;
+    return out;
+  }, [players]);
+
+  return { players, addPlayer, updatePlayer, refresh, ratings };
 }

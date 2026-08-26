@@ -2,6 +2,7 @@ import Dexie from 'dexie';
 import { db as defaultDb, UpnextDB } from './db';
 import { newId, getDeviceId } from '../lib/ids';
 import type { Player, SessionEvent } from '../domain/types';
+import { replay } from '../domain/reducer';
 
 /** Omit that distributes over a union, so each SessionEvent variant keeps its own payload fields. */
 type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never;
@@ -53,6 +54,13 @@ export async function listSessions(db: UpnextDB = defaultDb): Promise<SessionLis
   return starts
     .sort((a, b) => b.ts - a.ts)
     .map((s) => ({ sessionId: s.sessionId, startedAt: s.ts, endedAt: endBy.get(s.sessionId) ?? null }));
+}
+
+/** Player ids who checked in to the most recent ended session. Powers the returning players shortcut. */
+export async function lastSessionAttendees(db: UpnextDB = defaultDb): Promise<string[]> {
+  const last = (await listSessions(db)).find((s) => s.endedAt !== null);
+  if (!last) return [];
+  return replay(await loadSession(last.sessionId, db)).checkedIn;
 }
 
 export interface SessionExport {
