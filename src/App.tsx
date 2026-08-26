@@ -10,7 +10,7 @@ import { listSessions } from './db/eventStore';
 import { useWakeLock } from './lib/useWakeLock';
 import { shareSessionFile, importSessionFile } from './lib/exportFile';
 import * as cmd from './domain/commands';
-import type { RuleTemplate } from './domain/types';
+import type { Pairs, RuleTemplate } from './domain/types';
 
 type Screen = 'setup' | 'board' | 'summary';
 
@@ -61,6 +61,21 @@ export default function App() {
     else void dispatch(cmd.checkInPlayer(state, playerId));
   };
 
+  const swapPartners = (court: number) => {
+    const game = state.games[court];
+    if (!game) return;
+    const [[a, b], [c, d]] = game.pairs;
+    const next: Pairs = [[a, c], [b, d]]; // cycle: ab|cd to ac|bd to ad|cb and back
+    void dispatch(cmd.changeLineup(state, court, next));
+  };
+
+  const nextTemplate: Record<RuleTemplate, RuleTemplate> = {
+    'all-off': 'winners-stay',
+    'winners-stay': 'winners-split',
+    'winners-split': 'all-off',
+  };
+  const cycleRule = () => void dispatch(cmd.changeRule(state, nextTemplate[state.rule.template], state.rule.winCap));
+
   const end = async () => {
     await dispatch(cmd.endSession(state));
     setScreen('summary');
@@ -77,7 +92,9 @@ export default function App() {
       <span className="display" style={{ fontSize: 'var(--text-h1)', fontWeight: 600 }}>upnext</span>
       {screen === 'board' ? (
         <>
-          <StatusBadge status="neutral" label={RULE_LABEL[state.rule.template]} />
+          <button type="button" onClick={cycleRule} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }} aria-label="Change house rule">
+            <StatusBadge status="neutral" label={RULE_LABEL[state.rule.template]} />
+          </button>
           <span style={{ flex: 1 }} />
           <span className="mono" style={{ fontSize: '20px', color: 'var(--text-secondary)' }}>
             {fmt((clock - state.startedAt) / 1000)}
@@ -117,12 +134,15 @@ export default function App() {
           players={roster.players}
           undoLabel={session.undoLabel}
           onUndo={() => void session.undo()}
+          canRedo={session.canRedo}
+          onRedo={() => void session.redo()}
           onFinish={(court) => void dispatch(cmd.finishGame(state, court))}
           onWin={(court, w) => void dispatch(cmd.finishGame(state, court, w))}
           onCloseCourt={(court) => void dispatch(cmd.closeCourt(state, court))}
           onReopenCourt={(court) => void dispatch(cmd.reopenCourt(state, court))}
           onToggleSit={(id) => void dispatch(state.sittingOut.includes(id) ? cmd.returnPlayer(state, id) : cmd.sitOutPlayer(state, id))}
           onToggleCheck={toggleBoardCheck}
+          onSwap={swapPartners}
         />
       ) : (
         <SessionSummary

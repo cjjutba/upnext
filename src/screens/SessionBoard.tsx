@@ -3,6 +3,7 @@ import { CourtCard } from '../components/CourtCard';
 import { QueueRow } from '../components/QueueRow';
 import { CheckinTile, type TileState } from '../components/CheckinTile';
 import { UndoPill } from '../components/UndoPill';
+import { Button } from '../components/Button';
 import type { Player, SessionState } from '../domain/types';
 import { isPlaying } from '../domain/reducer';
 
@@ -18,17 +19,20 @@ const fmt = (totalSeconds: number): string => {
 };
 export { fmt };
 
-export function SessionBoard({ state, players, undoLabel, onUndo, onFinish, onWin, onCloseCourt, onReopenCourt, onToggleSit, onToggleCheck }: {
+export function SessionBoard({ state, players, undoLabel, onUndo, canRedo, onRedo, onFinish, onWin, onCloseCourt, onReopenCourt, onToggleSit, onToggleCheck, onSwap }: {
   state: SessionState;
   players: Player[];
   undoLabel: string | null;
   onUndo: () => void;
+  canRedo: boolean;
+  onRedo: () => void;
   onFinish: (court: number) => void;
   onWin: (court: number, winnerPair: 0 | 1) => void;
   onCloseCourt: (court: number) => void;
   onReopenCourt: (court: number) => void;
   onToggleSit: (playerId: string) => void;
   onToggleCheck: (playerId: string) => void;
+  onSwap: (court: number) => void;
 }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -57,7 +61,8 @@ export function SessionBoard({ state, players, undoLabel, onUndo, onFinish, onWi
           const pairs = game ? ([game.pairs[0].map(nameOf), game.pairs[1].map(nameOf)] as SessionState['games'][number]['pairs']) : null;
           return (
             <CourtCard key={n} court={n} status={status} pairs={pairs} elapsed={fmt(elapsed)} needsWinner={needsWinner}
-              onFinish={() => onFinish(n)} onWin={(w) => onWin(n, w)} onClose={() => onCloseCourt(n)} onReopen={() => onReopenCourt(n)} />
+              onFinish={() => onFinish(n)} onWin={(w) => onWin(n, w)} onClose={() => onCloseCourt(n)} onReopen={() => onReopenCourt(n)}
+              onSwap={() => onSwap(n)} />
           );
         })}
       </div>
@@ -90,8 +95,9 @@ export function SessionBoard({ state, players, undoLabel, onUndo, onFinish, onWi
         </div>
       </div>
       {undoLabel ? (
-        <div style={{ position: 'fixed', left: 'var(--space-4)', bottom: 'var(--space-4)', zIndex: 5 }}>
+        <div style={{ position: 'fixed', left: 'var(--space-4)', bottom: 'var(--space-4)', zIndex: 5, display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <UndoPill label={undoLabel} onUndo={onUndo} />
+          {canRedo ? <Button variant="ghost" onClick={onRedo}>Redo</Button> : null}
         </div>
       ) : null}
     </div>

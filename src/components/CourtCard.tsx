@@ -3,7 +3,7 @@ import { StatusBadge, type BadgeStatus } from './StatusBadge';
 import { TimerDisplay } from './TimerDisplay';
 import type { Pairs } from '../domain/types';
 
-export function CourtCard({ court, status, pairs, elapsed, needsWinner, onFinish, onWin, onClose, onReopen }: {
+export function CourtCard({ court, status, pairs, elapsed, needsWinner, onFinish, onWin, onClose, onReopen, onSwap }: {
   court: number;
   status: BadgeStatus; // live | warn | danger (closed) | neutral (open)
   pairs: Pairs | null;
@@ -13,6 +13,7 @@ export function CourtCard({ court, status, pairs, elapsed, needsWinner, onFinish
   onWin: (winnerPair: 0 | 1) => void;
   onClose: () => void;
   onReopen: () => void;
+  onSwap: () => void;
 }) {
   const closed = status === 'danger';
   const pairLabel = (p: [string, string]) => p.join(' + ');
@@ -53,6 +54,9 @@ export function CourtCard({ court, status, pairs, elapsed, needsWinner, onFinish
           ) : (
             <Button size="lg" block icon="square" onClick={onFinish}>Game over, all four off</Button>
           )}
+          <Button variant="ghost" onClick={onSwap} icon="shuffle" style={{ alignSelf: 'center' }} ariaLabel={'Swap partners on court ' + court}>
+            Swap partners
+          </Button>
         </>
       )}
     </div>
