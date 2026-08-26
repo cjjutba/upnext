@@ -71,6 +71,15 @@ describe('check-in and queue', () => {
     ]);
     expect(s.sittingOut).toEqual([]);
   });
+
+  it('sit-out and depart are no-ops for a player currently on a court', () => {
+    const four2: Pairs = [['a', 'c'], ['b', 'd']];
+    const events = [start(), checkIn('a'), checkIn('b'), checkIn('c'), checkIn('d'), game(1, four2)];
+    const s = replay([...events, ev({ type: 'player-sat-out', playerId: 'a' }), ev({ type: 'player-departed', playerId: 'a' })]);
+    expect(s.sittingOut).toEqual([]);
+    expect(s.departed).toEqual([]);
+    expect(s.games[1]?.pairs).toEqual(four2);
+  });
 });
 
 describe('games', () => {
@@ -142,6 +151,21 @@ describe('games', () => {
     expect(s.gamesPlayed).toEqual({});
     expect(s.finishedGames).toHaveLength(0);
   });
+
+  it('rule-changed mid game applies to the finish of a game started under the old rule', () => {
+    const s = replay([...base(), game(1, four),
+      ev({ type: 'rule-changed', template: 'winners-stay', config: { winCap: 3 } }),
+      finish(1, 0)]);
+    expect(s.queue).toEqual(['a', 'c', 'e', 'b', 'd']);
+    expect(s.wins).toEqual({ a: 1, c: 1 });
+  });
+
+  it('departing resets a stale win streak', () => {
+    const s = replay([start(1, 'winners-stay', 3), checkIn('a'), checkIn('b'), checkIn('c'), checkIn('d'), checkIn('e'),
+      game(1, four), finish(1, 0),
+      ev({ type: 'player-departed', playerId: 'a' })]);
+    expect(s.consecutiveWins['a']).toBe(0);
+  });
 });
 
 describe('courts', () => {
@@ -159,6 +183,11 @@ describe('courts', () => {
     const s = replay([start(), ev({ type: 'court-closed', court: 2 }), ev({ type: 'court-reopened', court: 2 })]);
     expect(s.closedCourts).toEqual([]);
   });
+
+  it('court-closed with an out of range court number is a no-op', () => {
+    const s = replay([start(2), ev({ type: 'court-closed', court: 9999 })]);
+    expect(s.closedCourts).toEqual([]);
+  });
 });
 
 describe('undo', () => {
@@ -174,5 +203,14 @@ describe('undo', () => {
     const u = ev({ type: 'event-undone', targetEventId: c.id });
     const s = replay([start(), c, u, ev({ type: 'event-undone', targetEventId: u.id })]);
     expect(s.queue).toEqual(['a']);
+  });
+
+  it('two undos of the same event keep it skipped even after one undo is itself undone', () => {
+    const c = checkIn('a');
+    const u1 = ev({ type: 'event-undone', targetEventId: c.id });
+    const u2 = ev({ type: 'event-undone', targetEventId: c.id });
+    const u3 = ev({ type: 'event-undone', targetEventId: u1.id });
+    const s = replay([start(), c, u1, u2, u3]);
+    expect(s.queue).toEqual([]);
   });
 });

@@ -88,6 +88,7 @@ export function applyEvent(state: SessionState, e: SessionEvent): SessionState {
         queue: state.queue.filter((p) => p !== e.playerId),
         sittingOut: state.sittingOut.filter((p) => p !== e.playerId),
         departed: [...state.departed, e.playerId],
+        consecutiveWins: { ...state.consecutiveWins, [e.playerId]: 0 },
       };
     }
     case 'player-sat-out': {
@@ -164,6 +165,7 @@ export function applyEvent(state: SessionState, e: SessionEvent): SessionState {
       const losers = active.pairs[e.winnerPair === 0 ? 1 : 0];
       const wins = bumpAll(state.wins, [...winners]);
       const streak = (p: string) => (state.consecutiveWins[p] ?? 0) + 1;
+      // queue placement order below is load bearing: templates infer who kept the court from the queue front
       if (rule.template === 'winners-stay') {
         const capped = winners.some((w) => streak(w) >= rule.winCap);
         if (capped) {
@@ -192,6 +194,7 @@ export function applyEvent(state: SessionState, e: SessionEvent): SessionState {
     }
     case 'court-closed': {
       if (state.closedCourts.includes(e.court)) return state;
+      if (e.court < 1 || e.court > state.courtCount) return state;
       const active = state.games[e.court];
       const games = { ...state.games };
       delete games[e.court];
