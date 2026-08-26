@@ -23,4 +23,40 @@ describe('useSession', () => {
     });
     await waitFor(() => expect(result.current.state.games[1]).toBeDefined());
   });
+
+  it('concurrent dispatches keep the in-memory log in canonical order', async () => {
+    const { result } = renderHook(() => useSession());
+    await act(async () => {
+      await result.current.dispatch(startSession({ courts: 1, template: 'all-off', winCap: 3 }, ['a', 'b']));
+    });
+    const sid = result.current.events[0].sessionId;
+    await act(async () => {
+      const p1 = result.current.dispatch([
+        { type: 'player-checked-in', playerId: 'c', sessionId: sid },
+        { type: 'player-checked-in', playerId: 'd', sessionId: sid },
+      ]);
+      const p2 = result.current.dispatch([{ type: 'player-checked-in', playerId: 'e', sessionId: sid }]);
+      await Promise.all([p1, p2]);
+    });
+    const ids = result.current.events.map((e) => e.id);
+    expect([...ids].sort()).toEqual(ids);
+    expect(result.current.state.queue).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+
+  it('a double tap on undo produces two clean sequential undos and redo recovers one', async () => {
+    const { result } = renderHook(() => useSession());
+    await act(async () => {
+      await result.current.dispatch(startSession({ courts: 1, template: 'all-off', winCap: 3 }, ['a', 'b', 'c', 'd', 'e']));
+    });
+    await waitFor(() => expect(result.current.state.games[1]).toBeDefined());
+    await act(async () => {
+      await Promise.all([result.current.undo(), result.current.undo()]);
+    });
+    await waitFor(() => expect(result.current.state.games[1]).toBeUndefined());
+    expect(result.current.state.queue).toEqual(['a', 'b', 'c', 'd']); // the second undo took the previous action, not the same one
+    await act(async () => {
+      await result.current.redo();
+    });
+    await waitFor(() => expect(result.current.state.queue).toEqual(['a', 'b', 'c', 'd', 'e']));
+  });
 });

@@ -9,7 +9,7 @@ interface ButtonProps {
   block?: boolean;
   onClick?: () => void;
   children: ReactNode;
-  style?: CSSProperties;
+  style?: CSSProperties; // must not set background, color, or border: those carry the pressed state
 }
 
 export function Button({ variant = 'primary', size = 'md', icon, disabled, block, onClick, children, style }: ButtonProps) {
@@ -22,7 +22,7 @@ export function Button({ variant = 'primary', size = 'md', icon, disabled, block
   return (
     <button
       type="button" disabled={disabled} onClick={onClick}
-      onPointerDown={() => setPressed(true)} onPointerUp={() => setPressed(false)} onPointerLeave={() => setPressed(false)}
+      onPointerDown={() => setPressed(true)} onPointerUp={() => setPressed(false)} onPointerLeave={() => setPressed(false)} onPointerCancel={() => setPressed(false)}
       style={{
         display: block ? 'flex' : 'inline-flex', width: block ? '100%' : undefined,
         alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',

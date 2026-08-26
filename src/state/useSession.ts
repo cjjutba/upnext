@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { append, loadSession } from '../db/eventStore';
 import { replay } from '../domain/reducer';
 import { describeEvent, redoTarget, undoTarget, type CommandEvent } from '../domain/commands';
@@ -21,7 +21,21 @@ export function useSession(): SessionApi {
   const [events, setEvents] = useState<SessionEvent[]>([]);
   const state: SessionState = useMemo(() => replay(events), [events]);
 
-  const dispatch = useCallback(async (commands: CommandEvent[] | null) => {
+  /**
+   * Every log mutation runs through one promise queue. Without it, two fast
+   * taps can merge events into memory in an order that differs from the
+   * canonical ULID order a reload replays, and a double tap on undo can
+   * target the same event twice, which breaks the redo chain.
+   */
+  const logRef = useRef<SessionEvent[]>([]);
+  const queueRef = useRef<Promise<void>>(Promise.resolve());
+  const enqueue = useCallback((job: () => Promise<void>): Promise<void> => {
+    const run = queueRef.current.then(job, job);
+    queueRef.current = run;
+    return run;
+  }, []);
+
+  const appendCommands = useCallback(async (commands: CommandEvent[] | null) => {
     if (!commands || commands.length === 0) {
       // a null command means the intent was refused (stale state, double tap); surface it in dev
       if (commands === null && import.meta.env.DEV) console.warn('upnext: command refused');
@@ -29,8 +43,38 @@ export function useSession(): SessionApi {
     }
     const appended: SessionEvent[] = [];
     for (const c of commands) appended.push(await append(c));
-    setEvents((prev) => [...prev, ...appended]);
+    logRef.current = [...logRef.current, ...appended];
+    setEvents(logRef.current);
   }, []);
+
+  const dispatch = useCallback(
+    (commands: CommandEvent[] | null) => enqueue(() => appendCommands(commands)),
+    [enqueue, appendCommands],
+  );
+
+  const undo = useCallback(
+    () =>
+      enqueue(async () => {
+        const log = logRef.current;
+        const target = undoTarget(log);
+        const sessionId = log[0]?.sessionId;
+        if (!target || !sessionId) return;
+        await appendCommands([{ type: 'event-undone', targetEventId: target, sessionId }]);
+      }),
+    [enqueue, appendCommands],
+  );
+
+  const redo = useCallback(
+    () =>
+      enqueue(async () => {
+        const log = logRef.current;
+        const target = redoTarget(log);
+        const sessionId = log[0]?.sessionId;
+        if (!target || !sessionId) return;
+        await appendCommands([{ type: 'event-undone', targetEventId: target, sessionId }]);
+      }),
+    [enqueue, appendCommands],
+  );
 
   const undoInfo = useMemo(() => {
     const target = undoTarget(events);
@@ -39,24 +83,23 @@ export function useSession(): SessionApi {
     return { target, label: describeEvent(targetEvent) };
   }, [events]);
 
-  const undo = useCallback(async () => {
-    const target = undoTarget(events);
-    if (!target || !state.sessionId) return;
-    await dispatch([{ type: 'event-undone', targetEventId: target, sessionId: state.sessionId }]);
-  }, [events, state.sessionId, dispatch]);
-
   const redoId = useMemo(() => redoTarget(events), [events]);
 
-  const redo = useCallback(async () => {
-    if (!redoId || !state.sessionId) return;
-    await dispatch([{ type: 'event-undone', targetEventId: redoId, sessionId: state.sessionId }]);
-  }, [redoId, state.sessionId, dispatch]);
+  const loadById = useCallback(
+    (sessionId: string) =>
+      enqueue(async () => {
+        logRef.current = await loadSession(sessionId);
+        setEvents(logRef.current);
+      }),
+    [enqueue],
+  );
 
-  const loadById = useCallback(async (sessionId: string) => {
-    setEvents(await loadSession(sessionId));
-  }, []);
-
-  const reset = useCallback(() => setEvents([]), []);
+  const reset = useCallback(() => {
+    void enqueue(async () => {
+      logRef.current = [];
+      setEvents([]);
+    });
+  }, [enqueue]);
 
   return {
     events,
