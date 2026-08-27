@@ -11,7 +11,7 @@ preference.
 | Rule | Detail |
 |---|---|
 | Light mode only | One `:root` block. No dark tokens, no theme switcher. Dark mode would be a designed theme, never an inversion |
-| Monochrome interactive layer | Primary buttons are solid `#171717` with white text. Never a colored button, never a colored icon tile |
+| Monochrome interactive layer | Primary buttons are solid `#171717` with white text. One exception: a destructive action is solid `--danger` red, and End session is the only one. Never a colored icon tile |
 | Structure from borders | 1px black-alpha borders, not shadows. Shadows exist only on menus and modals |
 | Blue is a state signal | `#006bff` for focus rings and text links. Nothing else. The next-four queue highlight is monochrome: gray 100 fill, 2px `#171717` left bar, "Next up" label |
 | Text-only badges | A pill with the word alone. No dots, no circles, no icons, ever. Tinted background, dark same-hue text |
@@ -38,6 +38,7 @@ change fails that, the color is carrying meaning it should not.
 | Borders | `--border`, `--border-hover`, `--border-active`, all black alpha |
 | Text | `--text`, `--text-secondary`, `--text-tertiary` |
 | Interactive | `--primary`, `--primary-press`, `--primary-fg` |
+| Destructive | `--danger`, `--danger-press`, `--danger-fg` |
 | Signals | `--blue`, `--focus-ring` |
 | Elevation | `--shadow-menu`, `--shadow-modal` |
 | Status | `--status-{green,amber,red,neutral}-{bg,text}` |

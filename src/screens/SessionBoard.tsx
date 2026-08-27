@@ -65,7 +65,7 @@ export function SessionBoard({
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
           <span className="micro-label">Courts</span>
           <span style={{ flex: 1 }} />
-          <Button variant="ghost" icon="plus" onClick={onAddCourt} disabled={eligibleQueue.length < 4} ariaLabel="Add court">Add court</Button>
+          <Button variant="primary" icon="plus" onClick={onAddCourt} disabled={eligibleQueue.length < 4} ariaLabel="Add court">Add court</Button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(480px, 1fr))', gap: 'var(--space-4)', alignContent: 'start' }}>
           {courts.map((n) => {
