@@ -22,7 +22,7 @@ export { fmt };
 
 export function SessionBoard({
   state, players, undoLabel, onUndo, canRedo, onRedo, onWin, onCloseCourt, onReopenCourt,
-  onToggleSit, onToggleCheck, onAddCourt, onAddPlayer, nextUp, onCallUpNext, canCallUpNext, narrow, onEditLineup,
+  onToggleSit, onToggleCheck, onAddCourt, onAddPlayer, nextUp, onCallUpNext, canCallUpNext, narrow, onEditLineup, recency,
 }: {
   state: SessionState;
   players: Player[];
@@ -44,9 +44,12 @@ export function SessionBoard({
   /** Phone portrait: the rail stacks under the courts and the page scrolls as one. */
   narrow: boolean;
   onEditLineup: (court: number) => void;
+  /** startedAt of the newest ended session each player attended; regulars sort first. */
+  recency: Record<string, number>;
 }) {
   const [now, setNow] = useState(() => Date.now());
   const [newName, setNewName] = useState('');
+  const [query, setQuery] = useState('');
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
@@ -56,7 +59,12 @@ export function SessionBoard({
   const courts = Array.from({ length: state.courtCount }, (_, i) => i + 1);
   const eligibleQueue = state.queue.filter((p) => !state.sittingOut.includes(p));
   const nextFour = new Set(eligibleQueue.slice(0, 4));
-  const grid = [...players].sort((a, b) => Number(state.checkedIn.includes(b.id)) - Number(state.checkedIn.includes(a.id)) || a.name.localeCompare(b.name));
+  const grid = [...players]
+    .sort((a, b) =>
+      Number(state.checkedIn.includes(b.id)) - Number(state.checkedIn.includes(a.id)) ||
+      (recency[b.id] ?? 0) - (recency[a.id] ?? 0) ||
+      a.name.localeCompare(b.name))
+    .filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase()));
 
   const tileState = (p: Player): TileState =>
     isPlaying(state, p.id) ? 'playing' : state.sittingOut.includes(p.id) ? 'sitting' : state.queue.includes(p.id) ? 'in' : 'out';
@@ -141,6 +149,14 @@ export function SessionBoard({
               }} />
             <Button variant="secondary" icon="user-plus" onClick={() => { if (newName.trim()) { onAddPlayer(newName.trim()); setNewName(''); } }}>Add</Button>
           </form>
+          {players.length > 12 ? (
+            <input
+              value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search players" aria-label="Search players"
+              style={{
+                minWidth: 0, height: 'var(--tap-min)', padding: '0 var(--space-3)', font: '400 16px var(--font-sans)',
+                border: '1px solid var(--border)', borderRadius: 'var(--radius-control)', background: 'var(--bg)', color: 'var(--text)',
+              }} />
+          ) : null}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
             {grid.map((p) => (
               <CheckinTile key={p.id} name={p.name} state={tileState(p)}

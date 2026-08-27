@@ -10,7 +10,7 @@ import { Button } from './components/Button';
 import { IconButton } from './components/IconButton';
 import { StandingsModal } from './components/StandingsModal';
 import { LineupEditor } from './components/LineupEditor';
-import { append, lastSessionAttendees, listSessions } from './db/eventStore';
+import { append, attendanceRecency, lastSessionAttendees, listSessions } from './db/eventStore';
 import { useWakeLock } from './lib/useWakeLock';
 import { useRoute } from './lib/useRoute';
 import { useSpeech } from './lib/useSpeech';
@@ -63,6 +63,11 @@ export default function App() {
 
   useEffect(() => {
     if (route === 'setup') void lastSessionAttendees().then(setReturningIds);
+  }, [route]);
+
+  const [recency, setRecency] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (route === 'board') void attendanceRecency().then(setRecency);
   }, [route]);
 
   const returning = roster.players.filter((p) => returningIds.includes(p.id) && !selected.includes(p.id));
@@ -245,6 +250,7 @@ export default function App() {
           canCallUpNext={speech.supported && speech.enabled}
           narrow={narrow}
           onEditLineup={setEditingCourt}
+          recency={recency}
         />
       ) : (
         <SessionSummary

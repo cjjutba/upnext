@@ -38,6 +38,7 @@ export function RosterSetup({
   narrow: boolean;
 }) {
   const [name, setName] = useState('');
+  const [query, setQuery] = useState('');
   const [courts, setCourts] = useState(2);
   const [mode, setMode] = useState<MatchingMode>('balanced');
   const [splitWinners, setSplitWinners] = useState(false);
@@ -73,8 +74,16 @@ export function RosterSetup({
             }} />
           <Button variant="secondary" icon="user-plus" onClick={() => { if (name.trim()) { onAddPlayer(name.trim()); setName(''); } }}>Add</Button>
         </form>
+        {players.length > 12 ? (
+          <input
+            value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search players" aria-label="Search players"
+            style={{
+              height: 'var(--tap-min)', padding: '0 var(--space-3)', font: '400 16px var(--font-sans)',
+              border: '1px solid var(--border)', borderRadius: 'var(--radius-control)', background: 'var(--bg)', color: 'var(--text)',
+            }} />
+        ) : null}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
-          {players.map((p) => (
+          {players.filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase())).map((p) => (
             <PlayerChip
               key={p.id}
               name={p.name}
