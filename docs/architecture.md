@@ -85,9 +85,10 @@ from `src/db/eventStore.ts` to render session history. Do not add more.
 
 ### `src/components`
 
-Fourteen presentational components: `Button`, `CheckinTile`, `CountBadge`,
-`CourtCard`, `CourtDiagram`, `Icon`, `ModeMenu`, `PlayerChip`, `QueueRow`,
-`RuleCard`, `StatusBadge`, `Stepper`, `TimerDisplay`, `UndoPill`. Rules in
+Seventeen presentational components: `Button`, `CheckinTile`, `CountBadge`,
+`CourtCard`, `CourtDiagram`, `Icon`, `IconButton`, `ModeChangeModal`,
+`ModeMenu`, `PlayerChip`, `QueueRow`, `RuleCard`, `StandingsModal`,
+`StatusBadge`, `Stepper`, `TimerDisplay`, `UndoPill`. Rules in
 `src/components/CLAUDE.md`.
 
 ### `src/screens`
@@ -151,12 +152,15 @@ it is the moment to fix a wrong name, swap someone in, or call the four over
 before anything is on the clock.
 
 `changeRule` is the defensive one. Every capacity-increasing command already
-staged, so it is normally a no-op.
+staged, so it is normally a no-op. That is deliberate. A mode switch governs
+the next stage and never rewrites a court already playing or already staged.
+`ModeChangeModal` confirms the switch before it is appended and says so in as
+many words.
 
-One consequence to know about: `unstageCourt` clears a court on purpose and
-does not stage it again, but the next command that frees capacity will. That is
-what makes "remove a player and the court refills itself" work, and it means a
-bare clear does not stay cleared.
+One more consequence to know about: `unstageCourt` clears a court on purpose
+and does not stage it again, but the next command that frees capacity will.
+That is what makes "remove a player and the court refills itself" work, and it
+means a bare clear does not stay cleared.
 
 ## Persistence
 
@@ -213,10 +217,14 @@ No Dexie migration. Events are one table with one envelope.
 4. `src/domain/reducer.ts`: only if the queue placement on finish differs from
    all-off. Non-winners templates already route through that path.
 5. `src/domain/modes.ts`: the `MODES` entry and both mapping functions.
-   `modeLabel()` uses a non-null `find`, so a missing entry throws at runtime.
-6. `src/screens/RosterSetup.tsx`: the `MODE_ICON` entry.
-7. `src/domain/invariants.test.ts`: add the id to the `template` arbitrary so
-   the property suite covers it.
+   `modeLabel()` is total and falls back to the raw id, so a missing entry is
+   caught by `src/domain/modes.test.ts` rather than thrown at a user.
+6. `src/domain/modes.test.ts`: the id in `ALL_TEMPLATES`, which the coverage
+   case reads. This is the tripwire for a forgotten `MODES` entry.
+7. `src/screens/RosterSetup.tsx`: the `MODE_ICON` entry.
+8. `src/domain/invariants.test.ts`: the id in `TEMPLATES`, which feeds both the
+   boot template and the mid-run `rule` op, so the property suite switches into
+   and out of the new mode.
 
 ### A new screen
 

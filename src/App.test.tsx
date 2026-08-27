@@ -78,8 +78,9 @@ async function startMatch(mode: RegExp) {
 /** The card div that owns a court's close button. */
 const courtCard = (n: number) => screen.getByLabelText(`Close court ${n}`).closest('div')!.parentElement!;
 
-/** The queue panel for the next four waiting. */
-const upNext = () => screen.getByText('Up next').closest('div')!.parentElement!;
+/** The queue panel under the courts: the next four, or the challengers a winners template promises. */
+const upNext = () =>
+  (screen.queryByText('Up next') ?? screen.getByText('Next challengers')).closest('div')!.parentElement!;
 
 const chip = (name: string, scope: HTMLElement) => within(scope).getByRole('button', { name: `${name}, change or remove` });
 
@@ -221,7 +222,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     expect(said().filter((l) => l.startsWith('Session complete.'))).toHaveLength(1);
   });
 
-  it('keeps the winners on court in Winners mode, staged rather than started', async () => {
+  it('keeps the winners on court in Winners mode, staged, and promises only the challengers', async () => {
     render(<App />);
     await startMatch(/^Winners/);
     await waitFor(() => expect(said()).toHaveLength(1));
@@ -231,6 +232,13 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await waitFor(() => expect(within(courtCard(1)).getByText('Staged')).toBeInTheDocument());
     for (const name of winners) expect(within(courtCard(1)).getByText(name)).toBeInTheDocument();
     expect(within(courtCard(1)).queryByText('0:00')).not.toBeInTheDocument(); // no clock until Start
+
+    // the four behind them depends on who wins, so the queue promises only the two who are certain
+    expect(screen.getByText('Next challengers')).toBeInTheDocument();
+    expect(screen.queryByText('Up next')).not.toBeInTheDocument();
+    expect(within(upNext()).getByText('Winners stay')).toBeInTheDocument();
+    await click(btn('Call players up next'));
+    expect(said().at(-1)).toMatch(/^Get ready\. Next challengers, \w+ and \w+\. You are on whoever wins\.$/);
   });
 
   it('swaps a waiting player onto a staged court, keeping the slot', async () => {
@@ -286,5 +294,103 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await click(btn(/Undo: court 1, team 1 won/));
     await waitFor(() => expect(within(courtCard(1)).getByText('Live')).toBeInTheDocument());
     expect(within(courtCard(1)).getByText('Alice')).toBeInTheDocument();
+  });
+});
+
+describe('App: switching matching mode mid-session', () => {
+  beforeEach(async () => {
+    installSpeechStub();
+    await reset();
+  });
+  afterEach(cleanup);
+
+  /** The four names showing on a court right now. */
+  const lineup = (n: number) => NAMES.filter((name) => within(courtCard(n)).queryByText(name) !== null);
+
+  const openMenu = async () => {
+    await click(btn('Change matching mode'));
+  };
+
+  it('asks before switching, and appends nothing until the organizer confirms', async () => {
+    render(<App />);
+    await startMatch(/^Balanced/);
+    const before = lineup(1);
+    expect(before).toHaveLength(4);
+
+    await openMenu();
+    await click(btn(/^Social mix/));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Switch to Social mix?' });
+    expect(within(dialog).getByText(/Courts in play finish under their current lineups/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Every game formed from now on uses Social mix/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/^Next game would be .+ vs .+\.$/)).toBeInTheDocument();
+    // still Balanced behind the modal, and nobody has moved
+    expect(btn('Change matching mode')).toHaveTextContent('Mode: Balanced');
+    expect(lineup(1)).toEqual(before);
+
+    await click(btn('Cancel', dialog));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Switch to Social mix?' })).not.toBeInTheDocument());
+    expect(btn('Change matching mode')).toHaveTextContent('Mode: Balanced');
+    expect(screen.queryByText('Undo: Social mix mode')).not.toBeInTheDocument();
+  });
+
+  it('applies the mode on confirm without taking anyone off a court', async () => {
+    render(<App />);
+    await startMatch(/^Balanced/);
+    const before = lineup(1);
+
+    await openMenu();
+    await click(btn(/^Social mix/));
+    await click(btn('Switch to Social mix', await screen.findByRole('dialog', { name: 'Switch to Social mix?' })));
+
+    await waitFor(() => expect(btn('Change matching mode')).toHaveTextContent('Mode: Social mix'));
+    expect(lineup(1)).toEqual(before); // next game only: the live court is untouched
+    expect(await screen.findByText('Undo: Social mix mode')).toBeInTheDocument();
+  });
+
+  it('re-picking the live mode closes the menu instead of confirming a no-op', async () => {
+    render(<App />);
+    await startMatch(/^Balanced/);
+
+    await openMenu();
+    await click(btn(/^Balanced/));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(btn('Change matching mode')).toHaveTextContent('Mode: Balanced');
+  });
+
+  it('confirms the win cap and the split toggle in the same modal', async () => {
+    render(<App />);
+    await startMatch(/^Winners/);
+
+    await openMenu();
+    await click(btn(/^Winners/));
+    const dialog = await screen.findByRole('dialog', { name: 'Adjust Winners settings?' });
+    expect(btn('Apply', dialog)).toBeDisabled(); // nothing proposed yet
+
+    await click(btn('Win cap up', dialog));
+    await click(btn('Toggle split winners', dialog));
+    await click(btn('Apply', dialog));
+
+    await waitFor(() => expect(btn('Change matching mode')).toHaveTextContent('Mode: Winners'));
+    expect(await screen.findByText('Undo: Winners mode')).toBeInTheDocument();
+    await openMenu();
+    expect(screen.getByText('Win cap 4. Split winners on. Tap to adjust.')).toBeInTheDocument();
+  });
+
+  it('switches into Winners from another mode and drops the queue panel back to challengers', async () => {
+    render(<App />);
+    await startMatch(/^Balanced/);
+    expect(screen.getByText('Up next')).toBeInTheDocument();
+
+    await openMenu();
+    await click(btn(/^Winners/));
+    const dialog = await screen.findByRole('dialog', { name: 'Switch to Winners?' });
+    expect(within(dialog).getByText(/^Next challengers would be .+ and .+\.$/)).toBeInTheDocument();
+    await click(btn('Switch to Winners', dialog));
+
+    await waitFor(() => expect(btn('Change matching mode')).toHaveTextContent('Mode: Winners'));
+    // the four is no longer knowable, so the panel names the two who are certain
+    expect(screen.getByText('Next challengers')).toBeInTheDocument();
+    expect(screen.queryByText('Up next')).not.toBeInTheDocument();
   });
 });

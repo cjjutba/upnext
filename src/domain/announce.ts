@@ -26,6 +26,14 @@ export function getReadyPhrase(pairs: Pairs, nameOf: NameOf, court?: number): st
 }
 
 /**
+ * The winners templates cannot name the four before a winner exists, so the
+ * Call players button reads the two who are certain and says why.
+ */
+export function challengersPhrase(pair: Pair, nameOf: NameOf): string {
+  return `Get ready. Next challengers, ${pairPhrase(pair, nameOf)}. You are on whoever wins.`;
+}
+
+/**
  * Phrases for a run of events this device just appended. Never call this with a
  * replayed log: it has no idea an event is old, and a resume would read back
  * every court call of the session.

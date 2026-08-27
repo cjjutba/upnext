@@ -1,4 +1,5 @@
-import type { Pairs, SessionState } from './types';
+import type { Pair, Pairs, SessionState } from './types';
+import { isWinnersTemplate } from './types';
 
 export interface LastFinished {
   pairs: Pairs;
@@ -128,24 +129,52 @@ export function nextLineup(state: SessionState, lastFinished: LastFinished | nul
   return freshFill(state);
 }
 
+/** What the board can honestly promise about the next game under the current rule. */
+export type UpNextPreview =
+  | { kind: 'lineup'; pairs: Pairs }
+  | { kind: 'challengers'; pair: Pair };
+
 /**
- * The waiting players as court graphics, four at a time. The first chunk is
- * `nextLineup` verbatim, so it is exactly what staging a court would produce.
- * Later chunks partition queue order and are indicative: what they will
- * actually play depends on results that have not happened yet.
+ * The two waiting players who go on next in a winners template, whoever wins.
+ * Sound either way the finish falls: uncapped, the reducer fronts the winners
+ * and the next four are the winners plus these two; capped, it fronts the
+ * queue and these two lead it.
  */
-export function previewLineups(state: SessionState, ratings: Ratings = {}, max = 3): Pairs[] {
+export function nextChallengers(state: SessionState): Pair | null {
   const e = eligible(state);
-  const out: Pairs[] = [];
-  for (let i = 0; i + 4 <= e.length && out.length < max; i += 4) {
-    if (i === 0) {
-      const first = nextLineup(state, null, ratings);
-      if (!first) break;
-      out.push(first);
-      continue;
-    }
+  return e.length >= 2 ? [e[0], e[1]] : null;
+}
+
+/**
+ * The single preview entry point for every mode. Winners templates cannot name
+ * the four before a winner exists, only the challengers, so the shape differs
+ * and callers branch on kind rather than on the template.
+ */
+export function upNextPreview(state: SessionState, ratings: Ratings = {}): UpNextPreview | null {
+  if (isWinnersTemplate(state.rule.template)) {
+    const pair = nextChallengers(state);
+    return pair ? { kind: 'challengers', pair } : null;
+  }
+  const pairs = nextLineup(state, null, ratings);
+  return pairs ? { kind: 'lineup', pairs } : null;
+}
+
+/**
+ * The waiting players as court graphics, four at a time, for the queue section
+ * under the courts. The first entry is `upNextPreview`, so it promises only
+ * what the mode can actually promise. A winners template stops there: it cannot
+ * name a four before a winner exists, so it certainly cannot name the one after
+ * that. Later entries partition queue order and are indicative.
+ */
+export function previewLineups(state: SessionState, ratings: Ratings = {}, max = 3): UpNextPreview[] {
+  const first = upNextPreview(state, ratings);
+  if (!first) return [];
+  if (first.kind === 'challengers') return [first];
+  const e = eligible(state);
+  const out: UpNextPreview[] = [first];
+  for (let i = 4; i + 4 <= e.length && out.length < max; i += 4) {
     const [a, b, c, d] = e.slice(i, i + 4);
-    out.push([[a, c], [b, d]]);
+    out.push({ kind: 'lineup', pairs: [[a, c], [b, d]] });
   }
   return out;
 }

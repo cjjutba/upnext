@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { announceBatch, courtPhrase, getReadyPhrase, leaderPhrase, pairPhrase, podiumPhrase } from './announce';
+import { announceBatch, challengersPhrase, courtPhrase, getReadyPhrase, leaderPhrase, pairPhrase, podiumPhrase } from './announce';
 import { standings } from './standings';
 import { replay } from './reducer';
 import { startSession, finishGame, closeCourt, changeLineup, startStagedGame, type CommandEvent } from './commands';
@@ -47,6 +47,11 @@ describe('phrase builders', () => {
       .toBe('Get ready. Up next. Team one, Eve and Frank. Versus team two, Grace and Henry.');
     expect(getReadyPhrase([['e', 'f'], ['g', 'h']], nameOf, 2))
       .toBe('Get ready. Court 2. Team one, Eve and Frank. Versus team two, Grace and Henry.');
+  });
+
+  it('calls the two challengers a winners template can promise, and says why there are only two', () => {
+    expect(challengersPhrase(['e', 'f'], nameOf))
+      .toBe('Get ready. Next challengers, Eve and Frank. You are on whoever wins.');
   });
 });
 

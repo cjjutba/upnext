@@ -6,6 +6,7 @@ import { RosterSetup } from './screens/RosterSetup';
 import { SessionBoard, fmt } from './screens/SessionBoard';
 import { SessionSummary } from './screens/SessionSummary';
 import { ModeMenu } from './components/ModeMenu';
+import { ModeChangeModal } from './components/ModeChangeModal';
 import { Button } from './components/Button';
 import { IconButton } from './components/IconButton';
 import { StandingsModal } from './components/StandingsModal';
@@ -16,11 +17,21 @@ import { useRoute } from './lib/useRoute';
 import { useSpeech } from './lib/useSpeech';
 import { shareSessionFile, importSessionFile } from './lib/exportFile';
 import * as cmd from './domain/commands';
-import { previewLineups } from './domain/templates';
-import { getReadyPhrase, leaderPhrase } from './domain/announce';
+import { previewLineups, upNextPreview } from './domain/templates';
+import { challengersPhrase, getReadyPhrase, leaderPhrase } from './domain/announce';
 import { standings } from './domain/standings';
 import { isStaged, stagedCourtOf } from './domain/reducer';
-import type { RuleTemplate } from './domain/types';
+import type { RuleConfig, RuleTemplate, SessionState } from './domain/types';
+import type { Ratings } from './domain/templates';
+
+/** What the proposed rule would form next, said in the board's own words. Pure, so it costs nothing to compute per render. */
+function previewLine(state: SessionState, ratings: Ratings, nameOf: (id: string) => string): string | null {
+  const p = upNextPreview(state, ratings);
+  if (!p) return null;
+  return p.kind === 'lineup'
+    ? `Next game would be ${p.pairs[0].map(nameOf).join(' + ')} vs ${p.pairs[1].map(nameOf).join(' + ')}.`
+    : `Next challengers would be ${p.pair.map(nameOf).join(' and ')}.`;
+}
 
 export default function App() {
   const session = useSession();
@@ -34,6 +45,8 @@ export default function App() {
   const [standingsOpen, setStandingsOpen] = useState(false);
   /** The tapped chip. `court` is null when the tap came from the queue section, where a swap reorders instead of substituting. */
   const [picking, setPicking] = useState<{ playerId: string; court: number | null } | null>(null);
+  /** The rule the organizer is proposing. Nothing is appended until the modal confirms it. */
+  const [pendingRule, setPendingRule] = useState<RuleConfig | null>(null);
   const { state, dispatch } = session;
 
   useEffect(() => {
@@ -71,7 +84,7 @@ export default function App() {
 
   const nameOf = (id: string) => roster.players.find((p) => p.id === id)?.name ?? 'Unknown';
 
-  // the queue section: whoever is left after every court has been staged
+  // the queue section: whoever is left after every court has been staged, in the shape the mode can honestly promise
   const previews = useMemo(
     () => (route === 'board' ? previewLineups(state, roster.ratings) : []),
     [route, state, roster.ratings],
@@ -159,14 +172,14 @@ export default function App() {
       <span className="display" style={{ fontSize: '22px', fontWeight: 600 }}>upnext</span>
       {route === 'board' ? (
         <>
-          <ModeMenu rule={state.rule} onChange={(t, cap) => void dispatch(cmd.changeRule(state, t, cap, roster.ratings))} />
+          <ModeMenu rule={state.rule} onRequestChange={(template, winCap) => setPendingRule({ template, winCap })} />
           <span style={{ flex: 1 }} />
           <span className="mono" style={{ fontSize: '20px' }}>
             {fmt((clock - state.startedAt) / 1000)}
           </span>
           <IconButton icon="trophy" ariaLabel="Live standings" onClick={() => setStandingsOpen(true)} />
           {muteToggle}
-          <Button variant="secondary" onClick={() => void end()}>End session</Button>
+          <Button variant="danger" onClick={() => void end()}>End session</Button>
         </>
       ) : route === 'summary' ? (
         <>
@@ -235,7 +248,10 @@ export default function App() {
             const pairs = state.staged[court] ?? state.games[court]?.pairs;
             if (pairs) speech.speak(getReadyPhrase(pairs, nameOf, court));
           }}
-          onCallUpNext={() => previews[0] && speech.speak(getReadyPhrase(previews[0], nameOf))}
+          onCallUpNext={() => {
+            const next = previews[0];
+            if (next) speech.speak(next.kind === 'lineup' ? getReadyPhrase(next.pairs, nameOf) : challengersPhrase(next.pair, nameOf));
+          }}
           previews={previews}
         />
       ) : (
@@ -263,6 +279,19 @@ export default function App() {
           }}
           onRemove={() => { void dispatch(cmd.departPlayer(state, picking.playerId)); setPicking(null); }}
           onClose={() => setPicking(null)}
+        />
+      ) : null}
+      {pendingRule && !state.ended ? (
+        <ModeChangeModal
+          from={state.rule}
+          draft={pendingRule}
+          onDraftChange={setPendingRule}
+          previewLine={previewLine({ ...state, rule: pendingRule }, roster.ratings, nameOf)}
+          onCancel={() => setPendingRule(null)}
+          onConfirm={() => {
+            void dispatch(cmd.changeRule(state, pendingRule.template, pendingRule.winCap, roster.ratings));
+            setPendingRule(null);
+          }}
         />
       ) : null}
       {standingsOpen ? (

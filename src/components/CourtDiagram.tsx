@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import type { Pairs } from '../domain/types';
+import type { Pair, Pairs } from '../domain/types';
+
+/** A four, or a pair whose opponents are not decided yet. */
+export type DiagramPairs = Pairs | [Pair, null];
 
 /**
  * Top-down pickleball court, true 44x20 ft proportions in a 860x420 viewBox.
@@ -7,13 +10,17 @@ import type { Pairs } from '../domain/types';
  * exception to the monochrome UI. pairs[0] is team 1 on the left.
  *
  * Takes player ids plus a name lookup rather than names, so a tapped chip can
- * report who it is. With onPlayerTap the chips become buttons.
+ * report who it is. With onPlayerTap the chips become buttons. A null second
+ * pair draws a placeholder instead: the winners templates know the two
+ * challengers long before they know who those two are playing.
  */
-export function CourtDiagram({ pairs, nameOf, onPlayerTap }: {
-  pairs: Pairs;
+export function CourtDiagram({ pairs, nameOf, onPlayerTap, unknownLabel = 'Winners stay' }: {
+  pairs: DiagramPairs;
   nameOf: (playerId: string) => string;
   /** Opens the picker for that player. Chips are plain text when this is absent. */
   onPlayerTap?: (playerId: string) => void;
+  /** Drawn across team 2 when its pair is null. */
+  unknownLabel?: string;
 }) {
   const [down, setDown] = useState<string | null>(null);
   const chip = (playerId: string, left: string, top: string) => {
@@ -37,6 +44,14 @@ export function CourtDiagram({ pairs, nameOf, onPlayerTap }: {
       </button>
     );
   };
+  const placeholder = (
+    <span style={{
+      position: 'absolute', left: '79%', top: '50%', transform: 'translate(-50%, -50%)',
+      background: 'rgba(255,255,255,0.15)', border: '1px dashed rgba(255,255,255,0.6)',
+      color: '#ffffff', padding: '8px 16px', borderRadius: 'var(--radius-full)',
+      font: '500 14px/1 var(--font-sans)', whiteSpace: 'nowrap',
+    }}>{unknownLabel}</span>
+  );
   const teamLabel = (label: string, left: string) => (
     <span style={{
       position: 'absolute', left, top: '8px', transform: 'translateX(-50%)',
@@ -67,8 +82,12 @@ export function CourtDiagram({ pairs, nameOf, onPlayerTap }: {
       {teamLabel('Team 2', '79%')}
       {chip(pairs[0][0], '21%', '29.5%')}
       {chip(pairs[0][1], '21%', '70.5%')}
-      {chip(pairs[1][0], '79%', '29.5%')}
-      {chip(pairs[1][1], '79%', '70.5%')}
+      {pairs[1] === null ? placeholder : (
+        <>
+          {chip(pairs[1][0], '79%', '29.5%')}
+          {chip(pairs[1][1], '79%', '70.5%')}
+        </>
+      )}
     </div>
   );
 }

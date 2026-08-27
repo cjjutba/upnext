@@ -5,7 +5,9 @@ import { QueueRow } from '../components/QueueRow';
 import { CheckinTile, type TileState } from '../components/CheckinTile';
 import { UndoPill } from '../components/UndoPill';
 import { Button } from '../components/Button';
-import type { Pairs, Player, SessionState } from '../domain/types';
+import type { Player, SessionState } from '../domain/types';
+import type { UpNextPreview } from '../domain/templates';
+import { modeLabel } from '../domain/modes';
 import { isPlaying, isStaged } from '../domain/reducer';
 
 // wall clock on purpose: timers derive from event ts so resume replays exactly; a mid-session OS clock change can jump timers, accepted trade-off
@@ -48,8 +50,8 @@ export function SessionBoard({
   onShuffle: (court: number) => void;
   onCallCourt: (court: number) => void;
   onCallUpNext: () => void;
-  /** Waiting matches, four at a time. The first is exactly what a stage would produce. */
-  previews: Pairs[];
+  /** Waiting matches, four at a time. The first promises only what the mode can: a lineup, or two challengers. */
+  previews: UpNextPreview[];
 }) {
   const [now, setNow] = useState(() => Date.now());
   const [newName, setNewName] = useState('');
@@ -61,7 +63,7 @@ export function SessionBoard({
   const nameOf = (id: string) => players.find((p) => p.id === id)?.name ?? 'Unknown';
   const courts = Array.from({ length: state.courtCount }, (_, i) => i + 1);
   const eligibleQueue = state.queue.filter((p) => !state.sittingOut.includes(p));
-  const previewed = new Set(previews.flatMap((pairs) => [...pairs[0], ...pairs[1]]));
+  const previewed = new Set(previews.flatMap((p) => (p.kind === 'lineup' ? [...p.pairs[0], ...p.pairs[1]] : p.pair)));
   const leftovers = state.queue.filter((id) => !previewed.has(id));
   const grid = [...players].sort((a, b) => Number(state.checkedIn.includes(b.id)) - Number(state.checkedIn.includes(a.id)) || a.name.localeCompare(b.name));
 
@@ -71,8 +73,9 @@ export function SessionBoard({
         : state.sittingOut.includes(p.id) ? 'sitting'
           : state.queue.includes(p.id) ? 'in' : 'out';
 
-  /** Where a preview four sits in the waiting list, so the panels and the rows line up. */
-  const positions = (i: number) => `${i * 4 + 1} to ${i * 4 + 4}`;
+  /** Where a preview sits in the waiting list, so the panels and the rows line up. */
+  const positions = (preview: UpNextPreview, i: number) =>
+    preview.kind === 'challengers' ? '1 and 2' : `${i * 4 + 1} to ${i * 4 + 4}`;
 
   /**
    * The queue section tracks the courts grid, so a panel is a court card's
@@ -92,7 +95,7 @@ export function SessionBoard({
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
             <span className="micro-label">Courts</span>
             <span style={{ flex: 1 }} />
-            <Button variant="ghost" icon="plus" onClick={onAddCourt} disabled={eligibleQueue.length < 4} ariaLabel="Add court">Add court</Button>
+            <Button variant="primary" icon="plus" onClick={onAddCourt} disabled={eligibleQueue.length < 4} ariaLabel="Add court">Add court</Button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(480px, 1fr))', gap: 'var(--space-4)', alignContent: 'start' }}>
             {courts.map((n) => {
@@ -116,6 +119,8 @@ export function SessionBoard({
         <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
             <span className="micro-label">Queue</span>
+            {/* the pairings below are a mode's decision, so the mode is named next to them */}
+            <span style={{ font: '400 13px/1 var(--font-sans)', color: 'var(--text-tertiary)' }}>{modeLabel(state.rule.template)}</span>
             <span style={{ flex: 1 }} />
             <span className="mono" style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>{eligibleQueue.length} waiting</span>
           </div>
@@ -126,9 +131,10 @@ export function SessionBoard({
                   ? 'Queue is empty: everyone is on a court.'
                   : 'Fewer than four waiting, so there is no next match yet.'}
               </div>
-            ) : previews.map((pairs, i) => (
-              <QueuePanel key={positions(i)} title={i === 0 ? 'Up next' : `Then, match ${i + 1}`} positions={positions(i)}
-                pairs={pairs} nameOf={nameOf} onPlayerTap={onQueuePlayerTap}
+            ) : previews.map((preview, i) => (
+              <QueuePanel key={positions(preview, i)} positions={positions(preview, i)}
+                title={preview.kind === 'challengers' ? 'Next challengers' : i === 0 ? 'Up next' : `Then, match ${i + 1}`}
+                preview={preview} nameOf={nameOf} onPlayerTap={onQueuePlayerTap}
                 onCall={i === 0 ? onCallUpNext : undefined} />
             ))}
           </div>
@@ -139,7 +145,7 @@ export function SessionBoard({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                   {leftovers.map((id) => (
                     <QueueRow key={id} position={state.queue.indexOf(id) + 1} name={nameOf(id)} games={state.gamesPlayed[id] ?? 0}
-                      sitOut={state.sittingOut.includes(id)} nextFour={false} nextUpLabel={false}
+                      sitOut={state.sittingOut.includes(id)}
                       onToggleSit={() => onToggleSit(id)} onRemove={() => onRemovePlayer(id)}
                       onOptions={() => onQueuePlayerTap(id)} />
                   ))}

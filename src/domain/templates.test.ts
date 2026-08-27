@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { freshFill, nextLineup, previewLineups } from './templates';
+import { freshFill, nextChallengers, nextLineup, previewLineups, upNextPreview } from './templates';
 import { emptyState } from './types';
 import type { SessionState, Pairs, FinishedGame } from './types';
 
@@ -129,18 +129,90 @@ describe('balanced and social pairing', () => {
   });
 });
 
+describe('nextChallengers', () => {
+  it('names the two waiting players who go on next whoever wins', () => {
+    const s = state({ rule: { template: 'winners-stay', winCap: 3 }, queue: ['a', 'b', 'c'] });
+    expect(nextChallengers(s)).toEqual(['a', 'b']);
+  });
+
+  it('skips sitting-out players', () => {
+    const s = state({ rule: { template: 'winners-stay', winCap: 3 }, queue: ['x', 'a', 'b'], sittingOut: ['x'] });
+    expect(nextChallengers(s)).toEqual(['a', 'b']);
+  });
+
+  it('returns null when fewer than two are eligible', () => {
+    expect(nextChallengers(state({ queue: ['a'] }))).toBeNull();
+    expect(nextChallengers(state({ queue: ['a', 'b'], sittingOut: ['b'] }))).toBeNull();
+  });
+
+  it('holds whether the winners stay or get capped to the back', () => {
+    // uncapped the reducer fronts the winners, capped it fronts the queue; either way the front two waiting are inside the next four
+    const s = state({ rule: { template: 'winners-stay', winCap: 3 }, queue: ['w1', 'w2', 'q0', 'q1'] });
+    const stayed = nextLineup(s, { pairs: [['w1', 'w2'], ['l1', 'l2']], winnerPair: 0 })!;
+    expect([...stayed[0], ...stayed[1]]).toEqual(expect.arrayContaining(['q0', 'q1']));
+    const capped = state({ rule: { template: 'winners-stay', winCap: 3 }, queue: ['q0', 'q1', 'q2', 'q3', 'w1', 'w2'] });
+    const fresh = nextLineup(capped, { pairs: [['w1', 'w2'], ['l1', 'l2']], winnerPair: 0 })!;
+    expect([...fresh[0], ...fresh[1]]).toEqual(expect.arrayContaining(['q0', 'q1']));
+  });
+});
+
+describe('upNextPreview across every mode', () => {
+  // one queue, one history, one set of ratings: only the template changes
+  const base = {
+    queue: ['a', 'b', 'c', 'd', 'e', 'f'],
+    finishedGames: [{ court: 1, pairs: [['a', 'c'], ['x', 'y']] as Pairs, startedAt: 0, endedAt: 1 }],
+  };
+  const ratings = { a: 5, b: 5, c: 1, d: 1 };
+  const preview = (template: SessionState['rule']['template']) =>
+    upNextPreview(state({ ...base, rule: { template, winCap: 3 } }), ratings);
+
+  it('classic queue takes the front four in paddle order, ignoring ratings and history', () => {
+    expect(preview('all-off')).toEqual({ kind: 'lineup', pairs: [['a', 'c'], ['b', 'd']] });
+  });
+
+  it('balanced levels the two teams by rating, then breaks the tie on repeat partners', () => {
+    // ac|bd and ad|bc both level at 0; a and c already partnered, so ad|bc wins
+    expect(preview('balanced')).toEqual({ kind: 'lineup', pairs: [['a', 'd'], ['b', 'c']] });
+  });
+
+  it('social mix splits the repeat partners and ignores the ratings that moved balanced', () => {
+    expect(preview('social')).toEqual({ kind: 'lineup', pairs: [['a', 'b'], ['c', 'd']] });
+  });
+
+  it('winners shows the guaranteed challengers, because the four depend on who wins', () => {
+    expect(preview('winners-stay')).toEqual({ kind: 'challengers', pair: ['a', 'b'] });
+    expect(preview('winners-split')).toEqual({ kind: 'challengers', pair: ['a', 'b'] });
+  });
+
+  it('previews nothing when no game can be formed', () => {
+    expect(upNextPreview(state({ rule: { template: 'balanced', winCap: 3 }, queue: ['a', 'b', 'c'] }))).toBeNull();
+    expect(upNextPreview(state({ rule: { template: 'winners-stay', winCap: 3 }, queue: ['a'] }))).toBeNull();
+  });
+
+  it('always keeps the front four eligible, whatever the mode does with the pairing', () => {
+    for (const template of ['all-off', 'balanced', 'social'] as const) {
+      const p = preview(template);
+      expect(p?.kind).toBe('lineup');
+      const four = p!.kind === 'lineup' ? [...p!.pairs[0], ...p!.pairs[1]].sort() : [];
+      expect(four).toEqual(['a', 'b', 'c', 'd']);
+    }
+  });
+});
+
 describe('previewLineups', () => {
-  it('chunks the waiting players into fours and matches nextLineup on the first', () => {
+  const lineup = (pairs: Pairs) => ({ kind: 'lineup', pairs });
+
+  it('chunks the waiting players into fours and leads with upNextPreview', () => {
     const s = state({ queue: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'] });
     const chunks = previewLineups(s, {});
     expect(chunks).toHaveLength(2); // nine waiting is two fours plus a leftover
-    expect(chunks[0]).toEqual(nextLineup(s, null, {}));
-    expect(chunks[1]).toEqual([['e', 'g'], ['f', 'h']]);
+    expect(chunks[0]).toEqual(upNextPreview(s, {}));
+    expect(chunks[1]).toEqual(lineup([['e', 'g'], ['f', 'h']]));
   });
 
   it('skips sitting-out players and stops at max', () => {
     const s = state({ queue: ['a', 'x', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], sittingOut: ['x'] });
-    expect(previewLineups(s, {})).toEqual([[['a', 'c'], ['b', 'd']], [['e', 'g'], ['f', 'h']]]);
+    expect(previewLineups(s, {})).toEqual([lineup([['a', 'c'], ['b', 'd']]), lineup([['e', 'g'], ['f', 'h']])]);
     expect(previewLineups(s, {}, 1)).toHaveLength(1);
   });
 
@@ -150,6 +222,11 @@ describe('previewLineups', () => {
 
   it('honours the balanced pairing on the first four', () => {
     const s = state({ rule: { template: 'balanced', winCap: 3 }, queue: ['a', 'b', 'c', 'd', 'e'] });
-    expect(previewLineups(s, { a: 5, b: 5, c: 1, d: 1 })[0]).toEqual([['a', 'c'], ['b', 'd']]);
+    expect(previewLineups(s, { a: 5, b: 5, c: 1, d: 1 })[0]).toEqual(lineup([['a', 'c'], ['b', 'd']]));
+  });
+
+  it('stops at the challengers in a winners template, which cannot name a four', () => {
+    const s = state({ rule: { template: 'winners-stay', winCap: 3 }, queue: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] });
+    expect(previewLineups(s, {})).toEqual([{ kind: 'challengers', pair: ['a', 'b'] }]);
   });
 });
