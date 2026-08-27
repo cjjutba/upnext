@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { freshFill, nextLineup } from './templates';
+import { freshFill, nextLineup, previewLineups } from './templates';
 import { emptyState } from './types';
 import type { SessionState, Pairs, FinishedGame } from './types';
 
@@ -126,5 +126,30 @@ describe('balanced and social pairing', () => {
     const pairs = nextLineup(s, null, ratings)!;
     const players = [...pairs[0], ...pairs[1]].sort();
     expect(players).toEqual(['a', 'b', 'c', 'd']); // e and f wait their turn no matter their ratings
+  });
+});
+
+describe('previewLineups', () => {
+  it('chunks the waiting players into fours and matches nextLineup on the first', () => {
+    const s = state({ queue: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'] });
+    const chunks = previewLineups(s, {});
+    expect(chunks).toHaveLength(2); // nine waiting is two fours plus a leftover
+    expect(chunks[0]).toEqual(nextLineup(s, null, {}));
+    expect(chunks[1]).toEqual([['e', 'g'], ['f', 'h']]);
+  });
+
+  it('skips sitting-out players and stops at max', () => {
+    const s = state({ queue: ['a', 'x', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], sittingOut: ['x'] });
+    expect(previewLineups(s, {})).toEqual([[['a', 'c'], ['b', 'd']], [['e', 'g'], ['f', 'h']]]);
+    expect(previewLineups(s, {}, 1)).toHaveLength(1);
+  });
+
+  it('returns nothing with fewer than four waiting', () => {
+    expect(previewLineups(state({ queue: ['a', 'b', 'c'] }), {})).toEqual([]);
+  });
+
+  it('honours the balanced pairing on the first four', () => {
+    const s = state({ rule: { template: 'balanced', winCap: 3 }, queue: ['a', 'b', 'c', 'd', 'e'] });
+    expect(previewLineups(s, { a: 5, b: 5, c: 1, d: 1 })[0]).toEqual([['a', 'c'], ['b', 'd']]);
   });
 });

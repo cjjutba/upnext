@@ -127,3 +127,25 @@ export function nextLineup(state: SessionState, lastFinished: LastFinished | nul
   }
   return freshFill(state);
 }
+
+/**
+ * The waiting players as court graphics, four at a time. The first chunk is
+ * `nextLineup` verbatim, so it is exactly what staging a court would produce.
+ * Later chunks partition queue order and are indicative: what they will
+ * actually play depends on results that have not happened yet.
+ */
+export function previewLineups(state: SessionState, ratings: Ratings = {}, max = 3): Pairs[] {
+  const e = eligible(state);
+  const out: Pairs[] = [];
+  for (let i = 0; i + 4 <= e.length && out.length < max; i += 4) {
+    if (i === 0) {
+      const first = nextLineup(state, null, ratings);
+      if (!first) break;
+      out.push(first);
+      continue;
+    }
+    const [a, b, c, d] = e.slice(i, i + 4);
+    out.push([[a, c], [b, d]]);
+  }
+  return out;
+}
