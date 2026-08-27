@@ -41,9 +41,12 @@ export default function App() {
       }
       setResuming(false);
     })();
-    void lastSessionAttendees().then(setReturningIds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (route === 'setup') void lastSessionAttendees().then(setReturningIds);
+  }, [route]);
 
   const returning = roster.players.filter((p) => returningIds.includes(p.id) && !selected.includes(p.id));
 
@@ -55,6 +58,11 @@ export default function App() {
   }, [route]);
 
   useWakeLock(route === 'board');
+
+  const misrouted = (route === 'board' || route === 'summary') && !state.started;
+  useEffect(() => {
+    if (!resuming && misrouted) navigate('setup', { replace: true });
+  }, [resuming, misrouted, navigate]);
 
   const start = async (config: { courts: number; template: RuleTemplate; winCap: number }) => {
     // close out any dangling live session so history never holds two in-progress logs
@@ -131,16 +139,7 @@ export default function App() {
     </div>
   );
 
-  if (resuming) return <div style={{ minHeight: '100vh', background: 'var(--bg)' }} />;
-
-  if (route === 'board' && !state.started) {
-    navigate('setup');
-    return <div style={{ minHeight: '100vh', background: 'var(--bg)' }} />;
-  }
-  if (route === 'summary' && !state.started) {
-    navigate('setup');
-    return <div style={{ minHeight: '100vh', background: 'var(--bg)' }} />;
-  }
+  if (resuming || misrouted) return <div style={{ minHeight: '100vh', background: 'var(--bg)' }} />;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>

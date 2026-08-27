@@ -8,6 +8,7 @@ export function PlayerChip({ name, selected, onClick, rating }: {
   return (
     <button
       type="button" onClick={onClick} aria-pressed={selected}
+      aria-label={rating ? name + ', rated ' + rating : name}
       onPointerDown={() => setPressed(true)} onPointerUp={() => setPressed(false)} onPointerLeave={() => setPressed(false)} onPointerCancel={() => setPressed(false)}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: '4px', height: 'var(--tap-min)', padding: '0 var(--space-3)',
@@ -19,7 +20,7 @@ export function PlayerChip({ name, selected, onClick, rating }: {
       }}>
       {name}
       {rating ? (
-        <span className="mono" style={{ display: 'inline-flex', alignItems: 'center', gap: '1px', fontSize: '12px' }}>
+        <span className="mono" aria-hidden style={{ display: 'inline-flex', alignItems: 'center', gap: '1px', fontSize: '12px' }}>
           {rating}
           <Icon name="star" size={12} />
         </span>

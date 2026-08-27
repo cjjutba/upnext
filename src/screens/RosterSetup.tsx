@@ -86,7 +86,7 @@ export function RosterSetup({
           return (
             <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap', padding: 'var(--space-3)', border: '1px solid var(--border)', borderRadius: 'var(--radius-card)' }}>
               <input
-                key={p.id} defaultValue={p.name} aria-label="Player name"
+                key={p.id + ':' + p.updatedAt} defaultValue={p.name} aria-label="Player name"
                 onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== p.name) onUpdatePlayer(p.id, { name: v }); }}
                 style={{ height: 'var(--tap-min)', padding: '0 var(--space-3)', font: '400 16px var(--font-sans)', border: '1px solid var(--border)', borderRadius: 'var(--radius-control)', background: 'var(--bg)', color: 'var(--text)' }} />
               <div style={{ display: 'flex' }} role="radiogroup" aria-label="Rating">
