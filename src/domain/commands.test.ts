@@ -111,6 +111,18 @@ describe('finishGame', () => {
     const log = boot(['a', 'b', 'c', 'd', 'e'], 'balanced', 1);
     expect(finishGame(replay(log), 1)).not.toBeNull();
   });
+
+  it('balanced counts the picked winner without starting a streak, and the waiting four take the court', () => {
+    let log = boot(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], 'balanced', 1);
+    const before = replay(log);
+    const winners = before.games[1]!.pairs[0];
+    log = [...log, ...seal(finishGame(before, 1, 0)!)];
+    const after = replay(log);
+    expect(after.wins).toEqual({ [winners[0]]: 1, [winners[1]]: 1 });
+    expect(after.consecutiveWins).toEqual({ a: 0, b: 0, c: 0, d: 0 }); // no streaks outside the winners templates
+    // all four went to the back, so the four who were waiting take the court
+    expect(after.games[1]!.pairs.flat().sort()).toEqual(['e', 'f', 'g', 'h']);
+  });
 });
 
 describe('rotation fairness and preview stability', () => {

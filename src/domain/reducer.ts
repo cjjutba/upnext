@@ -154,13 +154,16 @@ export function applyEvent(state: SessionState, e: SessionEvent): SessionState {
       };
       const rule = state.rule;
       const winnersMode = isWinnersTemplate(rule.template);
+      // every mode records the win; only the winners templates let it change who keeps the court
+      const wins = e.winnerPair === undefined ? state.wins : bumpAll(state.wins, [...active.pairs[e.winnerPair]]);
       if (!winnersMode || e.winnerPair === undefined) {
-        // casual finish: a recorded winner counts and leads the four to the back; legacy events without one keep lineup order
-        const wp = winnersMode ? undefined : e.winnerPair;
-        const leaving = wp === undefined ? players : [...active.pairs[wp], ...active.pairs[wp === 0 ? 1 : 0]];
+        // casual finish: the winners lead the four to the back; legacy events without a winner keep lineup order
+        const leaving = e.winnerPair === undefined
+          ? players
+          : [...active.pairs[e.winnerPair], ...active.pairs[e.winnerPair === 0 ? 1 : 0]];
         return {
           ...base,
-          wins: wp === undefined ? state.wins : bumpAll(state.wins, [...active.pairs[wp]]),
+          wins,
           queue: [...state.queue, ...leaving],
           consecutiveWins: resetAll(state.consecutiveWins, players),
           pairingCycle: state.pairingCycle + 1,
@@ -168,7 +171,6 @@ export function applyEvent(state: SessionState, e: SessionEvent): SessionState {
       }
       const winners = active.pairs[e.winnerPair];
       const losers = active.pairs[e.winnerPair === 0 ? 1 : 0];
-      const wins = bumpAll(state.wins, [...winners]);
       const streak = (p: string) => (state.consecutiveWins[p] ?? 0) + 1;
       // queue placement order below is load bearing: templates infer who kept the court from the queue front
       if (rule.template === 'winners-stay') {

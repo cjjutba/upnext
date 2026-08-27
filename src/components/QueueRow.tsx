@@ -20,7 +20,7 @@ export function QueueRow({ position, name, games, sitOut, nextFour, nextUpLabel,
       </span>
       {nextUpLabel && !sitOut ? <span className="micro-label">Next up</span> : null}
       <CountBadge value={games} title="Games played" />
-      <IconButton name={sitOut ? 'moon' : 'sun'} label={(sitOut ? 'Return ' : 'Sit out ') + name} onClick={onToggleSit} />
+      <IconButton icon={sitOut ? 'moon' : 'sun'} ariaLabel={(sitOut ? 'Return ' : 'Sit out ') + name} onClick={onToggleSit} />
     </div>
   );
 }

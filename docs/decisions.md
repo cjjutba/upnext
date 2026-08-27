@@ -1,0 +1,148 @@
+# Decisions
+
+Why the code is shaped this way. Each entry is the decision, the reason, and
+what it costs you. Sourced from code comments, the specs, and the git history.
+
+## 1. Event sourcing instead of stored state
+
+A session is an append-only log, and `SessionState` exists only as the result
+of `replay()`.
+
+Cloud sync is a v2 concern, and the shape it needs is an event upload. Storing
+derived state instead would mean rewriting the persistence layer to get there.
+Undo, crash recovery, resume, and device handoff all fall out of the same
+mechanism rather than needing four separate features.
+
+The cost: every state change has to be expressible as an event, and replay
+runs over the whole log on every change. For a three-hour session on one
+device that is nothing.
+
+## 2. ULID ids as the canonical order
+
+Replay sorts by `id` ascending. Ids come from a monotonic ULID factory, so
+they are globally unique and time sortable.
+
+Sorting by `ts` would break on a clock change and tie on same-millisecond
+events. Sorting by `seq` works on one device and falls apart across two.
+`[sessionId+seq]` exists in the schema, unused, waiting for sync.
+
+## 3. No sessions table
+
+The compound `[type+sessionId]` index answers "what sessions exist" by pulling
+`session-started` and `session-ended` rows. The index is the sessions table.
+
+A real table would be a second source of truth about something the log already
+knows, and it would need to be kept correct on undo. History renders without
+replaying anything.
+
+## 4. Undo is an event, not a delete
+
+`event-undone { targetEventId }` makes replay skip the target. The log stays
+append-only and the audit trail stays complete.
+
+Redo needs no extra machinery: an `event-undone` pointing at another
+`event-undone` cancels it and reinstates the original. One recursive
+definition in `computeSkipped()` covers both directions.
+
+The cost: `computeSkipped()` runs on every replay, and a malformed cycle in an
+imported log would recurse forever without the seed-as-false guard.
+
+## 5. One promise queue in useSession
+
+Every log mutation goes through a single serialized queue. Commit `76b230f`.
+
+Two fast taps could otherwise merge events into memory in an order that
+differs from the ULID order a reload would replay, and a double tap on undo
+could target the same event twice, which breaks the redo chain. Both cases are
+pinned by tests in `src/state/useSession.test.tsx`.
+
+This is a courtside app used by someone in a hurry. Double taps are the normal
+case, not the edge case.
+
+## 6. Commands simulate their own events
+
+`simulate()` in `src/domain/commands.ts` runs an event through `applyEvent`
+with a throwaway envelope, so a command can see the state its first event
+produces and decide what follows.
+
+A check-in that brings the queue to four has to know the player is queued
+before it can decide to fill a court. The alternative is duplicating reducer
+logic inside the command layer, which would drift.
+
+The sim envelopes never escape the module, which is what makes the
+module-level counter behind them acceptable.
+
+## 7. Rotation derives from games played together
+
+The tie-break rotation in `pickPairing()` and `freshFill()` uses
+`gamesTogether(state, four)`, not the session-global `pairingCycle`. Commit
+`c2db7ef`.
+
+This was a bug fix. Any non-winners finish bumps `pairingCycle`, so a pairing
+computed for the Up next preview could differ from the fill moments later, on
+a different court. The count of finished games that exact four have played
+together is identical before and after an unrelated finish, so the preview
+always equals the fill it promises.
+
+`pairingCycle` is still incremented for event compatibility and read by
+nothing.
+
+## 8. The front four always play
+
+A matching mode chooses among the three partitions of the front four eligible
+players. It never chooses the players.
+
+Rating-aware matching that reorders the queue would produce better games and
+break the paddle-rack promise: longest waiting plays next. That promise is why
+anyone trusts the app to run the night. A dedicated test in
+`templates.test.ts` pins it, and the property suite re-checks it across all
+five templates.
+
+## 9. isWinnersTemplate as the single check
+
+`isWinnersTemplate(t)` in `src/domain/types.ts`, used everywhere a winner
+matters. Commit `62121d9`.
+
+Four places had hand-rolled the check, and one of them used `!== 'all-off'` as
+a proxy. When `balanced` and `social` were added, that proxy started refusing
+one-tap finishes in both new modes. The named predicate makes the next mode
+addition safe by default.
+
+## 10. Timers derive from event timestamps
+
+A court timer is `now - game.startedAt`, where `startedAt` is the `ts` of the
+`game-started` event.
+
+Resume replays it exactly, with no separate timer state to restore. The
+tradeoff, accepted knowingly: an OS clock change mid-session makes the display
+jump.
+
+## 11. Light mode, monochrome, zero motion
+
+The v1 brief started as dark-first with a lime accent and 150 to 250ms
+transitions. All three were dropped.
+
+The lime read generic. The dark default became one light theme, on the
+argument that dark mode deserves to be designed rather than inverted. Motion
+went because the product should feel instant, and a court refilling with a
+150ms slide is 150ms of an organizer waiting.
+
+## 12. Sitting out freezes the queue spot
+
+A sitting-out player keeps their position and the game-former skips them until
+they return.
+
+This is deliberately generous. It works for bathroom breaks and technically
+rewards a twenty-minute wander. The always-visible games-played count is the
+correction, socially rather than mechanically. Enforcing it in code would mean
+guessing at intent.
+
+## 13. Invalid events no-op instead of throwing
+
+Every case in `applyEvent` returns the state unchanged when a guard fails, and
+the switch has a `default` that does the same.
+
+The UI already prevents these, so this is not the primary defense. It is there
+so a log imported from another device, or written by a newer build with an
+event type this one has never seen, degrades instead of crashing. A v1 build
+reading a v1.1 log skips `court-added` and keeps working.

@@ -29,7 +29,7 @@ export function CourtCard({ court, status, pairs, elapsed, onWin, onClose, onReo
         {closed ? (
           <Button variant="ghost" onClick={onReopen} ariaLabel={'Reopen court ' + court}>Reopen</Button>
         ) : (
-          <IconButton name="x" label={'Close court ' + court} onClick={onClose} />
+          <IconButton icon="x" ariaLabel={'Close court ' + court} onClick={onClose} />
         )}
       </div>
       {closed || !pairs ? (
@@ -41,6 +41,7 @@ export function CourtCard({ court, status, pairs, elapsed, onWin, onClose, onReo
       ) : (
         <>
           <CourtDiagram pairs={pairs} />
+          {/* every mode records the winner so standings mean something */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <Button size="lg" block icon="trophy" onClick={() => onWin(0)} ariaLabel={'Team 1 wins on court ' + court}>Team 1 wins</Button>
             <Button size="lg" block icon="trophy" onClick={() => onWin(1)} ariaLabel={'Team 2 wins on court ' + court}>Team 2 wins</Button>

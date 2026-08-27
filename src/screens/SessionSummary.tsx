@@ -1,20 +1,42 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../components/Button';
 import { TimerDisplay } from '../components/TimerDisplay';
+import { podiumPhrase } from '../domain/announce';
+import { standings, winRateLabel } from '../domain/standings';
 import type { Player, SessionState } from '../domain/types';
-import { isWinnersTemplate } from '../domain/types';
 import { fmt } from './SessionBoard';
 
-export function SessionSummary({ state, players, onExport, onDone }: {
-  state: SessionState; players: Player[]; onExport: () => void; onDone: () => void;
+const TOP = 10;
+const COLS = '48px 1fr 88px 64px 64px 88px';
+
+export function SessionSummary({ state, players, onExport, onDone, speak, canSpeak }: {
+  state: SessionState;
+  players: Player[];
+  onExport: () => void;
+  onDone: () => void;
+  speak: (text: string) => void;
+  /** False while muted, when the podium button would do nothing. */
+  canSpeak: boolean;
 }) {
   const nameOf = (id: string) => players.find((p) => p.id === id)?.name ?? 'Unknown';
-  const trackWins = isWinnersTemplate(state.rule.template);
-  const rows = Object.keys(state.gamesPlayed).sort(
-    (a, b) => (state.gamesPlayed[b] - state.gamesPlayed[a]) || nameOf(a).localeCompare(nameOf(b)),
-  );
+  const rows = useMemo(() => standings(state, nameOf), [state, players]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? rows : rows.slice(0, TOP);
+
   const sessionSeconds = ((state.endedAt ?? Date.now()) - state.startedAt) / 1000;
   const longest = state.finishedGames.reduce((m, g) => Math.max(m, (g.endedAt - g.startedAt) / 1000), 0);
-  const cols = trackWins ? '48px 1fr 96px 96px' : '48px 1fr 96px';
+  const decided = rows.some((r) => r.decided > 0);
+
+  const readPodium = () => speak(podiumPhrase(rows, nameOf));
+
+  // the podium reads itself once when the screen opens; a re-render must not repeat it
+  const readRef = useRef(false);
+  useEffect(() => {
+    if (readRef.current) return;
+    readRef.current = true;
+    readPodium();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div style={{ maxWidth: '760px', margin: '0 auto', padding: 'var(--space-5) var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
@@ -23,20 +45,44 @@ export function SessionSummary({ state, players, onExport, onDone }: {
         <TimerDisplay value={fmt(longest)} size="md" muted label="Longest game" />
       </div>
       <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-card)', overflow: 'hidden' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: cols, gap: 'var(--space-2)', padding: '12px var(--space-4)', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '12px var(--space-4)', borderBottom: '1px solid var(--border)' }}>
+          <span className="micro-label">{showAll || rows.length <= TOP ? 'Final standings' : `Top ${TOP}`}</span>
+          <span style={{ flex: 1 }} />
+          <Button variant="secondary" icon="volume-2" disabled={!canSpeak || !decided} onClick={readPodium}>
+            Read podium
+          </Button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 'var(--space-2)', padding: '10px var(--space-4)', borderBottom: '1px solid var(--border)' }}>
           <span className="micro-label">#</span>
           <span className="micro-label">Player</span>
           <span className="micro-label" style={{ textAlign: 'right' }}>Games</span>
-          {trackWins ? <span className="micro-label" style={{ textAlign: 'right' }}>Wins</span> : null}
+          <span className="micro-label" style={{ textAlign: 'right' }}>W</span>
+          <span className="micro-label" style={{ textAlign: 'right' }}>L</span>
+          <span className="micro-label" style={{ textAlign: 'right' }}>Win rate</span>
         </div>
-        {rows.map((id, i) => (
-          <div key={id} style={{ display: 'grid', gridTemplateColumns: cols, gap: 'var(--space-2)', alignItems: 'center', minHeight: 'var(--tap-min)', padding: '0 var(--space-4)', borderBottom: i < rows.length - 1 ? '1px solid var(--border)' : 'none' }}>
-            <span className="mono" style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{i + 1}</span>
-            <span className="display" style={{ fontSize: 'var(--text-h3)' }}>{nameOf(id)}</span>
-            <span className="mono" style={{ fontSize: '18px', textAlign: 'right' }}>{state.gamesPlayed[id]}</span>
-            {trackWins ? <span className="mono" style={{ fontSize: '18px', textAlign: 'right', color: 'var(--text-secondary)' }}>{state.wins[id] ?? 0}</span> : null}
+        {visible.map((row, i) => (
+          <div key={row.playerId} style={{
+            display: 'grid', gridTemplateColumns: COLS, gap: 'var(--space-2)', alignItems: 'center',
+            minHeight: 'var(--tap-min)', padding: '0 var(--space-4)',
+            borderBottom: i < visible.length - 1 ? '1px solid var(--border)' : 'none',
+          }}>
+            <span className="mono" style={{ fontSize: row.rank <= 3 ? 'var(--text-h2)' : '14px', color: row.rank <= 3 ? 'var(--text)' : 'var(--text-secondary)' }}>
+              {row.rank}
+            </span>
+            <span className="display" style={{ fontSize: 'var(--text-h3)' }}>{nameOf(row.playerId)}</span>
+            <span className="mono" style={{ fontSize: '18px', textAlign: 'right' }}>{row.games}</span>
+            <span className="mono" style={{ fontSize: '18px', textAlign: 'right' }}>{row.wins}</span>
+            <span className="mono" style={{ fontSize: '18px', textAlign: 'right', color: 'var(--text-secondary)' }}>{row.losses}</span>
+            <span className="mono" style={{ fontSize: '18px', textAlign: 'right', color: 'var(--text-secondary)' }}>{winRateLabel(row)}</span>
           </div>
         ))}
+        {rows.length > TOP ? (
+          <div style={{ borderTop: '1px solid var(--border)', padding: 'var(--space-2) var(--space-3)' }}>
+            <Button variant="ghost" block onClick={() => setShowAll(!showAll)}>
+              {showAll ? `Show top ${TOP}` : `Show all ${rows.length} players`}
+            </Button>
+          </div>
+        ) : null}
       </div>
       <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
         <Button size="lg" icon="share-2" onClick={onExport}>Share summary</Button>

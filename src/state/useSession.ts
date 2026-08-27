@@ -7,6 +7,12 @@ import type { SessionEvent, SessionState } from '../domain/types';
 export interface SessionApi {
   events: SessionEvent[];
   state: SessionState;
+  /**
+   * The events the last dispatch appended, a fresh array every time. Emptied by
+   * loadById and reset, which is what stops a resume from re-announcing the
+   * whole log: replayed events are never a batch.
+   */
+  lastBatch: SessionEvent[];
   /** Append command events. Accepts null so callers can pass a command result directly. */
   dispatch: (commands: CommandEvent[] | null) => Promise<void>;
   undo: () => Promise<void>;
@@ -19,6 +25,7 @@ export interface SessionApi {
 
 export function useSession(): SessionApi {
   const [events, setEvents] = useState<SessionEvent[]>([]);
+  const [lastBatch, setLastBatch] = useState<SessionEvent[]>([]);
   const state: SessionState = useMemo(() => replay(events), [events]);
 
   /**
@@ -45,6 +52,7 @@ export function useSession(): SessionApi {
     for (const c of commands) appended.push(await append(c));
     logRef.current = [...logRef.current, ...appended];
     setEvents(logRef.current);
+    setLastBatch(appended);
   }, []);
 
   const dispatch = useCallback(
@@ -90,6 +98,7 @@ export function useSession(): SessionApi {
       enqueue(async () => {
         logRef.current = await loadSession(sessionId);
         setEvents(logRef.current);
+        setLastBatch([]);
       }),
     [enqueue],
   );
@@ -98,12 +107,14 @@ export function useSession(): SessionApi {
     void enqueue(async () => {
       logRef.current = [];
       setEvents([]);
+      setLastBatch([]);
     });
   }, [enqueue]);
 
   return {
     events,
     state,
+    lastBatch,
     dispatch,
     undo,
     redo,

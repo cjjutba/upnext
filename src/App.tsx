@@ -1,28 +1,36 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSession } from './state/useSession';
 import { useRoster } from './state/useRoster';
+import { useAnnouncer } from './state/useAnnouncer';
 import { RosterSetup } from './screens/RosterSetup';
 import { SessionBoard, fmt } from './screens/SessionBoard';
 import { SessionSummary } from './screens/SessionSummary';
 import { ModeMenu } from './components/ModeMenu';
 import { Button } from './components/Button';
+import { IconButton } from './components/IconButton';
+import { StandingsModal } from './components/StandingsModal';
 import { append, lastSessionAttendees, listSessions } from './db/eventStore';
 import { useWakeLock } from './lib/useWakeLock';
 import { useRoute } from './lib/useRoute';
+import { useSpeech } from './lib/useSpeech';
 import { shareSessionFile, importSessionFile } from './lib/exportFile';
 import * as cmd from './domain/commands';
 import { nextLineup } from './domain/templates';
+import { leaderPhrase, upNextPhrase } from './domain/announce';
+import { standings } from './domain/standings';
 import { isWinnersTemplate } from './domain/types';
-import type { RuleTemplate } from './domain/types';
+import type { Pairs, RuleTemplate } from './domain/types';
 
 export default function App() {
   const session = useSession();
   const roster = useRoster();
+  const speech = useSpeech();
   const [route, navigate] = useRoute();
   const [selected, setSelected] = useState<string[]>([]);
   const [clock, setClock] = useState(() => Date.now());
   const [resuming, setResuming] = useState(true);
   const [returningIds, setReturningIds] = useState<string[]>([]);
+  const [standingsOpen, setStandingsOpen] = useState(false);
   const { state, dispatch } = session;
 
   useEffect(() => {
@@ -58,6 +66,28 @@ export default function App() {
     if (!resuming && misrouted) navigate('setup', { replace: true });
   }, [resuming, misrouted, navigate]);
 
+  const nameOf = (id: string) => roster.players.find((p) => p.id === id)?.name ?? 'Unknown';
+
+  // null in the winners templates, where the next lineup depends on who wins
+  const nextUp: Pairs | null =
+    route === 'board' && !isWinnersTemplate(state.rule.template) ? nextLineup(state, null, roster.ratings) : null;
+
+  useAnnouncer({
+    lastBatch: session.lastBatch,
+    state,
+    nextUp,
+    nameOf,
+    speak: speech.speak,
+    // names come from the roster, so wait for it rather than calling four Unknowns to a court
+    active: route === 'board' && roster.players.length > 0,
+  });
+
+  const rows = useMemo(
+    () => standings(state, nameOf),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [state, roster.players],
+  );
+
   const start = async (config: { courts: number; template: RuleTemplate; winCap: number }) => {
     // close out any dangling live session so history never holds two in-progress logs
     const dangling = (await listSessions()).filter((s) => s.endedAt === null);
@@ -79,15 +109,25 @@ export default function App() {
   };
 
   const end = async () => {
+    speech.cancel(); // a queued court call must not talk over the podium
     await dispatch(cmd.endSession(state));
     navigate('summary');
   };
 
   const fresh = () => {
+    speech.cancel();
     session.reset();
     setSelected([]);
     navigate('setup');
   };
+
+  const muteToggle = speech.supported ? (
+    <IconButton
+      icon={speech.enabled ? 'volume-2' : 'volume-x'}
+      ariaLabel={speech.enabled ? 'Mute announcements' : 'Unmute announcements'}
+      pressed={!speech.enabled}
+      onClick={speech.toggle} />
+  ) : null;
 
   const header = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '12px var(--space-4)', borderBottom: '1px solid var(--border)', background: 'var(--bg)', position: 'sticky', top: 0, zIndex: 10 }}>
@@ -99,12 +139,15 @@ export default function App() {
           <span className="mono" style={{ fontSize: '20px' }}>
             {fmt((clock - state.startedAt) / 1000)}
           </span>
+          <IconButton icon="trophy" ariaLabel="Live standings" onClick={() => setStandingsOpen(true)} />
+          {muteToggle}
           <Button variant="secondary" onClick={() => void end()}>End session</Button>
         </>
       ) : route === 'summary' ? (
         <>
           <span className="micro-label">Session summary</span>
           <span style={{ flex: 1 }} />
+          {muteToggle}
         </>
       ) : (
         <>
@@ -113,6 +156,7 @@ export default function App() {
             {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
           </span>
           <span style={{ flex: 1 }} />
+          {muteToggle}
         </>
       )}
     </div>
@@ -156,7 +200,9 @@ export default function App() {
           onToggleCheck={toggleBoardCheck}
           onAddCourt={() => void dispatch(cmd.addCourt(state, roster.ratings))}
           onAddPlayer={(n) => void addAndCheckIn(n)}
-          nextUp={isWinnersTemplate(state.rule.template) ? null : nextLineup(state, null, roster.ratings)}
+          nextUp={nextUp}
+          onCallUpNext={() => nextUp && speech.speak(upNextPhrase(nextUp, nameOf))}
+          canCallUpNext={speech.supported && speech.enabled}
         />
       ) : (
         <SessionSummary
@@ -164,8 +210,19 @@ export default function App() {
           players={roster.players}
           onExport={() => state.sessionId && void shareSessionFile(state.sessionId)}
           onDone={fresh}
+          speak={speech.speak}
+          canSpeak={speech.supported && speech.enabled}
         />
       )}
+      {standingsOpen ? (
+        <StandingsModal
+          rows={rows}
+          nameOf={nameOf}
+          onClose={() => setStandingsOpen(false)}
+          onRead={() => speech.speak(leaderPhrase(rows, nameOf))}
+          canRead={speech.supported && speech.enabled}
+        />
+      ) : null}
     </div>
   );
 }
