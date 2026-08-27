@@ -18,7 +18,7 @@ them; callers never set them.
 | `ts` | number | Wall clock ms. Timers derive from this, so a resume replays identically |
 | `v` | `1` | Schema version. Nothing reads it yet. Bump only for a breaking payload change |
 
-## The 14 event types
+## The 17 event types
 
 Guards run in order. When any guard fails the reducer returns the state
 unchanged. That is not an error path, it is the design: a log written by
@@ -28,20 +28,50 @@ another device or a newer build must never crash replay.
 |---|---|---|---|
 | `session-started` | `courts`, `template`, `config.winCap` | not already started | Resets to `emptyState()` with `sessionId`, `startedAt = ts`, `courtCount`, `rule` |
 | `rule-changed` | `template`, `config.winCap` | started, not ended | Replaces `rule`. Takes effect on the next finish, including games started under the old mode |
-| `player-checked-in` | `playerId` | started, not ended, not queued, not playing | Appends to `checkedIn` if new, clears from `departed` and `sittingOut`, pushes to the queue back |
+| `player-checked-in` | `playerId` | started, not ended, not queued, not playing, not staged | Appends to `checkedIn` if new, clears from `departed` and `sittingOut`, pushes to the queue back |
 | `player-departed` | `playerId` | must be in the queue | Removes from queue and `sittingOut`, adds to `departed`, resets the win streak. Cannot depart mid-game or twice |
 | `player-sat-out` | `playerId` | in queue, not already sitting | Adds to `sittingOut`. The queue position is kept |
 | `player-returned` | `playerId` | currently sitting out | Removes from `sittingOut` |
-| `game-started` | `court`, `pairs` | started, not ended; court empty, not closed, within `1..courtCount`; four distinct players; all queued and none sitting out | Removes the four from the queue, creates the active game with `startedAt = ts` |
+| `game-started` | `court`, `pairs` | started, not ended; court empty, not closed, within `1..courtCount`; four distinct players; either exactly the four staged on that court, or all queued and none sitting out | Clears `staged[court]`, removes the four from the queue, creates the active game with `startedAt = ts` |
+| `game-staged` | `court`, `pairs`, `auto?` | started, not ended; no live game on the court, not closed, within `1..courtCount`; four distinct players; every *added* player queued and not sitting out | Sets `staged[court]`. Added players leave the queue, replaced players go to the queue **front**. Handles a fresh stage and a restage after a substitution with the same code |
+| `game-unstaged` | `court` | the court has a staged four | Sends them to the queue **front**, clears `staged[court]` |
+| `queue-swapped` | `playerA`, `playerB` | both in the queue, distinct | Exchanges the two queue positions |
 | `game-lineup-changed` | `court`, `pairs` | court has an active game; four distinct; any added player is queued and not sitting out | Swaps the pairs. Replaced players go to the queue front. `startedAt` is untouched, so the timer keeps running |
 | `game-finished` | `court`, `winnerPair?`, `score?` | court has an active game; `winnerPair` is `undefined`, `0`, or `1` | Ends the game, bumps `gamesPlayed` for all four, appends to `finishedGames`, then places the four in the queue by mode. See below |
-| `court-closed` | `court` | not already closed; within `1..courtCount` | Voids any game in progress without counting it and sends its four to the queue **front**, resets their streaks, adds to `closedCourts` |
+| `court-closed` | `court` | not already closed; within `1..courtCount` | Voids any game in progress without counting it, sends its four and any staged four to the queue **front**, resets the playing four's streaks, adds to `closedCourts` |
 | `court-reopened` | `court` | currently closed | Clears the closed flag. The command then refills |
 | `court-added` | none | started, not ended | `courtCount + 1`. Courts are only ever added. Closing covers taking one out of service |
 | `event-undone` | `targetEventId` | none | No direct effect. `replay()` handles it through `computeSkipped()` |
 | `session-ended` | none | started, not ended | `ended = true`, `endedAt = ts` |
 
 `score` is on the `game-finished` payload and no UI writes it yet.
+
+`auto` on `game-staged` records why the event exists: `true` for a stage a
+command emitted as a fill, absent for one the organizer asked for. The reducer
+ignores it. Only `undoTarget()` reads it, so that one undo reverts a win
+together with the stage it caused while a deliberate substitution stays
+undoable on its own.
+
+## Staged versus live
+
+A court holds four people in one of two states. `staged` means they are on the
+court with the clock stopped, waiting for the organizer to tap Start.
+`games[court]` means the clock is running.
+
+Staged players leave the queue, exactly like players in a live game, so a
+checked-in, non-departed player is in exactly one of three places: the queue, a
+staged court, or a live court. `stagedCourtOf()` and `isStaged()` in
+`src/domain/reducer.ts` answer where.
+
+`staged` is a field of its own rather than a flag inside `ActiveGame` on
+purpose: `isPlaying()`, `standings.ts`, `pairHistory()`, and the summary all
+iterate `state.games` and assume the clock is running. A flag would put a check
+in every one of them.
+
+Because `player-departed` and `player-sat-out` both require the player to be in
+the queue, the commands for those pull a staged player off the court first,
+either by substituting whoever is next up into their slot or by unstaging the
+whole four when nobody is waiting.
 
 ## Queue placement on finish
 
@@ -76,7 +106,8 @@ Every field is derived by replay and none is stored. From
 | `sittingOut` | Players who keep a queue spot but are skipped when forming games |
 | `departed` | Left for the night. A later check-in clears this |
 | `queue` | Waiting order, front first. Sitting-out players stay in place |
-| `games` | `Record<court, ActiveGame>`. A missing key means an empty court |
+| `games` | `Record<court, ActiveGame>`. A missing key means no live game |
+| `staged` | `Record<court, Pairs>`. Four on the court with the clock stopped |
 | `closedCourts` | Out of service. Never filled |
 | `gamesPlayed`, `wins` | Per player counters |
 | `consecutiveWins` | Current streak on court, for the win cap. Reset when a player leaves the court |
@@ -95,12 +126,17 @@ id as `false` before recursing, which keeps a malformed cycle from hanging
 replay.
 
 - `undoTarget(events)` scans from newest, skipping `event-undone` events,
-  already-skipped events, and `game-started` fills, and returns the first real
-  action. Fills are never undone directly: skipping the action that caused one
-  invalidates the fill on replay (the court is still occupied, its players
-  never queued), so a single undo reverts a team win together with the refill
-  it triggered. It returns `null` at `session-started`, which is never
-  undoable.
+  already-skipped events, and `game-staged` events carrying `auto`, and returns
+  the first real action. Auto stages are never undone directly: skipping the
+  action that caused one invalidates the stage on replay (its players were
+  never queued), so a single undo reverts a team win together with the stage it
+  triggered. A `game-started` is a deliberate tap, so it stays undoable and puts
+  the court back to staged. It returns `null` at `session-started`, which is
+  never undoable.
+
+  A log written before staging existed contains auto-fill `game-started`
+  events. Those replay identically, but the undo pill on such a resumed session
+  points at the refill rather than the win behind it.
 - `redoTarget(events)` scans from newest, skipping skipped events. The first
   `event-undone` it meets is the redo target. Any other event type that is not
   `session-started` returns `null`, so taking a new action clears the redo.
@@ -115,7 +151,8 @@ breaks the redo chain. `src/state/useSession.test.tsx` pins both cases.
 ## Templates and pairing
 
 A template never runs during replay. It runs inside a command, and the lineup
-it picks is written into the `game-started` event.
+it picks is written into the `game-staged` event, then carried unchanged into
+the `game-started` that promotes it.
 
 `nextLineup(state, lastFinished, ratings)` in `src/domain/templates.ts`:
 
@@ -154,8 +191,14 @@ have played together. `freshFill()` uses the same rotation for its
 exactly-four case.
 
 That counter matters more than it looks. It is stable across an unrelated
-court finishing, so the Up next preview always equals the fill it promises.
+court finishing, so the Up next preview always equals the lineup it promises.
 Using the session-global `pairingCycle` here was a real bug, fixed in `c2db7ef`.
+
+`previewLineups(state, ratings, max)` feeds the queue section under the courts.
+The first chunk is `nextLineup(state, null, ratings)` verbatim, so it is exactly
+what staging a court would produce. Later chunks partition the following fours
+as `[[a,c],[b,d]]` and are indicative: what they actually play depends on
+results that have not happened yet.
 
 ## Dexie schema
 

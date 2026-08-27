@@ -50,6 +50,9 @@ wins.
 | Pairing rotation comes from `pairingCycle` (both plans) | It comes from `gamesTogether()` in `../src/domain/templates.ts`. `pairingCycle` is still incremented for event compatibility and read by nothing |
 | Players carry a free-form `level` tag (v1 spec) | `level` is on the type and unused. Star `rating` replaced it |
 | Three rotation templates (v1 spec) | Five template ids behind four user-facing modes |
+| Courts fill and start automatically (both plans, v1 spec) | Commands emit `game-staged`; only the Start button emits `game-started`. See decisions 14 and 15 |
+| The queue lives in the right rail (both plans) | It sits under the courts in the main column, drawn on `CourtDiagram`. The rail holds check-in alone |
+| An automatic "Up next" call fires when the queue settles (v1.1 plan) | It does not. The Call players button is the only up next call |
 
 Two things no document mentioned before now: the `meta` Dexie table, which
 holds the per-device `seq` counter, and the fact that `.oxlintrc.json` has no
