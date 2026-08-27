@@ -50,6 +50,7 @@ wins.
 | Pairing rotation comes from `pairingCycle` (both plans) | It comes from `gamesTogether()` in `../src/domain/templates.ts`. `pairingCycle` is still incremented for event compatibility and read by nothing |
 | Players carry a free-form `level` tag (v1 spec) | `level` is on the type and unused. Star `rating` replaced it |
 | Three rotation templates (v1 spec) | Five template ids behind four user-facing modes |
+| Colored buttons are banned outright (design brief) | End session is solid `--danger` red. It is the only one, and the ban holds everywhere else |
 
 Two things no document mentioned before now: the `meta` Dexie table, which
 holds the per-device `seq` counter, and the fact that `.oxlintrc.json` has no

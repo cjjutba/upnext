@@ -141,7 +141,7 @@ export default function App() {
           </span>
           <IconButton icon="trophy" ariaLabel="Live standings" onClick={() => setStandingsOpen(true)} />
           {muteToggle}
-          <Button variant="secondary" onClick={() => void end()}>End session</Button>
+          <Button variant="danger" onClick={() => void end()}>End session</Button>
         </>
       ) : route === 'summary' ? (
         <>
