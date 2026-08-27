@@ -5,7 +5,9 @@ import { CheckinTile, type TileState } from '../components/CheckinTile';
 import { UndoPill } from '../components/UndoPill';
 import { Button } from '../components/Button';
 import { IconButton } from '../components/IconButton';
-import type { Pairs, Player, SessionState } from '../domain/types';
+import type { Player, SessionState } from '../domain/types';
+import type { UpNextPreview } from '../domain/templates';
+import { modeLabel } from '../domain/modes';
 import { isPlaying } from '../domain/reducer';
 
 // wall clock on purpose: timers derive from event ts so resume replays exactly; a mid-session OS clock change can jump timers, accepted trade-off
@@ -22,7 +24,7 @@ export { fmt };
 
 export function SessionBoard({
   state, players, undoLabel, onUndo, canRedo, onRedo, onWin, onCloseCourt, onReopenCourt,
-  onToggleSit, onToggleCheck, onAddCourt, onAddPlayer, nextUp, onCallUpNext, canCallUpNext,
+  onToggleSit, onToggleCheck, onAddCourt, onAddPlayer, preview, onCallUpNext, canCallUpNext,
 }: {
   state: SessionState;
   players: Player[];
@@ -37,7 +39,8 @@ export function SessionBoard({
   onToggleCheck: (playerId: string) => void;
   onAddCourt: () => void;
   onAddPlayer: (name: string) => void;
-  nextUp: Pairs | null;
+  /** A full lineup, or just the two challengers a winners template can promise. */
+  preview: UpNextPreview | null;
   onCallUpNext: () => void;
   /** False while muted, when the call button would do nothing. */
   canCallUpNext: boolean;
@@ -87,18 +90,24 @@ export function SessionBoard({
         <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
             <span className="micro-label">Queue</span>
+            {/* the pairing below is a mode's decision, so the mode is named next to it */}
+            <span style={{ font: '400 13px/1 var(--font-sans)', color: 'var(--text-tertiary)' }}>{modeLabel(state.rule.template)}</span>
             <span style={{ flex: 1 }} />
             <span className="mono" style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>{eligibleQueue.length} waiting</span>
           </div>
-          {nextUp ? (
+          {preview ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '0 var(--space-2) 4px var(--space-3)' }}>
-              <span className="micro-label">Up next</span>
+              <span className="micro-label">{preview.kind === 'lineup' ? 'Up next' : 'Next challengers'}</span>
               <span className="display" style={{ fontSize: '15px' }}>
-                {nextUp[0].map(nameOf).join(' + ')} vs {nextUp[1].map(nameOf).join(' + ')}
+                {preview.kind === 'lineup'
+                  ? `${preview.pairs[0].map(nameOf).join(' + ')} vs ${preview.pairs[1].map(nameOf).join(' + ')}`
+                  : preview.pair.map(nameOf).join(' and ')}
               </span>
               <span style={{ flex: 1 }} />
               {canCallUpNext ? (
-                <IconButton icon="volume-2" ariaLabel="Call up next" onClick={onCallUpNext} size="sm" />
+                <IconButton
+                  icon="volume-2" size="sm" onClick={onCallUpNext}
+                  ariaLabel={preview.kind === 'lineup' ? 'Call up next' : 'Call next challengers'} />
               ) : null}
             </div>
           ) : null}

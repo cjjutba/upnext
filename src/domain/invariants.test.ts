@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
 import { replay, isPlaying } from './reducer';
 import * as cmd from './commands';
-import type { SessionEvent, SessionState } from './types';
+import type { RuleTemplate, SessionEvent, SessionState } from './types';
 
 const PLAYERS = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10'];
 
@@ -15,22 +15,24 @@ function seal(events: cmd.CommandEvent[]): SessionEvent[] {
 }
 
 interface Op {
-  kind: 'finish' | 'checkin' | 'sit' | 'return' | 'depart' | 'close' | 'reopen' | 'undo' | 'addcourt';
+  kind: 'finish' | 'checkin' | 'sit' | 'return' | 'depart' | 'close' | 'reopen' | 'undo' | 'addcourt' | 'rule';
   pick: number;
   winner: 0 | 1;
+  template: RuleTemplate;
 }
 
+const TEMPLATES: RuleTemplate[] = ['all-off', 'winners-stay', 'winners-split', 'balanced', 'social'];
+
+const template = fc.constantFrom(...TEMPLATES);
+
 const opArb = fc.record({
-  kind: fc.constantFrom<Op['kind']>('finish', 'checkin', 'sit', 'return', 'depart', 'close', 'reopen', 'undo', 'addcourt'),
+  kind: fc.constantFrom<Op['kind']>('finish', 'checkin', 'sit', 'return', 'depart', 'close', 'reopen', 'undo', 'addcourt', 'rule'),
   pick: fc.nat(29),
   winner: fc.constantFrom<0 | 1>(0, 1),
+  template,
 });
 
-const template = fc.constantFrom<'all-off' | 'winners-stay' | 'winners-split' | 'balanced' | 'social'>(
-  'all-off', 'winners-stay', 'winners-split', 'balanced', 'social',
-);
-
-function run(ops: Op[], tpl: 'all-off' | 'winners-stay' | 'winners-split' | 'balanced' | 'social'): SessionEvent[] {
+function run(ops: Op[], tpl: RuleTemplate): SessionEvent[] {
   let log = seal(cmd.startSession({ courts: 2, template: tpl, winCap: 2 }, PLAYERS.slice(0, 6)));
   for (const op of ops) {
     const s = replay(log);
@@ -85,6 +87,11 @@ function run(ops: Op[], tpl: 'all-off' | 'winners-stay' | 'winners-split' | 'bal
         out = cmd.addCourt(s);
         break;
       }
+      case 'rule': {
+        // the organizer switching mode mid-session, which must never strand a court or a player
+        out = cmd.changeRule(s, op.template, s.rule.winCap);
+        break;
+      }
     }
     if (out) log = [...log, ...seal(out)];
   }
@@ -123,6 +130,25 @@ describe('invariants over random command sequences', () => {
         checkInvariants(s1);
         const s2 = replay(log);
         expect(s2).toEqual(s1); // determinism
+      }),
+      { numRuns: 60 },
+    );
+  });
+
+  it('a mode switch never disturbs a game already in progress', () => {
+    fc.assert(
+      fc.property(fc.array(opArb, { minLength: 1, maxLength: 40 }), template, template, (ops, from, to) => {
+        const log = run(ops as Op[], from);
+        const before = replay(log);
+        const events = cmd.changeRule(before, to, before.rule.winCap);
+        if (!events) return; // re-selecting the live rule is refused
+        const after = replay([...log, ...seal(events)]);
+        expect(after.rule.template).toBe(to);
+        // the new mode governs the next fill, never the courts already playing
+        for (const [court, game] of Object.entries(before.games)) {
+          expect(after.games[Number(court)]).toEqual(game);
+        }
+        checkInvariants(after);
       }),
       { numRuns: 60 },
     );
