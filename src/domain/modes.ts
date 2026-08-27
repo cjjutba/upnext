@@ -13,7 +13,7 @@ export const MODES: ModeInfo[] = [
   { id: 'balanced', label: 'Balanced', description: 'Longest rested play next. Teams balanced by rating, repeat matchups avoided.', recommended: true },
   { id: 'social', label: 'Social mix', description: 'Avoids repeat partners and opponents. Ratings are ignored.' },
   { id: 'classic', label: 'Classic queue', description: 'Pure paddle queue: first four in line play, all four rejoin the back.' },
-  { id: 'winners', label: 'Winners', description: 'Winning pair stays on. Win cap and split winners are configurable.' },
+  { id: 'winners', label: 'Winners', description: 'Winners stay on. With Split on, each winner anchors a new pair instead. Win cap applies.' },
 ];
 
 export function templateForMode(mode: MatchingMode, splitWinners: boolean): RuleTemplate {

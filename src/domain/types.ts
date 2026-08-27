@@ -88,7 +88,7 @@ export interface SessionState {
   /** Consecutive wins on court right now, for the win cap. Reset when a player leaves the court. */
   consecutiveWins: Record<string, number>;
   finishedGames: FinishedGame[];
-  /** Cycles the three pairings when exactly four players share one court under all-off. */
+  /** Cycles the three pairings: exactly four players under all-off, and exact score ties in balanced and social. */
   pairingCycle: number;
 }
 

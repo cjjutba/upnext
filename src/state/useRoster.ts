@@ -23,13 +23,14 @@ export function useRoster() {
     return player;
   }, [refresh]);
 
+  /** A colliding rename is refused, but a rating change in the same call always lands. */
   const updatePlayer = useCallback(async (id: string, changes: { name?: string; rating?: number }) => {
     const existing = await db.players.get(id);
     if (!existing) return;
-    const name = changes.name?.trim();
+    let name = changes.name?.trim();
     if (name && name.toLowerCase() !== existing.name.toLowerCase()) {
       const all = await db.players.toArray();
-      if (all.some((p) => p.id !== id && p.name.toLowerCase() === name.toLowerCase())) return;
+      if (all.some((p) => p.id !== id && p.name.toLowerCase() === name!.toLowerCase())) name = undefined;
     }
     await db.players.put({
       ...existing,
