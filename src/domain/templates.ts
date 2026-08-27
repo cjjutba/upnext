@@ -158,3 +158,23 @@ export function upNextPreview(state: SessionState, ratings: Ratings = {}): UpNex
   const pairs = nextLineup(state, null, ratings);
   return pairs ? { kind: 'lineup', pairs } : null;
 }
+
+/**
+ * The waiting players as court graphics, four at a time, for the queue section
+ * under the courts. The first entry is `upNextPreview`, so it promises only
+ * what the mode can actually promise. A winners template stops there: it cannot
+ * name a four before a winner exists, so it certainly cannot name the one after
+ * that. Later entries partition queue order and are indicative.
+ */
+export function previewLineups(state: SessionState, ratings: Ratings = {}, max = 3): UpNextPreview[] {
+  const first = upNextPreview(state, ratings);
+  if (!first) return [];
+  if (first.kind === 'challengers') return [first];
+  const e = eligible(state);
+  const out: UpNextPreview[] = [first];
+  for (let i = 4; i + 4 <= e.length && out.length < max; i += 4) {
+    const [a, b, c, d] = e.slice(i, i + 4);
+    out.push({ kind: 'lineup', pairs: [[a, c], [b, d]] });
+  }
+  return out;
+}

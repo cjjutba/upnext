@@ -13,9 +13,10 @@ preference.
 | Light mode only | One `:root` block. No dark tokens, no theme switcher. Dark mode would be a designed theme, never an inversion |
 | Monochrome interactive layer | Primary buttons are solid `#171717` with white text. One exception: a destructive action is solid `--danger` red, and End session is the only one. Never a colored icon tile |
 | Structure from borders | 1px black-alpha borders, not shadows. Shadows exist only on menus and modals |
-| Blue is a state signal | `#006bff` for focus rings and text links. Nothing else. The next-four queue highlight is monochrome: gray 100 fill, 2px `#171717` left bar, "Next up" label |
+| Blue is a state signal | `#006bff` for focus rings and text links. Nothing else. Court state is carried by a text badge, never by a hue |
 | Text-only badges | A pill with the word alone. No dots, no circles, no icons, ever. Tinted background, dark same-hue text |
 | Zero motion | No transitions, no easing, no press scale, no slide, no shimmer. Press feedback is an instant one-step background or border change |
+| The court is the graphic | A four on a court is drawn on `CourtDiagram`, live or staged or merely next up. The queue section under the courts uses the same graphic on purpose |
 | Type | Geist Sans 400/500/600 and Geist Mono. Mono with tabular numerals for every timer, count, position, and stat column, so digits never shift layout |
 | Radii | 6px controls, 8px cards, 12px modals, 9999px pills |
 | Spacing | 8pt grid via the `--space-*` tokens |
@@ -78,17 +79,22 @@ Copy these rather than inventing a parallel approach.
 ## Testing
 
 All correctness risk lives in the reducer and the templates, and both are pure
-functions. 78 cases across 7 files.
+functions. 182 cases across 12 files.
 
 | File | Covers |
 |---|---|
 | `src/domain/reducer.test.ts` | Every event type, guards, no-op paths, undo chains |
 | `src/domain/templates.test.ts` | Pairing selection per mode, fairness, rotation |
-| `src/domain/commands.test.ts` | Command output, auto-fill, refusals, undo targeting |
+| `src/domain/commands.test.ts` | Command output, auto-staging, starting, substitutions, refusals, undo targeting |
 | `src/domain/invariants.test.ts` | fast-check property suite |
 | `src/db/eventStore.test.ts` | Append, ordering, listing, export and import |
 | `src/state/useSession.test.tsx` | Dispatch, undo, redo, concurrent taps |
 | `src/lib/ids.test.ts` | ULID ordering, stable device id |
+| `src/domain/announce.test.ts` | Phrase builders and what a batch reads aloud |
+| `src/domain/standings.test.ts` | Ranking, ties, win rate |
+| `src/state/useAnnouncer.test.tsx` | Which batches speak and which stay silent |
+| `src/App.test.tsx` | The board driven end to end: staging, starting, calls, crowd operations, mode switches |
+| `src/domain/modes.test.ts` | Mode metadata, and that every template has a label |
 
 Shared helpers, worth reusing:
 
@@ -115,6 +121,7 @@ through the real command layer and asserts things that must never be false:
 - The queue and the courts are disjoint.
 - Every checked-in, non-departed player is in exactly one place.
 - Sitting-out players keep a queue spot.
+- Nobody is staged on two courts, and no court is staged and live at once.
 - Closed courts are never occupied and never exceed `courtCount`.
 - Replay is deterministic, and undo then redo restores the exact state.
 

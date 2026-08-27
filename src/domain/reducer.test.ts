@@ -238,3 +238,96 @@ describe('court-added', () => {
     expect(before.courtCount).toBe(0);
   });
 });
+
+describe('staging', () => {
+  const stage = (court: number, pairs: Pairs, auto?: true) => ev({ type: 'game-staged', court, pairs, ...(auto ? { auto } : {}) });
+  const four = ['a', 'b', 'c', 'd'].map(checkIn);
+  const boot = () => [start(2), ...['a', 'b', 'c', 'd', 'e'].map(checkIn)];
+
+  it('game-staged pulls the four out of the queue onto the court', () => {
+    const s = replay([...boot(), stage(1, [['a', 'c'], ['b', 'd']])]);
+    expect(s.staged[1]).toEqual([['a', 'c'], ['b', 'd']]);
+    expect(s.queue).toEqual(['e']);
+    expect(s.games[1]).toBeUndefined(); // staged is not live
+  });
+
+  it('restaging swaps one player and sends the replaced one to the queue front', () => {
+    const s = replay([
+      ...boot(),
+      stage(1, [['a', 'c'], ['b', 'd']]),
+      stage(1, [['a', 'c'], ['b', 'e']]),
+    ]);
+    expect(s.staged[1]).toEqual([['a', 'c'], ['b', 'e']]);
+    expect(s.queue).toEqual(['d']);
+  });
+
+  it('game-staged no-ops on a live court, a closed court, out of range, duplicates, and unqueued players', () => {
+    const live = [...boot(), game(1, [['a', 'c'], ['b', 'd']])];
+    expect(replay([...live, stage(1, [['a', 'c'], ['b', 'e']])]).staged[1]).toBeUndefined();
+    expect(replay([...boot(), ev({ type: 'court-closed', court: 1 }), stage(1, [['a', 'c'], ['b', 'd']])]).staged[1]).toBeUndefined();
+    expect(replay([...boot(), stage(9, [['a', 'c'], ['b', 'd']])]).staged[9]).toBeUndefined();
+    expect(replay([...boot(), stage(1, [['a', 'a'], ['b', 'd']])]).staged[1]).toBeUndefined();
+    expect(replay([...boot(), stage(1, [['a', 'c'], ['b', 'zz']])]).staged[1]).toBeUndefined();
+  });
+
+  it('game-staged refuses a player who is sitting out', () => {
+    const s = replay([...boot(), ev({ type: 'player-sat-out', playerId: 'c' }), stage(1, [['a', 'c'], ['b', 'd']])]);
+    expect(s.staged[1]).toBeUndefined();
+  });
+
+  it('game-unstaged returns the four to the queue front', () => {
+    const s = replay([...boot(), stage(1, [['a', 'c'], ['b', 'd']]), ev({ type: 'game-unstaged', court: 1 })]);
+    expect(s.staged[1]).toBeUndefined();
+    expect(s.queue).toEqual(['a', 'c', 'b', 'd', 'e']);
+  });
+
+  it('game-unstaged on an unstaged court is a no-op', () => {
+    const s = replay([...boot(), ev({ type: 'game-unstaged', court: 1 })]);
+    expect(s.queue).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+
+  it('game-started promotes the staged four even though they left the queue', () => {
+    const s = replay([...boot(), stage(1, [['a', 'c'], ['b', 'd']]), game(1, [['a', 'c'], ['b', 'd']])]);
+    expect(s.staged[1]).toBeUndefined();
+    expect(s.games[1]?.pairs).toEqual([['a', 'c'], ['b', 'd']]);
+    expect(s.queue).toEqual(['e']);
+  });
+
+  it('game-started with four who are neither staged nor queued is a no-op', () => {
+    const s = replay([...boot(), stage(1, [['a', 'c'], ['b', 'd']]), game(2, [['a', 'c'], ['b', 'd']])]);
+    expect(s.games[2]).toBeUndefined();
+    expect(s.staged[1]).toEqual([['a', 'c'], ['b', 'd']]);
+  });
+
+  it('checking in a staged player is a no-op, not a second queue slot', () => {
+    const s = replay([...boot(), stage(1, [['a', 'c'], ['b', 'd']]), checkIn('a')]);
+    expect(s.queue).toEqual(['e']);
+  });
+
+  it('departing or sitting out a staged player is refused: they are not in the queue', () => {
+    const base = [...boot(), stage(1, [['a', 'c'], ['b', 'd']])];
+    expect(replay([...base, ev({ type: 'player-departed', playerId: 'a' })]).departed).toEqual([]);
+    expect(replay([...base, ev({ type: 'player-sat-out', playerId: 'a' })]).sittingOut).toEqual([]);
+  });
+
+  it('closing a court sends its staged four to the queue front too', () => {
+    const s = replay([...boot(), stage(1, [['a', 'c'], ['b', 'd']]), ev({ type: 'court-closed', court: 1 })]);
+    expect(s.staged[1]).toBeUndefined();
+    expect(s.queue).toEqual(['a', 'c', 'b', 'd', 'e']);
+    expect(s.closedCourts).toEqual([1]);
+  });
+
+  it('queue-swapped exchanges two queue positions and no-ops otherwise', () => {
+    const s = replay([...boot(), ev({ type: 'queue-swapped', playerA: 'a', playerB: 'd' })]);
+    expect(s.queue).toEqual(['d', 'b', 'c', 'a', 'e']);
+    expect(replay([...boot(), ev({ type: 'queue-swapped', playerA: 'a', playerB: 'a' })]).queue).toEqual(['a', 'b', 'c', 'd', 'e']);
+    expect(replay([...boot(), ev({ type: 'queue-swapped', playerA: 'a', playerB: 'zz' })]).queue).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+
+  it('an old log with no staging replays with an empty staged record', () => {
+    expect(four).toHaveLength(4);
+    const s = replay([start(1), ...four, game(1, [['a', 'c'], ['b', 'd']])]);
+    expect(s.staged).toEqual({});
+    expect(s.games[1]?.pairs).toEqual([['a', 'c'], ['b', 'd']]);
+  });
+});
