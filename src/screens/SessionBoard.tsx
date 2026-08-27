@@ -26,7 +26,7 @@ export { fmt };
 export function SessionBoard({
   state, players, undoLabel, onUndo, canRedo, onRedo, onWin, onCloseCourt, onReopenCourt,
   onToggleSit, onToggleCheck, onAddCourt, onAddPlayer, onRemovePlayer, onCourtPlayerTap, onQueuePlayerTap,
-  onStart, onStage, onShuffle, onCallCourt, onCallUpNext, onEditLineup, previews, narrow, recency,
+  onStart, onStage, onShuffle, onCallCourt, onCallUpNext, onEditLineup, previews, narrow, railCollapsed, recency,
   onSeatPlayer, onCreateAndSeat, onFillCourt,
 }: {
   state: SessionState;
@@ -57,6 +57,8 @@ export function SessionBoard({
   previews: UpNextPreview[];
   /** Phone portrait: the rail stacks under the courts and the page scrolls as one. */
   narrow: boolean;
+  /** The organizer hid check-in to give the courts the full width. Wide drops the rail; narrow keeps its header. */
+  railCollapsed: boolean;
   /** startedAt of the newest ended session each player attended; regulars sort first. */
   recency: Record<string, number>;
   onSeatPlayer: (court: number, slot: SlotIndex, playerId: string) => void;
@@ -76,6 +78,8 @@ export function SessionBoard({
   const nameOf = (id: string) => players.find((p) => p.id === id)?.name ?? 'Unknown';
   const courts = Array.from({ length: state.courtCount }, (_, i) => i + 1);
   const eligibleQueue = state.queue.filter((p) => !state.sittingOut.includes(p));
+  // checkedIn only grows, so anyone who left has to be subtracted rather than looked up there
+  const present = state.checkedIn.filter((id) => !state.departed.includes(id));
   const previewed = new Set(previews.flatMap((p) => (p.kind === 'lineup' ? [...p.pairs[0], ...p.pairs[1]] : p.pair)));
   const leftovers = state.queue.filter((id) => !previewed.has(id));
   const grid = [...players]
@@ -180,45 +184,62 @@ export function SessionBoard({
           ) : null}
         </section>
       </main>
-      <aside style={narrow
-        ? {
-          borderTop: '1px solid var(--border)', padding: '20px 16px 104px',
-          display: 'flex', flexDirection: 'column', gap: '28px', background: 'var(--bg)',
-        }
-        : {
-          width: '360px', flex: 'none', borderLeft: '1px solid var(--border)', padding: '20px', overflowY: 'auto',
-          display: 'flex', flexDirection: 'column', gap: '28px', background: 'var(--bg)',
-        }}>
-        <section style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <span className="micro-label">Check-in</span>
-          <form
-            style={{ display: 'flex', gap: 'var(--space-2)' }}
-            onSubmit={(e) => { e.preventDefault(); if (newName.trim()) { onAddPlayer(newName.trim()); setNewName(''); } }}>
-            <input
-              value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Add player" aria-label="Add player"
-              style={{
-                flex: 1, minWidth: 0, height: 'var(--tap-min)', padding: '0 var(--space-3)', font: '400 16px var(--font-sans)',
-                border: '1px solid var(--border)', borderRadius: 'var(--radius-control)', background: 'var(--bg)', color: 'var(--text)',
-              }} />
-            <Button variant="secondary" icon="user-plus" onClick={() => { if (newName.trim()) { onAddPlayer(newName.trim()); setNewName(''); } }}>Add</Button>
-          </form>
-          {players.length > 12 ? (
-            <input
-              value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search players" aria-label="Search players"
-              style={{
-                minWidth: 0, height: 'var(--tap-min)', padding: '0 var(--space-3)', font: '400 16px var(--font-sans)',
-                border: '1px solid var(--border)', borderRadius: 'var(--radius-control)', background: 'var(--bg)', color: 'var(--text)',
-              }} />
-          ) : null}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
-            {grid.map((p) => (
-              <CheckinTile key={p.id} name={p.name} state={tileState(p)}
-                games={state.checkedIn.includes(p.id) ? state.gamesPlayed[p.id] ?? 0 : undefined}
-                onTap={() => onToggleCheck(p.id)} />
-            ))}
-          </div>
-        </section>
-      </aside>
+      {/* wide and collapsed drops the rail entirely, so the courts grid gets the whole width */}
+      {railCollapsed && !narrow ? null : (
+        <aside style={narrow
+          ? {
+            // the 104px keeps the fixed undo pill off the section, collapsed or not: the count row is the last thing on the page
+            borderTop: '1px solid var(--border)', padding: '20px 16px 104px',
+            display: 'flex', flexDirection: 'column', gap: '28px', background: 'var(--bg)',
+          }
+          : {
+            width: '360px', flex: 'none', borderLeft: '1px solid var(--border)', padding: '20px', overflowY: 'auto',
+            display: 'flex', flexDirection: 'column', gap: '28px', background: 'var(--bg)',
+          }}>
+          <section style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+              <span className="micro-label">Check-in</span>
+              {/* collapsed, the count is all that is left, so it has to say who is actually still here */}
+              {railCollapsed ? (
+                <>
+                  <span style={{ flex: 1 }} />
+                  <span className="mono" style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>{present.length} in</span>
+                </>
+              ) : null}
+            </div>
+            {railCollapsed ? null : (
+              <>
+                <form
+                  style={{ display: 'flex', gap: 'var(--space-2)' }}
+                  onSubmit={(e) => { e.preventDefault(); if (newName.trim()) { onAddPlayer(newName.trim()); setNewName(''); } }}>
+                  <input
+                    value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Add player" aria-label="Add player"
+                    style={{
+                      flex: 1, minWidth: 0, height: 'var(--tap-min)', padding: '0 var(--space-3)', font: '400 16px var(--font-sans)',
+                      border: '1px solid var(--border)', borderRadius: 'var(--radius-control)', background: 'var(--bg)', color: 'var(--text)',
+                    }} />
+                  <Button variant="secondary" icon="user-plus" onClick={() => { if (newName.trim()) { onAddPlayer(newName.trim()); setNewName(''); } }}>Add</Button>
+                </form>
+                {players.length > 12 ? (
+                  <input
+                    value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search players" aria-label="Search players"
+                    style={{
+                      minWidth: 0, height: 'var(--tap-min)', padding: '0 var(--space-3)', font: '400 16px var(--font-sans)',
+                      border: '1px solid var(--border)', borderRadius: 'var(--radius-control)', background: 'var(--bg)', color: 'var(--text)',
+                    }} />
+                ) : null}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
+                  {grid.map((p) => (
+                    <CheckinTile key={p.id} name={p.name} state={tileState(p)}
+                      games={state.checkedIn.includes(p.id) ? state.gamesPlayed[p.id] ?? 0 : undefined}
+                      onTap={() => onToggleCheck(p.id)} />
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
+        </aside>
+      )}
       {seating ? (
         <PlayerPickerModal
           title={`Add a player to court ${seating.court}`}

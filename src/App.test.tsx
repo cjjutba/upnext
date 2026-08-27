@@ -519,3 +519,42 @@ describe('App: switching matching mode mid-session', () => {
     expect(screen.queryByText('Up next')).not.toBeInTheDocument();
   });
 });
+
+describe('App: hiding the check-in rail', () => {
+  beforeEach(async () => {
+    installSpeechStub();
+    await reset();
+  });
+  afterEach(cleanup);
+
+  /** jsdom has no matchMedia, so useNarrow is false and this is the wide two-column board. */
+  it('drops the rail on the toggle and brings it back', async () => {
+    render(<App />);
+    await openBoard(/^Balanced/);
+    expect(screen.getByLabelText('Add player')).toBeInTheDocument();
+
+    await click(btn('Hide check-in'));
+    expect(screen.queryByLabelText('Add player')).not.toBeInTheDocument();
+    expect(screen.queryByText('Check-in')).not.toBeInTheDocument();
+    // the courts keep the whole width, so nothing about the session changed
+    expect(within(courtCard(1)).getByText('Staged')).toBeInTheDocument();
+
+    await click(btn('Show check-in'));
+    expect(screen.getByLabelText('Add player')).toBeInTheDocument();
+    expect(screen.getByText('Check-in')).toBeInTheDocument();
+  });
+
+  it('offers one search field once the roster passes twelve', async () => {
+    render(<App />);
+    await openBoard(/^Balanced/);
+    expect(screen.queryByLabelText('Search players')).not.toBeInTheDocument();
+
+    for (const name of ['Ivy', 'Jack', 'Kim', 'Leo', 'Mia']) {
+      act(() => { fireEvent.change(screen.getByLabelText('Add player'), { target: { value: name } }); });
+      await click(btn('Add'));
+      await screen.findByText(name);
+    }
+
+    await waitFor(() => expect(screen.getAllByLabelText('Search players')).toHaveLength(1));
+  });
+});

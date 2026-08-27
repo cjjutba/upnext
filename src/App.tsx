@@ -17,6 +17,7 @@ import { useWakeLock } from './lib/useWakeLock';
 import { useRoute } from './lib/useRoute';
 import { useSpeech } from './lib/useSpeech';
 import { useNarrow } from './lib/useViewport';
+import { useRailCollapsed } from './lib/useRailCollapsed';
 import { shareSessionFile, importSessionFile } from './lib/exportFile';
 import * as cmd from './domain/commands';
 import { previewLineups, upNextPreview } from './domain/templates';
@@ -53,6 +54,7 @@ export default function App() {
   /** The rule the organizer is proposing. Nothing is appended until the modal confirms it. */
   const [pendingRule, setPendingRule] = useState<RuleConfig | null>(null);
   const narrow = useNarrow();
+  const rail = useRailCollapsed();
   const { state, dispatch } = session;
 
   // an armed end button disarms itself; an accidental tap must not linger as a one-tap landmine
@@ -231,6 +233,12 @@ export default function App() {
           <span className="mono" style={{ fontSize: '20px' }}>
             {fmt((clock - state.startedAt) / 1000)}
           </span>
+          {/* mid session the organizer is looking at courts, so the rail is the 360px worth giving up */}
+          <IconButton
+            icon={rail.collapsed ? 'panel-right-open' : 'panel-right-close'}
+            ariaLabel={rail.collapsed ? 'Show check-in' : 'Hide check-in'}
+            pressed={rail.collapsed}
+            onClick={rail.toggle} />
           <IconButton icon="trophy" ariaLabel="Live standings" onClick={() => setStandingsOpen(true)} />
           {muteToggle}
           <Button variant="danger" onClick={endTap}>
@@ -315,6 +323,7 @@ export default function App() {
           onEditLineup={setEditingCourt}
           previews={previews}
           narrow={narrow}
+          railCollapsed={rail.collapsed}
           recency={recency}
           onSeatPlayer={(court, slot, id) => void dispatch(cmd.seatPlayer(state, court, slot, id, roster.ratings))}
           onCreateAndSeat={(court, slot, name) => void createAndSeat(court, slot, name)}
