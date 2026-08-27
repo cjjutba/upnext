@@ -8,11 +8,10 @@ import { StatusBadge } from './components/StatusBadge';
 import { Button } from './components/Button';
 import { append, listSessions } from './db/eventStore';
 import { useWakeLock } from './lib/useWakeLock';
+import { useRoute } from './lib/useRoute';
 import { shareSessionFile, importSessionFile } from './lib/exportFile';
 import * as cmd from './domain/commands';
 import type { Pairs, RuleTemplate } from './domain/types';
-
-type Screen = 'setup' | 'board' | 'summary';
 
 const RULE_LABEL: Record<RuleTemplate, string> = {
   'all-off': 'All four off',
@@ -25,7 +24,7 @@ const RULE_LABEL: Record<RuleTemplate, string> = {
 export default function App() {
   const session = useSession();
   const roster = useRoster();
-  const [screen, setScreen] = useState<Screen>('setup');
+  const [route, navigate] = useRoute();
   const [selected, setSelected] = useState<string[]>([]);
   const [clock, setClock] = useState(() => Date.now());
   const [resuming, setResuming] = useState(true);
@@ -37,7 +36,7 @@ export default function App() {
       const live = sessions.find((s) => s.endedAt === null); // listSessions returns newest first
       if (live) {
         await session.loadById(live.sessionId);
-        setScreen('board');
+        navigate('board');
       }
       setResuming(false);
     })();
@@ -45,13 +44,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (screen !== 'board') return;
+    if (route !== 'board') return;
     setClock(Date.now());
     const t = setInterval(() => setClock(Date.now()), 1000);
     return () => clearInterval(t);
-  }, [screen]);
+  }, [route]);
 
-  useWakeLock(screen === 'board');
+  useWakeLock(route === 'board');
 
   const start = async (config: { courts: number; template: RuleTemplate; winCap: number }) => {
     // close out any dangling live session so history never holds two in-progress logs
@@ -59,7 +58,7 @@ export default function App() {
     for (const s of dangling) await append({ type: 'session-ended', sessionId: s.sessionId });
     session.reset(); // a start must never append into a previous session's in-memory log
     await dispatch(cmd.startSession(config, selected));
-    setScreen('board');
+    navigate('board');
   };
 
   const toggleBoardCheck = (playerId: string) => {
@@ -88,19 +87,19 @@ export default function App() {
 
   const end = async () => {
     await dispatch(cmd.endSession(state));
-    setScreen('summary');
+    navigate('summary');
   };
 
   const fresh = () => {
     session.reset();
     setSelected([]);
-    setScreen('setup');
+    navigate('setup');
   };
 
   const header = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '12px var(--space-4)', borderBottom: '1px solid var(--border)', background: 'var(--bg)', position: 'sticky', top: 0, zIndex: 10 }}>
       <span className="display" style={{ fontSize: 'var(--text-h1)', fontWeight: 600 }}>upnext</span>
-      {screen === 'board' ? (
+      {route === 'board' ? (
         <>
           <button type="button" onClick={cycleRule} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', minHeight: 'var(--tap-min)', minWidth: 'var(--tap-min)', display: 'inline-flex', alignItems: 'center', borderRadius: 'var(--radius-full)' }} aria-label="Change house rule">
             <StatusBadge status="neutral" label={RULE_LABEL[state.rule.template]} />
@@ -111,7 +110,7 @@ export default function App() {
           </span>
           <Button variant="secondary" onClick={() => void end()}>End session</Button>
         </>
-      ) : screen === 'summary' ? (
+      ) : route === 'summary' ? (
         <>
           <span className="micro-label">Session summary</span>
           <span style={{ flex: 1 }} />
@@ -119,6 +118,9 @@ export default function App() {
       ) : (
         <>
           <span className="micro-label">Open play</span>
+          <span className="mono" style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+            {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+          </span>
           <span style={{ flex: 1 }} />
         </>
       )}
@@ -127,20 +129,29 @@ export default function App() {
 
   if (resuming) return <div style={{ minHeight: '100vh', background: 'var(--bg)' }} />;
 
+  if (route === 'board' && !state.started) {
+    navigate('setup');
+    return <div style={{ minHeight: '100vh', background: 'var(--bg)' }} />;
+  }
+  if (route === 'summary' && !state.started) {
+    navigate('setup');
+    return <div style={{ minHeight: '100vh', background: 'var(--bg)' }} />;
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       {header}
-      {screen === 'setup' ? (
+      {route === 'setup' ? (
         <RosterSetup
           players={roster.players}
           onAddPlayer={(name) => void roster.addPlayer(name)}
           selected={selected}
           onToggle={(id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))}
           onStart={(config) => void start(config)}
-          onResume={(sessionId) => void session.loadById(sessionId).then(() => setScreen('board'))}
+          onResume={(sessionId) => void session.loadById(sessionId).then(() => navigate('board'))}
           onImport={(file) => void importSessionFile(file).then(() => window.location.reload()).catch(() => window.alert('Import failed: that is not a valid upnext session file'))}
         />
-      ) : screen === 'board' ? (
+      ) : route === 'board' ? (
         <SessionBoard
           state={state}
           players={roster.players}
