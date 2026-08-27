@@ -27,7 +27,7 @@ another device or a newer build must never crash replay.
 | Type | Payload | Guards | Effect |
 |---|---|---|---|
 | `session-started` | `courts`, `template`, `config.winCap` | not already started | Resets to `emptyState()` with `sessionId`, `startedAt = ts`, `courtCount`, `rule` |
-| `rule-changed` | `template`, `config.winCap` | started, not ended | Replaces `rule`. Takes effect on the next finish, including games started under the old mode |
+| `rule-changed` | `template`, `config.winCap` | started, not ended | Replaces `rule`, and nothing else. Takes effect on the next fill, including games started under the old mode. Courts already playing keep their lineups; no `game-lineup-changed` is ever emitted by a switch. The board confirms it in `ModeChangeModal` before appending |
 | `player-checked-in` | `playerId` | started, not ended, not queued, not playing | Appends to `checkedIn` if new, clears from `departed` and `sittingOut`, pushes to the queue back |
 | `player-departed` | `playerId` | must be in the queue | Removes from queue and `sittingOut`, adds to `departed`, resets the win streak. Cannot depart mid-game or twice |
 | `player-sat-out` | `playerId` | in queue, not already sitting | Adds to `sittingOut`. The queue position is kept |
