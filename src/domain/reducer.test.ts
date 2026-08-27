@@ -167,12 +167,19 @@ describe('games', () => {
     expect(s.consecutiveWins['a']).toBe(0);
   });
 
-  it('balanced and social finishes send all four to the back even if a winnerPair sneaks in', () => {
+  it('balanced and social finishes count the winner and send winners to the back first', () => {
     const s = replay([start(1, 'balanced', 3), checkIn('a'), checkIn('b'), checkIn('c'), checkIn('d'), checkIn('e'),
-      game(1, four), finish(1, 0)]);
+      game(1, four), finish(1, 1)]);
+    expect(s.queue).toEqual(['e', 'b', 'd', 'a', 'c']); // winners b and d lead the four, nobody keeps the court
+    expect(s.wins).toEqual({ b: 1, d: 1 });
+    expect(s.consecutiveWins).toEqual({ a: 0, b: 0, c: 0, d: 0 });
+  });
+
+  it('a legacy casual finish without a winner keeps lineup order and records no win', () => {
+    const s = replay([start(1, 'balanced', 3), checkIn('a'), checkIn('b'), checkIn('c'), checkIn('d'), checkIn('e'),
+      game(1, four), finish(1)]);
     expect(s.queue).toEqual(['e', 'a', 'c', 'b', 'd']);
     expect(s.wins).toEqual({});
-    expect(s.consecutiveWins).toEqual({ a: 0, b: 0, c: 0, d: 0 });
   });
 });
 

@@ -155,9 +155,13 @@ export function applyEvent(state: SessionState, e: SessionEvent): SessionState {
       const rule = state.rule;
       const winnersMode = isWinnersTemplate(rule.template);
       if (!winnersMode || e.winnerPair === undefined) {
+        // casual finish: a recorded winner counts and leads the four to the back; legacy events without one keep lineup order
+        const wp = winnersMode ? undefined : e.winnerPair;
+        const leaving = wp === undefined ? players : [...active.pairs[wp], ...active.pairs[wp === 0 ? 1 : 0]];
         return {
           ...base,
-          queue: [...state.queue, ...players],
+          wins: wp === undefined ? state.wins : bumpAll(state.wins, [...active.pairs[wp]]),
+          queue: [...state.queue, ...leaving],
           consecutiveWins: resetAll(state.consecutiveWins, players),
           pairingCycle: state.pairingCycle + 1,
         };

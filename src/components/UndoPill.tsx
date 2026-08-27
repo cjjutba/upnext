@@ -11,7 +11,7 @@ export function UndoPill({ label, onUndo }: { label: string; onUndo: () => void 
         display: 'inline-flex', alignItems: 'center', gap: '12px', height: 'var(--tap-primary)', padding: '0 var(--space-4)',
         borderRadius: 'var(--radius-full)', background: pressed ? 'var(--gray-100)' : 'var(--bg)',
         border: '1px solid var(--border-active)', color: 'var(--text)',
-        font: '500 16px/1 var(--font-sans)', cursor: 'pointer', boxShadow: 'var(--shadow-menu)',
+        font: '500 16px/1 var(--font-sans)', cursor: 'pointer',
       }}>
       <Icon name="undo-2" size={22} />
       {label}

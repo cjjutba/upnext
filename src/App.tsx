@@ -13,7 +13,7 @@ import { shareSessionFile, importSessionFile } from './lib/exportFile';
 import * as cmd from './domain/commands';
 import { nextLineup } from './domain/templates';
 import { isWinnersTemplate } from './domain/types';
-import type { Pairs, RuleTemplate } from './domain/types';
+import type { RuleTemplate } from './domain/types';
 
 export default function App() {
   const session = useSession();
@@ -78,14 +78,6 @@ export default function App() {
     if (player) await dispatch(cmd.checkInPlayer(state, player.id, roster.ratings));
   };
 
-  const swapPartners = (court: number) => {
-    const game = state.games[court];
-    if (!game) return;
-    const [[a, b], [c, d]] = game.pairs;
-    const next: Pairs = [[a, d], [b, c]]; // cycle: ab|cd to ad|bc to ac|bd and back
-    void dispatch(cmd.changeLineup(state, court, next));
-  };
-
   const end = async () => {
     await dispatch(cmd.endSession(state));
     navigate('summary');
@@ -99,12 +91,12 @@ export default function App() {
 
   const header = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '12px var(--space-4)', borderBottom: '1px solid var(--border)', background: 'var(--bg)', position: 'sticky', top: 0, zIndex: 10 }}>
-      <span className="display" style={{ fontSize: 'var(--text-h1)', fontWeight: 600 }}>upnext</span>
+      <span className="display" style={{ fontSize: '22px', fontWeight: 600 }}>upnext</span>
       {route === 'board' ? (
         <>
           <ModeMenu rule={state.rule} onChange={(t, cap) => void dispatch(cmd.changeRule(state, t, cap, roster.ratings))} />
           <span style={{ flex: 1 }} />
-          <span className="mono" style={{ fontSize: '20px', color: 'var(--text-secondary)' }}>
+          <span className="mono" style={{ fontSize: '20px' }}>
             {fmt((clock - state.startedAt) / 1000)}
           </span>
           <Button variant="secondary" onClick={() => void end()}>End session</Button>
@@ -129,7 +121,10 @@ export default function App() {
   if (resuming || misrouted) return <div style={{ minHeight: '100vh', background: 'var(--bg)' }} />;
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+    /* the board pins to the viewport so the courts area and the rail scroll independently; other routes keep page scroll */
+    <div style={route === 'board'
+      ? { height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)' }
+      : { minHeight: '100vh', background: 'var(--bg)' }}>
       {header}
       {route === 'setup' ? (
         <RosterSetup
@@ -154,13 +149,11 @@ export default function App() {
           onUndo={() => void session.undo()}
           canRedo={session.canRedo}
           onRedo={() => void session.redo()}
-          onFinish={(court) => void dispatch(cmd.finishGame(state, court, undefined, roster.ratings))}
           onWin={(court, w) => void dispatch(cmd.finishGame(state, court, w, roster.ratings))}
           onCloseCourt={(court) => void dispatch(cmd.closeCourt(state, court, roster.ratings))}
           onReopenCourt={(court) => void dispatch(cmd.reopenCourt(state, court, roster.ratings))}
           onToggleSit={(id) => void dispatch(state.sittingOut.includes(id) ? cmd.returnPlayer(state, id, roster.ratings) : cmd.sitOutPlayer(state, id))}
           onToggleCheck={toggleBoardCheck}
-          onSwap={swapPartners}
           onAddCourt={() => void dispatch(cmd.addCourt(state, roster.ratings))}
           onAddPlayer={(n) => void addAndCheckIn(n)}
           nextUp={isWinnersTemplate(state.rule.template) ? null : nextLineup(state, null, roster.ratings)}

@@ -95,14 +95,21 @@ describe('finishGame', () => {
     expect(s.games[1]).toBeUndefined(); // court 1 did not steal the winner priority fill
   });
 
-  it('balanced finishes with one tap and never records a winner', () => {
+  it('a balanced finish carries the winner and counts the win', () => {
     let log = boot(['a', 'b', 'c', 'd', 'e'], 'balanced', 1);
-    const events = finishGame(replay(log), 1);
+    const s = replay(log);
+    const winners = s.games[1]!.pairs[1];
+    const events = finishGame(s, 1, 1);
     expect(events).not.toBeNull();
     const finish = events!.find((e) => e.type === 'game-finished')!;
-    expect(finish.type === 'game-finished' && finish.winnerPair !== undefined).toBe(false);
+    expect(finish.type === 'game-finished' && finish.winnerPair).toBe(1);
     log = [...log, ...seal(events!)];
-    expect(replay(log).wins).toEqual({});
+    expect(replay(log).wins).toEqual({ [winners[0]]: 1, [winners[1]]: 1 });
+  });
+
+  it('a balanced finish without a winner is still accepted', () => {
+    const log = boot(['a', 'b', 'c', 'd', 'e'], 'balanced', 1);
+    expect(finishGame(replay(log), 1)).not.toBeNull();
   });
 });
 
@@ -257,6 +264,7 @@ describe('describeEvent', () => {
   it('produces the undo pill label', () => {
     const [started] = boot(['a', 'b', 'c', 'd'], 'all-off', 1);
     expect(describeEvent({ ...started, type: 'game-finished', court: 2 } as SessionEvent)).toBe('Undo: court 2 finished');
+    expect(describeEvent({ ...started, type: 'game-finished', court: 1, winnerPair: 1 } as SessionEvent)).toBe('Undo: court 1, team 2 won');
     expect(describeEvent({ ...started, type: 'player-checked-in', playerId: 'x' } as SessionEvent)).toBe('Undo: check-in');
   });
 });

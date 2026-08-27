@@ -12,16 +12,18 @@ describe('useSession', () => {
     await waitFor(() => expect(result.current.state.started).toBe(true));
     expect(result.current.state.games[1]).toBeDefined();
     expect(result.current.state.queue).toEqual(['e']);
-    expect(result.current.undoLabel).toContain('court 1');
+    // undo targets the newest primary action (e's check-in), never the fill; the fill of a-d survives
+    expect(result.current.undoLabel).toContain('check-in');
     await act(async () => {
       await result.current.undo();
     });
-    await waitFor(() => expect(result.current.state.games[1]).toBeUndefined());
+    await waitFor(() => expect(result.current.state.queue).toEqual([]));
+    expect(result.current.state.games[1]).toBeDefined();
     expect(result.current.canRedo).toBe(true);
     await act(async () => {
       await result.current.redo();
     });
-    await waitFor(() => expect(result.current.state.games[1]).toBeDefined());
+    await waitFor(() => expect(result.current.state.queue).toEqual(['e']));
   });
 
   it('concurrent dispatches keep the in-memory log in canonical order', async () => {
@@ -52,11 +54,14 @@ describe('useSession', () => {
     await act(async () => {
       await Promise.all([result.current.undo(), result.current.undo()]);
     });
+    // first undo removed e's check-in; the second removed d's, which dissolves the fill that needed d
     await waitFor(() => expect(result.current.state.games[1]).toBeUndefined());
-    expect(result.current.state.queue).toEqual(['a', 'b', 'c', 'd']); // the second undo took the previous action, not the same one
+    expect(result.current.state.queue).toEqual(['a', 'b', 'c']);
     await act(async () => {
       await result.current.redo();
     });
-    await waitFor(() => expect(result.current.state.queue).toEqual(['a', 'b', 'c', 'd', 'e']));
+    // redo reinstates d's check-in, which revalidates the fill of a-d
+    await waitFor(() => expect(result.current.state.games[1]).toBeDefined());
+    expect(result.current.state.queue).toEqual([]);
   });
 });
