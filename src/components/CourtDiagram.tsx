@@ -1,19 +1,42 @@
+import { useState } from 'react';
 import type { Pairs } from '../domain/types';
 
 /**
  * Top-down pickleball court, true 44x20 ft proportions in a 860x420 viewBox.
  * The colors are literal by design: the court is imagery, the one sanctioned
  * exception to the monochrome UI. pairs[0] is team 1 on the left.
+ *
+ * Takes player ids plus a name lookup rather than names, so a tapped chip can
+ * report who it is. With onPlayerTap the chips become buttons.
  */
-export function CourtDiagram({ pairs }: { pairs: Pairs }) {
-  const chip = (name: string, left: string, top: string) => (
-    <span style={{
-      position: 'absolute', left, top, transform: 'translate(-50%, -50%)',
-      background: 'rgba(23,23,23,0.85)', color: '#ffffff', padding: '8px 16px',
-      borderRadius: 'var(--radius-full)', font: '600 15px/1 var(--font-sans)',
-      whiteSpace: 'nowrap', maxWidth: '26%', overflow: 'hidden', textOverflow: 'ellipsis', boxSizing: 'border-box',
-    }}>{name}</span>
-  );
+export function CourtDiagram({ pairs, nameOf, onPlayerTap }: {
+  pairs: Pairs;
+  nameOf: (playerId: string) => string;
+  /** Opens the picker for that player. Chips are plain text when this is absent. */
+  onPlayerTap?: (playerId: string) => void;
+}) {
+  const [down, setDown] = useState<string | null>(null);
+  const chip = (playerId: string, left: string, top: string) => {
+    const name = nameOf(playerId);
+    const look = {
+      position: 'absolute' as const, left, top, transform: 'translate(-50%, -50%)',
+      background: down === playerId ? '#ffffff' : 'rgba(23,23,23,0.85)',
+      color: down === playerId ? '#171717' : '#ffffff',
+      padding: '8px 16px', borderRadius: 'var(--radius-full)', font: '600 15px/1 var(--font-sans)',
+      whiteSpace: 'nowrap' as const, maxWidth: '26%', overflow: 'hidden', textOverflow: 'ellipsis', boxSizing: 'border-box' as const,
+    };
+    if (!onPlayerTap) return <span key={playerId + left + top} style={look}>{name}</span>;
+    return (
+      <button
+        key={playerId + left + top} type="button" onClick={() => onPlayerTap(playerId)}
+        aria-label={name + ', change or remove'}
+        onPointerDown={() => setDown(playerId)} onPointerUp={() => setDown(null)}
+        onPointerLeave={() => setDown(null)} onPointerCancel={() => setDown(null)}
+        style={{ ...look, border: '1px solid rgba(255,255,255,0.5)', cursor: 'pointer' }}>
+        {name}
+      </button>
+    );
+  };
   const teamLabel = (label: string, left: string) => (
     <span style={{
       position: 'absolute', left, top: '8px', transform: 'translateX(-50%)',

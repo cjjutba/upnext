@@ -1,8 +1,9 @@
 import { CountBadge } from './CountBadge';
 import { IconButton } from './IconButton';
 
-export function QueueRow({ position, name, games, sitOut, nextFour, nextUpLabel, onToggleSit }: {
-  position: number; name: string; games: number; sitOut: boolean; nextFour: boolean; nextUpLabel: boolean; onToggleSit: () => void;
+export function QueueRow({ position, name, games, sitOut, nextFour, nextUpLabel, onToggleSit, onRemove, onOptions }: {
+  position: number; name: string; games: number; sitOut: boolean; nextFour: boolean; nextUpLabel: boolean;
+  onToggleSit: () => void; onRemove: () => void; onOptions: () => void;
 }) {
   return (
     <div style={{
@@ -15,12 +16,20 @@ export function QueueRow({ position, name, games, sitOut, nextFour, nextUpLabel,
       <span className="mono" style={{ fontSize: '16px', width: '32px', textAlign: 'right', color: nextFour ? 'var(--text)' : 'var(--text-tertiary)' }}>
         {position}
       </span>
-      <span className="display" style={{ fontSize: 'var(--text-queue)', flex: 1, textDecoration: sitOut ? 'line-through' : 'none' }}>
-        {name}
-      </span>
+      <button
+        type="button" onClick={onOptions} aria-label={name + ', change or remove'}
+        style={{
+          flex: 1, minWidth: 0, textAlign: 'left', padding: 0, border: 'none', background: 'transparent',
+          color: 'var(--text)', cursor: 'pointer', font: 'inherit',
+        }}>
+        <span className="display" style={{ fontSize: 'var(--text-queue)', textDecoration: sitOut ? 'line-through' : 'none' }}>
+          {name}
+        </span>
+      </button>
       {nextUpLabel && !sitOut ? <span className="micro-label">Next up</span> : null}
       <CountBadge value={games} title="Games played" />
-      <IconButton icon={sitOut ? 'moon' : 'sun'} ariaLabel={(sitOut ? 'Return ' : 'Sit out ') + name} onClick={onToggleSit} />
+      <IconButton icon={sitOut ? 'moon' : 'sun'} ariaLabel={(sitOut ? 'Return ' : 'Sit out ') + name} onClick={onToggleSit} size="sm" />
+      <IconButton icon="user-minus" ariaLabel={'Remove ' + name + ' from session'} onClick={onRemove} size="sm" />
     </div>
   );
 }

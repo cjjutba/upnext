@@ -16,9 +16,13 @@ export function courtPhrase(court: number, pairs: Pairs, nameOf: NameOf): string
   return `Court ${court}. ${matchup(pairs, nameOf)}. Please proceed to court ${court}.`;
 }
 
-/** The standing call for whoever is at the front of the queue. */
-export function upNextPhrase(pairs: Pairs, nameOf: NameOf): string {
-  return `Up next. ${matchup(pairs, nameOf)}. Please get ready.`;
+/**
+ * The Call players button. Staging is silent, so this is the only way four
+ * people hear their names before a match starts.
+ */
+export function getReadyPhrase(pairs: Pairs, nameOf: NameOf, court?: number): string {
+  const teams = `Team one, ${pairPhrase(pairs[0], nameOf)}. Versus team two, ${pairPhrase(pairs[1], nameOf)}.`;
+  return court === undefined ? `Get ready. Up next. ${teams}` : `Get ready. Court ${court}. ${teams}`;
 }
 
 /**
@@ -27,7 +31,7 @@ export function upNextPhrase(pairs: Pairs, nameOf: NameOf): string {
  * every court call of the session.
  */
 export function announceBatch(batch: SessionEvent[], stateAfter: SessionState, nameOf: NameOf): string[] {
-  const refilled = new Set(batch.filter((e) => e.type === 'game-started').map((e) => e.court));
+  const restaged = new Set(batch.filter((e) => e.type === 'game-staged').map((e) => e.court));
   const out: string[] = [];
   for (const e of batch) {
     switch (e.type) {
@@ -39,8 +43,8 @@ export function announceBatch(batch: SessionEvent[], stateAfter: SessionState, n
         break;
       case 'game-finished': {
         if (e.winnerPair === undefined) {
-          // finishGame emits the refill in the same batch, so the court call already says the game ended
-          if (!refilled.has(e.court)) out.push(`Court ${e.court}. Game over.`);
+          // finishGame stages the next four in the same batch, and the board shows them, so saying it too is noise
+          if (!restaged.has(e.court)) out.push(`Court ${e.court}. Game over.`);
           break;
         }
         // the payload carries no pairs, so read them back off the game the reducer just filed
@@ -54,7 +58,7 @@ export function announceBatch(batch: SessionEvent[], stateAfter: SessionState, n
         out.push(`Court ${e.court} is closed.`);
         break;
       default:
-        break; // check-ins, sit-outs, rule changes, and undo stay silent
+        break; // check-ins, sit-outs, rule changes, undo, and every staging event stay silent
     }
   }
   return out;
