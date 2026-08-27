@@ -1,6 +1,6 @@
 import { Button } from './Button';
 import { StatusBadge, type BadgeStatus } from './StatusBadge';
-import { TimerDisplay } from './TimerDisplay';
+import { CourtDiagram } from './CourtDiagram';
 import type { Pairs } from '../domain/types';
 
 export function CourtCard({ court, status, pairs, elapsed, needsWinner, onFinish, onWin, onClose, onReopen, onSwap }: {
@@ -16,15 +16,17 @@ export function CourtCard({ court, status, pairs, elapsed, needsWinner, onFinish
   onSwap: () => void;
 }) {
   const closed = status === 'danger';
-  const pairLabel = (p: [string, string]) => p.join(' + ');
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', padding: 'var(--space-4)',
       background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-card)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <span className="display" style={{ fontSize: 'var(--text-court-num)', lineHeight: 1 }}>{court}</span>
+        <span className="display" style={{ fontSize: 'var(--text-h2)', lineHeight: 1 }}>{court}</span>
         <StatusBadge status={status} />
+        {!closed && pairs ? (
+          <span className="mono" style={{ fontSize: '16px', color: 'var(--text-secondary)' }}>{elapsed}</span>
+        ) : null}
         <span style={{ flex: 1 }} />
         {closed ? (
           <Button variant="ghost" onClick={onReopen} ariaLabel={'Reopen court ' + court}>Reopen</Button>
@@ -40,19 +42,14 @@ export function CourtCard({ court, status, pairs, elapsed, needsWinner, onFinish
         </div>
       ) : (
         <>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-1)' }}>
-            <span className="display" style={{ fontSize: '22px', lineHeight: 1.2 }}>{pairLabel(pairs[0])}</span>
-            <span className="micro-label">vs</span>
-            <span className="display" style={{ fontSize: '22px', lineHeight: 1.2 }}>{pairLabel(pairs[1])}</span>
-          </div>
-          <TimerDisplay value={elapsed} size="lg" />
+          <CourtDiagram top={pairs[0]} bottom={pairs[1]} />
           {needsWinner ? (
-            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-              <Button variant="secondary" size="lg" block style={{ flex: 1 }} onClick={() => onWin(0)}>{pairLabel(pairs[0])} won</Button>
-              <Button variant="secondary" size="lg" block style={{ flex: 1 }} onClick={() => onWin(1)}>{pairLabel(pairs[1])} won</Button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              <Button variant="secondary" size="lg" block onClick={() => onWin(0)}>Top pair won</Button>
+              <Button variant="secondary" size="lg" block onClick={() => onWin(1)}>Bottom pair won</Button>
             </div>
           ) : (
-            <Button size="lg" block icon="square" onClick={onFinish}>Game over, all four off</Button>
+            <Button size="lg" block icon="square" onClick={onFinish}>Game over</Button>
           )}
           <Button variant="ghost" onClick={onSwap} icon="shuffle" style={{ alignSelf: 'center' }} ariaLabel={'Swap partners on court ' + court}>
             Swap partners
