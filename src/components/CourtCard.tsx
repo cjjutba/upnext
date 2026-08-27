@@ -20,25 +20,28 @@ export function CourtCard({ court, status, pairs, elapsed, onWin, onClose, onReo
   const [score, setScore] = useState('');
   const win = (pair: 0 | 1) => onWin(pair, score.trim() || undefined);
   return (
-    <div style={{
+    <div data-court={court} style={{
       display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', padding: '20px',
       background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-card)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-        <span className="display" style={{ fontSize: 'var(--text-h2)', lineHeight: 1 }}>Court {court}</span>
+      {/* wraps on phone-width cards, where the timer and controls take a second row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px 14px', flexWrap: 'wrap' }}>
+        <span className="display" style={{ fontSize: 'var(--text-h2)', lineHeight: 1, whiteSpace: 'nowrap' }}>Court {court}</span>
         <StatusBadge status={status} />
-        <span style={{ flex: 1 }} />
-        {!closed && pairs ? (
-          <span className="mono" style={{ fontSize: '40px', lineHeight: 1, letterSpacing: '-0.01em' }}>{elapsed}</span>
-        ) : null}
-        {closed ? (
-          <Button variant="ghost" onClick={onReopen} ariaLabel={'Reopen court ' + court}>Reopen</Button>
-        ) : (
-          <>
-            {pairs ? <IconButton icon="pencil" ariaLabel={'Edit lineup on court ' + court} onClick={onEdit} /> : null}
-            <IconButton icon="x" ariaLabel={'Close court ' + court} onClick={onClose} />
-          </>
-        )}
+        {/* one cluster so the timer and controls wrap together, right-aligned on either line */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginLeft: 'auto' }}>
+          {!closed && pairs ? (
+            <span className="mono" style={{ fontSize: 'clamp(24px, 9vw, 40px)', lineHeight: 1, letterSpacing: '-0.01em' }}>{elapsed}</span>
+          ) : null}
+          {closed ? (
+            <Button variant="ghost" onClick={onReopen} ariaLabel={'Reopen court ' + court}>Reopen</Button>
+          ) : (
+            <>
+              {pairs ? <IconButton icon="pencil" ariaLabel={'Edit lineup on court ' + court} onClick={onEdit} /> : null}
+              <IconButton icon="x" ariaLabel={'Close court ' + court} onClick={onClose} />
+            </>
+          )}
+        </div>
       </div>
       {closed || !pairs ? (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-4) 0' }}>

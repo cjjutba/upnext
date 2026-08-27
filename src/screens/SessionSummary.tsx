@@ -7,9 +7,8 @@ import type { Player, SessionState } from '../domain/types';
 import { fmt } from './SessionBoard';
 
 const TOP = 10;
-const COLS = '48px 1fr 88px 64px 64px 88px';
 
-export function SessionSummary({ state, players, onExport, onDone, speak, canSpeak, autoRead }: {
+export function SessionSummary({ state, players, onExport, onDone, speak, canSpeak, autoRead, narrow }: {
   state: SessionState;
   players: Player[];
   onExport: () => void;
@@ -19,7 +18,10 @@ export function SessionSummary({ state, players, onExport, onDone, speak, canSpe
   canSpeak: boolean;
   /** True only when a live session just ended here; browsing history stays silent. */
   autoRead: boolean;
+  /** Phone portrait: the fixed table columns tighten so nothing clips. */
+  narrow: boolean;
 }) {
+  const cols = narrow ? '32px 1fr 52px 40px 40px 64px' : '48px 1fr 88px 64px 64px 88px';
   const nameOf = (id: string) => players.find((p) => p.id === id)?.name ?? 'Unknown';
   const rows = useMemo(() => standings(state, nameOf), [state, players]); // eslint-disable-line react-hooks/exhaustive-deps
   const [showAll, setShowAll] = useState(false);
@@ -54,7 +56,7 @@ export function SessionSummary({ state, players, onExport, onDone, speak, canSpe
             Read podium
           </Button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 'var(--space-2)', padding: '10px var(--space-4)', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: cols, gap: 'var(--space-2)', padding: '10px var(--space-4)', borderBottom: '1px solid var(--border)' }}>
           <span className="micro-label">#</span>
           <span className="micro-label">Player</span>
           <span className="micro-label" style={{ textAlign: 'right' }}>Games</span>
@@ -64,7 +66,7 @@ export function SessionSummary({ state, players, onExport, onDone, speak, canSpe
         </div>
         {visible.map((row, i) => (
           <div key={row.playerId} style={{
-            display: 'grid', gridTemplateColumns: COLS, gap: 'var(--space-2)', alignItems: 'center',
+            display: 'grid', gridTemplateColumns: cols, gap: 'var(--space-2)', alignItems: 'center',
             minHeight: 'var(--tap-min)', padding: '0 var(--space-4)',
             borderBottom: i < visible.length - 1 ? '1px solid var(--border)' : 'none',
           }}>

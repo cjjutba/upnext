@@ -261,6 +261,7 @@ export default function App() {
           speak={speech.speak}
           canSpeak={speech.supported && speech.enabled}
           autoRead={session.lastBatch.some((e) => e.type === 'session-ended')}
+          narrow={narrow}
         />
       )}
       {standingsOpen ? (

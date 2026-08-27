@@ -65,7 +65,7 @@ async function startSession(mode: RegExp) {
 }
 
 /** The card div that owns a court's close button. */
-const courtCard = (n: number) => screen.getByLabelText(`Close court ${n}`).closest('div')!.parentElement!;
+const courtCard = (n: number) => screen.getByLabelText(`Close court ${n}`).closest('[data-court]') as HTMLElement;
 
 const openStandings = async () => {
   await click(btn('Live standings'));
