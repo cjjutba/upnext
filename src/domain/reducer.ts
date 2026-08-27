@@ -154,9 +154,12 @@ export function applyEvent(state: SessionState, e: SessionEvent): SessionState {
       };
       const rule = state.rule;
       const winnersMode = isWinnersTemplate(rule.template);
+      // every mode records the win; only the winners templates let it change who keeps the court
+      const wins = e.winnerPair === undefined ? state.wins : bumpAll(state.wins, [...active.pairs[e.winnerPair]]);
       if (!winnersMode || e.winnerPair === undefined) {
         return {
           ...base,
+          wins,
           queue: [...state.queue, ...players],
           consecutiveWins: resetAll(state.consecutiveWins, players),
           pairingCycle: state.pairingCycle + 1,
@@ -164,7 +167,6 @@ export function applyEvent(state: SessionState, e: SessionEvent): SessionState {
       }
       const winners = active.pairs[e.winnerPair];
       const losers = active.pairs[e.winnerPair === 0 ? 1 : 0];
-      const wins = bumpAll(state.wins, [...winners]);
       const streak = (p: string) => (state.consecutiveWins[p] ?? 0) + 1;
       // queue placement order below is load bearing: templates infer who kept the court from the queue front
       if (rule.template === 'winners-stay') {

@@ -4,6 +4,7 @@ import { QueueRow } from '../components/QueueRow';
 import { CheckinTile, type TileState } from '../components/CheckinTile';
 import { UndoPill } from '../components/UndoPill';
 import { Button } from '../components/Button';
+import { IconButton } from '../components/IconButton';
 import type { Pairs, Player, SessionState } from '../domain/types';
 import { isWinnersTemplate } from '../domain/types';
 import { isPlaying } from '../domain/reducer';
@@ -22,7 +23,7 @@ export { fmt };
 
 export function SessionBoard({
   state, players, undoLabel, onUndo, canRedo, onRedo, onFinish, onWin, onCloseCourt, onReopenCourt,
-  onToggleSit, onToggleCheck, onSwap, onAddCourt, onAddPlayer, nextUp,
+  onToggleSit, onToggleCheck, onSwap, onAddCourt, onAddPlayer, nextUp, onCallUpNext, canCallUpNext,
 }: {
   state: SessionState;
   players: Player[];
@@ -40,6 +41,9 @@ export function SessionBoard({
   onAddCourt: () => void;
   onAddPlayer: (name: string) => void;
   nextUp: Pairs | null;
+  onCallUpNext: () => void;
+  /** False while muted, when the call button would do nothing. */
+  canCallUpNext: boolean;
 }) {
   const [now, setNow] = useState(() => Date.now());
   const [newName, setNewName] = useState('');
@@ -88,11 +92,15 @@ export function SessionBoard({
             <span className="mono" style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{state.queue.length} waiting</span>
           </div>
           {nextUp ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '4px var(--space-3) 8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '0 var(--space-2) 4px var(--space-3)' }}>
               <span className="micro-label">Up next</span>
               <span className="display" style={{ fontSize: '15px' }}>
                 {nextUp[0].map(nameOf).join(' + ')} vs {nextUp[1].map(nameOf).join(' + ')}
               </span>
+              <span style={{ flex: 1 }} />
+              {canCallUpNext ? (
+                <IconButton icon="volume-2" ariaLabel="Call up next" onClick={onCallUpNext} size="sm" />
+              ) : null}
             </div>
           ) : null}
           {state.queue.map((id, i) => (

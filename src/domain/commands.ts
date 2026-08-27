@@ -61,11 +61,9 @@ export function startSession(config: SessionConfig, playerIds: string[], ratings
 export function finishGame(state: SessionState, court: number, winnerPair?: 0 | 1, ratings: Ratings = {}): CommandEvent[] | null {
   const active = state.games[court];
   if (!active || !state.sessionId || state.ended) return null;
-  const needsWinner = isWinnersTemplate(state.rule.template);
-  if (needsWinner && winnerPair === undefined) return null;
-  const e: CommandEvent = {
-    type: 'game-finished', court, winnerPair: needsWinner ? winnerPair : undefined, sessionId: state.sessionId,
-  };
+  // Winners templates cannot rotate without a winner; every other mode records one when the organizer taps it and shrugs when they do not.
+  if (isWinnersTemplate(state.rule.template) && winnerPair === undefined) return null;
+  const e: CommandEvent = { type: 'game-finished', court, winnerPair, sessionId: state.sessionId };
   const after = simulate(state, e);
   return [e, ...fillEvents(after, { pairs: active.pairs, winnerPair: e.winnerPair }, court, ratings)];
 }

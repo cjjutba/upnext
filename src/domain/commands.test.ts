@@ -95,7 +95,7 @@ describe('finishGame', () => {
     expect(s.games[1]).toBeUndefined(); // court 1 did not steal the winner priority fill
   });
 
-  it('balanced finishes with one tap and never records a winner', () => {
+  it('balanced finishes with no winner and records none', () => {
     let log = boot(['a', 'b', 'c', 'd', 'e'], 'balanced', 1);
     const events = finishGame(replay(log), 1);
     expect(events).not.toBeNull();
@@ -103,6 +103,18 @@ describe('finishGame', () => {
     expect(finish.type === 'game-finished' && finish.winnerPair !== undefined).toBe(false);
     log = [...log, ...seal(events!)];
     expect(replay(log).wins).toEqual({});
+  });
+
+  it('balanced records a winner when the organizer picks one, without changing the rotation', () => {
+    let log = boot(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], 'balanced', 1);
+    const before = replay(log);
+    const winners = before.games[1]!.pairs[0];
+    log = [...log, ...seal(finishGame(before, 1, 0)!)];
+    const after = replay(log);
+    expect(after.wins).toEqual({ [winners[0]]: 1, [winners[1]]: 1 });
+    expect(after.consecutiveWins).toEqual({ a: 0, b: 0, c: 0, d: 0 }); // no streaks outside the winners templates
+    // all four went to the back, so the four who were waiting take the court
+    expect(after.games[1]!.pairs.flat().sort()).toEqual(['e', 'f', 'g', 'h']);
   });
 });
 

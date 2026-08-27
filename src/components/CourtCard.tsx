@@ -44,17 +44,21 @@ export function CourtCard({ court, status, pairs, elapsed, needsWinner, onFinish
       ) : (
         <>
           <CourtDiagram top={pairs[0]} bottom={pairs[1]} height={compact ? 190 : undefined} />
-          {needsWinner ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              <Button variant="secondary" size="lg" block onClick={() => onWin(0)}>Top pair won</Button>
-              <Button variant="secondary" size="lg" block onClick={() => onWin(1)}>Bottom pair won</Button>
-            </div>
-          ) : (
-            <Button size="lg" block icon="square" onClick={onFinish}>Game over</Button>
-          )}
-          <Button variant="ghost" onClick={onSwap} icon="shuffle" style={{ alignSelf: 'center' }} ariaLabel={'Swap partners on court ' + court}>
-            Swap partners
-          </Button>
+          {/* every mode records the winner so standings mean something; only the winners templates require one */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <Button variant="secondary" size="lg" block onClick={() => onWin(0)}>Top pair won</Button>
+            <Button variant="secondary" size="lg" block onClick={() => onWin(1)}>Bottom pair won</Button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
+            {needsWinner ? null : (
+              <Button variant="ghost" icon="square" onClick={onFinish} ariaLabel={'Finish court ' + court + ' with no winner'}>
+                No winner
+              </Button>
+            )}
+            <Button variant="ghost" onClick={onSwap} icon="shuffle" ariaLabel={'Swap partners on court ' + court}>
+              Swap partners
+            </Button>
+          </div>
         </>
       )}
     </div>
