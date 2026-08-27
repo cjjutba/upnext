@@ -157,10 +157,14 @@ export function applyEvent(state: SessionState, e: SessionEvent): SessionState {
       // every mode records the win; only the winners templates let it change who keeps the court
       const wins = e.winnerPair === undefined ? state.wins : bumpAll(state.wins, [...active.pairs[e.winnerPair]]);
       if (!winnersMode || e.winnerPair === undefined) {
+        // casual finish: the winners lead the four to the back; legacy events without a winner keep lineup order
+        const leaving = e.winnerPair === undefined
+          ? players
+          : [...active.pairs[e.winnerPair], ...active.pairs[e.winnerPair === 0 ? 1 : 0]];
         return {
           ...base,
           wins,
-          queue: [...state.queue, ...players],
+          queue: [...state.queue, ...leaving],
           consecutiveWins: resetAll(state.consecutiveWins, players),
           pairingCycle: state.pairingCycle + 1,
         };

@@ -94,9 +94,13 @@ cancels it, which reinstates the original. The lookup memoizes and seeds each
 id as `false` before recursing, which keeps a malformed cycle from hanging
 replay.
 
-- `undoTarget(events)` scans from newest, skipping `event-undone` events and
-  already-skipped events, and returns the first real action. It returns `null`
-  at `session-started`, which is never undoable.
+- `undoTarget(events)` scans from newest, skipping `event-undone` events,
+  already-skipped events, and `game-started` fills, and returns the first real
+  action. Fills are never undone directly: skipping the action that caused one
+  invalidates the fill on replay (the court is still occupied, its players
+  never queued), so a single undo reverts a team win together with the refill
+  it triggered. It returns `null` at `session-started`, which is never
+  undoable.
 - `redoTarget(events)` scans from newest, skipping skipped events. The first
   `event-undone` it meets is the redo target. Any other event type that is not
   `session-started` returns `null`, so taking a new action clears the redo.

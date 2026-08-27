@@ -30,9 +30,15 @@ export function ModeMenu({ rule, onChange }: {
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
-      <Button variant="secondary" onClick={() => setOpen(!open)} ariaLabel="Change matching mode">
+      <button
+        type="button" onClick={() => setOpen(!open)} aria-label="Change matching mode"
+        style={{
+          display: 'inline-flex', alignItems: 'center', height: '40px', padding: '0 var(--space-3)',
+          background: 'var(--bg)', color: 'var(--text-secondary)', border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-control)', font: '500 14px/1 var(--font-sans)', cursor: 'pointer',
+        }}>
         {'Mode: ' + MODES.find((m) => m.id === current)!.label}
-      </Button>
+      </button>
       {open ? (
         <div style={{
           position: 'absolute', top: 'calc(100% + var(--space-2))', left: 0, zIndex: 20,

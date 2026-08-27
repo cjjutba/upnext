@@ -86,27 +86,16 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await waitFor(() => expect(said()).toHaveLength(1));
     expect(said()[0]).toMatch(/^Court 1\. \w+ and \w+ versus \w+ and \w+\. Please proceed to court 1\.$/);
 
-    await click(btn('Top pair won', courtCard(1)));
+    await click(btn(/Team 1 wins/, courtCard(1)));
     await waitFor(() => expect(said()).toHaveLength(3));
     expect(said()[1]).toMatch(/^Court 1\. \w+ and \w+ win\.$/);
     expect(said()[2]).toMatch(/^Court 1\. .* Please proceed to court 1\.$/);
   });
 
-  it('offers a no-winner finish outside the winners templates and stays quiet about it', async () => {
-    render(<App />);
-    await startSession(/^Balanced/);
-    await waitFor(() => expect(said()).toHaveLength(1));
-
-    await click(btn('Finish court 1 with no winner', courtCard(1)));
-    await waitFor(() => expect(said()).toHaveLength(2));
-    expect(said().some((s) => s.includes('Game over'))).toBe(false);
-    expect(said()[1]).toMatch(/Please proceed to court 1/);
-  });
-
   it('records wins in Balanced mode and ranks them in the live standings', async () => {
     render(<App />);
     await startSession(/^Balanced/);
-    await click(btn('Top pair won', courtCard(1)));
+    await click(btn(/Team 1 wins/, courtCard(1)));
 
     const dialog = await openStandings();
     expect(within(dialog).getByText('8 players')).toBeInTheDocument();
@@ -126,7 +115,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await click(btn('Mute announcements'));
     expect(spoken.at(-1)).toBe('[cancel]'); // muting stops the sentence in flight
 
-    await click(btn('Top pair won', courtCard(1)));
+    await click(btn(/Team 1 wins/, courtCard(1)));
     const dialog = await openStandings();
     await waitFor(() => expect(within(dialog).getAllByText('100%')).toHaveLength(2)); // the win landed
     expect(said()).toHaveLength(1); // and nothing was said about it
@@ -151,7 +140,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await act(() => new Promise((r) => setTimeout(r, 1400))); // past the up next settle window
     expect(said()).toEqual([]);
 
-    await click(btn('Bottom pair won', courtCard(1)));
+    await click(btn(/Team 2 wins/, courtCard(1)));
     await waitFor(() => expect(said().length).toBeGreaterThan(0));
     expect(said()[0]).toMatch(/win\.$/);
   });
@@ -159,7 +148,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
   it('reads the podium when the session ends, and ranks the summary', async () => {
     render(<App />);
     await startSession(/^Balanced/);
-    await click(btn('Top pair won', courtCard(1)));
+    await click(btn(/Team 1 wins/, courtCard(1)));
     await waitFor(() => expect(said()).toHaveLength(3));
 
     await click(btn('End session'));
@@ -185,7 +174,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await startSession(/^Balanced/);
     await waitFor(() => expect(said()).toHaveLength(1)); // the court call, not two of them
 
-    await click(btn('Top pair won', courtCard(1)));
+    await click(btn(/Team 1 wins/, courtCard(1)));
     await waitFor(() => expect(said()).toHaveLength(3));
 
     await click(btn('End session'));
@@ -200,7 +189,6 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await waitFor(() => expect(said()).toHaveLength(1));
 
     expect(screen.queryByRole('button', { name: 'Call up next' })).not.toBeInTheDocument();
-    expect(within(courtCard(1)).queryByRole('button', { name: 'Finish court 1 with no winner' })).not.toBeInTheDocument();
     await act(() => new Promise((r) => setTimeout(r, 1400)));
     expect(said().some((s) => s.startsWith('Up next'))).toBe(false);
   });

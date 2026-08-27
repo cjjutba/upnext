@@ -1,38 +1,35 @@
 import { Button } from './Button';
+import { IconButton } from './IconButton';
 import { StatusBadge, type BadgeStatus } from './StatusBadge';
 import { CourtDiagram } from './CourtDiagram';
 import type { Pairs } from '../domain/types';
 
-export function CourtCard({ court, status, pairs, elapsed, needsWinner, onFinish, onWin, onClose, onReopen, onSwap, compact }: {
+export function CourtCard({ court, status, pairs, elapsed, onWin, onClose, onReopen }: {
   court: number;
   status: BadgeStatus; // live | warn | danger (closed) | neutral (open)
   pairs: Pairs | null;
   elapsed: string;
-  needsWinner: boolean;
-  onFinish: () => void;
   onWin: (winnerPair: 0 | 1) => void;
   onClose: () => void;
   onReopen: () => void;
-  onSwap: () => void;
-  compact?: boolean;
 }) {
   const closed = status === 'danger';
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column', gap: compact ? 'var(--space-2)' : 'var(--space-3)', padding: compact ? 'var(--space-3)' : 'var(--space-4)',
+      display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', padding: '20px',
       background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-card)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <span className="display" style={{ fontSize: 'var(--text-h2)', lineHeight: 1 }}>{court}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        <span className="display" style={{ fontSize: 'var(--text-h2)', lineHeight: 1 }}>Court {court}</span>
         <StatusBadge status={status} />
-        {!closed && pairs ? (
-          <span className="mono" style={{ fontSize: '16px', color: 'var(--text-secondary)' }}>{elapsed}</span>
-        ) : null}
         <span style={{ flex: 1 }} />
+        {!closed && pairs ? (
+          <span className="mono" style={{ fontSize: '40px', lineHeight: 1, letterSpacing: '-0.01em' }}>{elapsed}</span>
+        ) : null}
         {closed ? (
           <Button variant="ghost" onClick={onReopen} ariaLabel={'Reopen court ' + court}>Reopen</Button>
         ) : (
-          <Button variant="ghost" onClick={onClose} icon="x" ariaLabel={'Close court ' + court}>Close court</Button>
+          <IconButton icon="x" ariaLabel={'Close court ' + court} onClick={onClose} />
         )}
       </div>
       {closed || !pairs ? (
@@ -43,21 +40,11 @@ export function CourtCard({ court, status, pairs, elapsed, needsWinner, onFinish
         </div>
       ) : (
         <>
-          <CourtDiagram top={pairs[0]} bottom={pairs[1]} height={compact ? 190 : undefined} />
-          {/* every mode records the winner so standings mean something; only the winners templates require one */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            <Button variant="secondary" size="lg" block onClick={() => onWin(0)}>Top pair won</Button>
-            <Button variant="secondary" size="lg" block onClick={() => onWin(1)}>Bottom pair won</Button>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
-            {needsWinner ? null : (
-              <Button variant="ghost" icon="square" onClick={onFinish} ariaLabel={'Finish court ' + court + ' with no winner'}>
-                No winner
-              </Button>
-            )}
-            <Button variant="ghost" onClick={onSwap} icon="shuffle" ariaLabel={'Swap partners on court ' + court}>
-              Swap partners
-            </Button>
+          <CourtDiagram pairs={pairs} />
+          {/* every mode records the winner so standings mean something */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <Button size="lg" block icon="trophy" onClick={() => onWin(0)} ariaLabel={'Team 1 wins on court ' + court}>Team 1 wins</Button>
+            <Button size="lg" block icon="trophy" onClick={() => onWin(1)} ariaLabel={'Team 2 wins on court ' + court}>Team 2 wins</Button>
           </div>
         </>
       )}
