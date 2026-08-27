@@ -10,15 +10,20 @@ import { ModeChangeModal } from './components/ModeChangeModal';
 import { Button } from './components/Button';
 import { IconButton } from './components/IconButton';
 import { StandingsModal } from './components/StandingsModal';
-import { append, lastSessionAttendees, listSessions } from './db/eventStore';
+import { PlayerPicker } from './components/PlayerPicker';
+import { LineupEditor } from './components/LineupEditor';
+import { append, attendanceRecency, lastSessionAttendees, listSessions } from './db/eventStore';
 import { useWakeLock } from './lib/useWakeLock';
 import { useRoute } from './lib/useRoute';
 import { useSpeech } from './lib/useSpeech';
+import { useNarrow } from './lib/useViewport';
 import { shareSessionFile, importSessionFile } from './lib/exportFile';
 import * as cmd from './domain/commands';
-import { upNextPreview } from './domain/templates';
-import { challengersPhrase, leaderPhrase, upNextPhrase } from './domain/announce';
+import { previewLineups, upNextPreview } from './domain/templates';
+import { challengersPhrase, getReadyPhrase, leaderPhrase } from './domain/announce';
 import { standings } from './domain/standings';
+import { isStaged, stagedCourtOf } from './domain/reducer';
+import { fullLineup, slotAt } from './domain/types';
 import type { RuleConfig, RuleTemplate, SessionState, SlotIndex } from './domain/types';
 import type { Ratings } from './domain/templates';
 
@@ -41,9 +46,24 @@ export default function App() {
   const [resuming, setResuming] = useState(true);
   const [returningIds, setReturningIds] = useState<string[]>([]);
   const [standingsOpen, setStandingsOpen] = useState(false);
+  /** The tapped chip. `court` is null when the tap came from the queue section, where a swap reorders instead of substituting. */
+  const [picking, setPicking] = useState<{ playerId: string; court: number | null } | null>(null);
+  const [editingCourt, setEditingCourt] = useState<number | null>(null);
+  const [endArmed, setEndArmed] = useState(false);
   /** The rule the organizer is proposing. Nothing is appended until the modal confirms it. */
   const [pendingRule, setPendingRule] = useState<RuleConfig | null>(null);
+  const narrow = useNarrow();
   const { state, dispatch } = session;
+
+  // an armed end button disarms itself; an accidental tap must not linger as a one-tap landmine
+  useEffect(() => {
+    if (!endArmed) return;
+    const t = setTimeout(() => setEndArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [endArmed]);
+  useEffect(() => {
+    setEndArmed(false);
+  }, [route]);
 
   useEffect(() => {
     void (async () => {
@@ -60,6 +80,11 @@ export default function App() {
 
   useEffect(() => {
     if (route === 'setup') void lastSessionAttendees().then(setReturningIds);
+  }, [route]);
+
+  const [recency, setRecency] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (route === 'board') void attendanceRecency().then(setRecency);
   }, [route]);
 
   const returning = roster.players.filter((p) => returningIds.includes(p.id) && !selected.includes(p.id));
@@ -80,13 +105,15 @@ export default function App() {
 
   const nameOf = (id: string) => roster.players.find((p) => p.id === id)?.name ?? 'Unknown';
 
-  // one preview path for every mode: a full lineup, or the challengers a winners template can promise
-  const preview = route === 'board' ? upNextPreview(state, roster.ratings) : null;
+  // the queue section: whoever is left after every court has been staged, in the shape the mode can honestly promise
+  const previews = useMemo(
+    () => (route === 'board' ? previewLineups(state, roster.ratings) : []),
+    [route, state, roster.ratings],
+  );
 
   useAnnouncer({
     lastBatch: session.lastBatch,
     state,
-    preview,
     nameOf,
     speak: speech.speak,
     // names come from the roster, so wait for it rather than calling four Unknowns to a court
@@ -109,10 +136,38 @@ export default function App() {
   };
 
   const toggleBoardCheck = (playerId: string) => {
-    // On the board a tap checks a player in, or departs a waiting player. Playing players are untouchable.
-    if (state.queue.includes(playerId)) void dispatch(cmd.departPlayer(state, playerId));
+    // On the board a tap checks a player in, or removes a waiting or staged one. Players mid game are untouchable.
+    if (state.queue.includes(playerId) || isStaged(state, playerId)) void dispatch(cmd.departPlayer(state, playerId));
     else void dispatch(cmd.checkInPlayer(state, playerId, roster.ratings));
   };
+
+  /** Where the picker's swap sends the pair: onto a court, or up and down the queue. */
+  const swapPicked = (inId: string) => {
+    if (!picking) return;
+    void dispatch(picking.court === null
+      ? cmd.swapQueue(state, picking.playerId, inId)
+      : cmd.substitutePlayer(state, picking.court, picking.playerId, inId));
+    setPicking(null);
+  };
+
+  const pickerContext = (playerId: string): string => {
+    const court = stagedCourtOf(state, playerId) ?? Object.values(state.games).find((g) => [...g.pairs[0], ...g.pairs[1]].includes(playerId))?.court;
+    if (court !== undefined && court !== null) return `Court ${court}`;
+    const at = state.queue.indexOf(playerId);
+    return at < 0 ? 'Not in this session' : `Waiting, position ${at + 1}`;
+  };
+
+  /** Everyone who could take the tapped player's spot: waiting, not sitting out, not already there. */
+  // only a live court can go short handed, so Off the court is offered there and nowhere else
+  const liftSlot: SlotIndex | null = picking && picking.court !== null
+    ? (([0, 1, 2, 3] as SlotIndex[]).find(
+        (i) => state.games[picking.court!] && slotAt(state.games[picking.court!].pairs, i) === picking.playerId,
+      ) ?? null)
+    : null;
+
+  const candidates = picking
+    ? roster.players.filter((p) => state.queue.includes(p.id) && !state.sittingOut.includes(p.id) && p.id !== picking.playerId)
+    : [];
 
   const addAndCheckIn = async (name: string) => {
     const player = await roster.addPlayer(name);
@@ -128,6 +183,26 @@ export default function App() {
   const end = async () => {
     speech.cancel(); // a queued court call must not talk over the podium
     await dispatch(cmd.endSession(state));
+    navigate('summary');
+  };
+
+  const endTap = () => {
+    if (!endArmed) {
+      setEndArmed(true);
+      return;
+    }
+    setEndArmed(false);
+    void end();
+  };
+
+  const reopen = async (sessionId: string) => {
+    await session.loadById(sessionId);
+    await session.undo(); // the newest effective event of an ended log is session-ended
+    navigate('board');
+  };
+
+  const view = async (sessionId: string) => {
+    await session.loadById(sessionId);
     navigate('summary');
   };
 
@@ -147,7 +222,7 @@ export default function App() {
   ) : null;
 
   const header = (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '12px var(--space-4)', borderBottom: '1px solid var(--border)', background: 'var(--bg)', position: 'sticky', top: 0, zIndex: 10 }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--space-3)', padding: '12px var(--space-4)', borderBottom: '1px solid var(--border)', background: 'var(--bg)', position: 'sticky', top: 0, zIndex: 10 }}>
       <span className="display" style={{ fontSize: '22px', fontWeight: 600 }}>upnext</span>
       {route === 'board' ? (
         <>
@@ -158,7 +233,9 @@ export default function App() {
           </span>
           <IconButton icon="trophy" ariaLabel="Live standings" onClick={() => setStandingsOpen(true)} />
           {muteToggle}
-          <Button variant="danger" onClick={() => void end()}>End session</Button>
+          <Button variant="danger" onClick={endTap}>
+            {endArmed ? 'Tap again to end' : 'End session'}
+          </Button>
         </>
       ) : route === 'summary' ? (
         <>
@@ -182,8 +259,8 @@ export default function App() {
   if (resuming || misrouted) return <div style={{ minHeight: '100vh', background: 'var(--bg)' }} />;
 
   return (
-    /* the board pins to the viewport so the courts area and the rail scroll independently; other routes keep page scroll */
-    <div style={route === 'board'
+    /* the wide board pins to the viewport so the courts area and the rail scroll independently; narrow stacks and keeps page scroll */
+    <div style={route === 'board' && !narrow
       ? { height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)' }
       : { minHeight: '100vh', background: 'var(--bg)' }}>
       {header}
@@ -195,12 +272,15 @@ export default function App() {
           onToggle={(id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))}
           onStart={(config) => void start(config)}
           onResume={(sessionId) => void session.loadById(sessionId).then(() => navigate('board'))}
+          onReopen={(sessionId) => void reopen(sessionId)}
+          onView={(sessionId) => void view(sessionId)}
           onImport={(file) => void importSessionFile(file).then(() => window.location.reload()).catch(() => window.alert('Import failed: that is not a valid upnext session file'))}
           onSelectAll={() => setSelected(roster.players.map((p) => p.id))}
           onClearAll={() => setSelected([])}
           returning={returning}
           onCheckInReturning={() => setSelected((s) => [...s, ...returning.map((p) => p.id)])}
           onUpdatePlayer={(id, changes) => void roster.updatePlayer(id, changes)}
+          narrow={narrow}
         />
       ) : route === 'board' ? (
         <SessionBoard
@@ -210,19 +290,32 @@ export default function App() {
           onUndo={() => void session.undo()}
           canRedo={session.canRedo}
           onRedo={() => void session.redo()}
-          onWin={(court, w) => void dispatch(cmd.finishGame(state, court, w, roster.ratings))}
+          onWin={(court, w, score) => void dispatch(cmd.finishGame(state, court, w, roster.ratings, score))}
           onCloseCourt={(court) => void dispatch(cmd.closeCourt(state, court, roster.ratings))}
           onReopenCourt={(court) => void dispatch(cmd.reopenCourt(state, court, roster.ratings))}
           onToggleSit={(id) => void dispatch(state.sittingOut.includes(id) ? cmd.returnPlayer(state, id, roster.ratings) : cmd.sitOutPlayer(state, id))}
           onToggleCheck={toggleBoardCheck}
           onAddCourt={() => void dispatch(cmd.addCourt(state, roster.ratings))}
           onAddPlayer={(n) => void addAndCheckIn(n)}
-          preview={preview}
-          onCallUpNext={() => preview && speech.speak(
-            preview.kind === 'lineup' ? upNextPhrase(preview.pairs, nameOf) : challengersPhrase(preview.pair, nameOf),
-          )}
-          canCallUpNext={speech.supported && speech.enabled}
-          onRemoveFromCourt={(court, slot) => void dispatch(cmd.removeFromLineup(state, court, slot))}
+          onRemovePlayer={(id) => void dispatch(cmd.departPlayer(state, id))}
+          onCourtPlayerTap={(court, id) => setPicking({ playerId: id, court })}
+          onQueuePlayerTap={(id) => setPicking({ playerId: id, court: null })}
+          onStart={(court) => void dispatch(cmd.startStagedGame(state, court))}
+          onStage={(court) => void dispatch(cmd.stageCourt(state, court, roster.ratings))}
+          onShuffle={(court) => void dispatch(cmd.shufflePairing(state, court))}
+          onCallCourt={(court) => {
+            const lineup = state.staged[court] ?? state.games[court]?.pairs;
+            const pairs = lineup && fullLineup(lineup);
+            if (pairs) speech.speak(getReadyPhrase(pairs, nameOf, court));
+          }}
+          onCallUpNext={() => {
+            const next = previews[0];
+            if (next) speech.speak(next.kind === 'lineup' ? getReadyPhrase(next.pairs, nameOf) : challengersPhrase(next.pair, nameOf));
+          }}
+          onEditLineup={setEditingCourt}
+          previews={previews}
+          narrow={narrow}
+          recency={recency}
           onSeatPlayer={(court, slot, id) => void dispatch(cmd.seatPlayer(state, court, slot, id, roster.ratings))}
           onCreateAndSeat={(court, slot, name) => void createAndSeat(court, slot, name)}
           onFillCourt={(court) => void dispatch(cmd.fillCourt(state, court, roster.ratings))}
@@ -235,8 +328,31 @@ export default function App() {
           onDone={fresh}
           speak={speech.speak}
           canSpeak={speech.supported && speech.enabled}
+          autoRead={session.lastBatch.some((e) => e.type === 'session-ended')}
+          narrow={narrow}
         />
       )}
+      {picking ? (
+        <PlayerPicker
+          name={nameOf(picking.playerId)}
+          context={pickerContext(picking.playerId)}
+          candidates={candidates}
+          sitting={state.sittingOut.includes(picking.playerId)}
+          onSwap={swapPicked}
+          onSit={() => {
+            void dispatch(state.sittingOut.includes(picking.playerId)
+              ? cmd.returnPlayer(state, picking.playerId, roster.ratings)
+              : cmd.sitOutPlayer(state, picking.playerId));
+            setPicking(null);
+          }}
+          onRemove={() => { void dispatch(cmd.departPlayer(state, picking.playerId)); setPicking(null); }}
+          onLift={liftSlot === null ? undefined : () => {
+            void dispatch(cmd.removeFromLineup(state, picking.court!, liftSlot));
+            setPicking(null);
+          }}
+          onClose={() => setPicking(null)}
+        />
+      ) : null}
       {pendingRule && !state.ended ? (
         <ModeChangeModal
           from={state.rule}
@@ -257,6 +373,16 @@ export default function App() {
           onClose={() => setStandingsOpen(false)}
           onRead={() => speech.speak(leaderPhrase(rows, nameOf))}
           canRead={speech.supported && speech.enabled}
+        />
+      ) : null}
+      {editingCourt !== null && (state.staged[editingCourt] ?? state.games[editingCourt]) ? (
+        <LineupEditor
+          court={editingCourt}
+          pairs={state.staged[editingCourt] ?? state.games[editingCourt].pairs}
+          bench={state.queue.filter((id) => !state.sittingOut.includes(id))}
+          nameOf={nameOf}
+          onApply={(pairs) => void dispatch(cmd.setLineup(state, editingCourt, pairs))}
+          onClose={() => setEditingCourt(null)}
         />
       ) : null}
     </div>

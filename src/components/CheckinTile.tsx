@@ -1,6 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 
-export type TileState = 'out' | 'in' | 'playing' | 'sitting';
+export type TileState = 'out' | 'in' | 'staged' | 'playing' | 'sitting';
 
 export function CheckinTile({ name, state = 'out', games, onTap }: {
   name: string; state?: TileState; games?: number; onTap: () => void;
@@ -9,10 +9,11 @@ export function CheckinTile({ name, state = 'out', games, onTap }: {
   const looks: Record<TileState, CSSProperties> = {
     out: { background: pressed ? 'var(--gray-100)' : 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-secondary)' },
     in: { background: pressed ? 'var(--gray-200)' : 'var(--gray-100)', border: '1px solid var(--gray-1000)', color: 'var(--text)' },
+    staged: { background: pressed ? 'var(--gray-200)' : 'var(--gray-100)', border: '1px dashed var(--gray-1000)', color: 'var(--text)' },
     playing: { background: pressed ? 'var(--primary-press)' : 'var(--primary)', border: '1px solid transparent', color: 'var(--primary-fg)' },
     sitting: { background: 'var(--bg)', border: '1px dashed var(--border-hover)', color: 'var(--text-tertiary)' },
   };
-  const sub: Record<TileState, string | null> = { out: null, in: 'In', playing: 'Playing', sitting: 'Sitting out' };
+  const sub: Record<TileState, string | null> = { out: null, in: 'In', staged: 'On deck', playing: 'Playing', sitting: 'Sitting out' };
   return (
     <button
       type="button" disabled={state === 'playing'} onClick={state === 'playing' ? undefined : onTap}

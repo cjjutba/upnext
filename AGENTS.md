@@ -8,13 +8,13 @@ from the specs, which have drifted. See `docs/README.md` for the drift list.
 
 An offline-first PWA that one organizer runs courtside to manage a pickleball
 open play session. Check players in, hold the paddle queue, form games of
-four, rotate by the chosen matching mode, undo anything. No backend, no
-accounts, no player phones. A session is an append-only event log in
-IndexedDB, so cloud sync later is an upload rather than a rewrite.
+four, start them by hand, rotate by the chosen matching mode, undo anything.
+No backend, no accounts, no player phones. A session is an append-only event
+log in IndexedDB, so cloud sync later is an upload rather than a rewrite.
 
 Stack: Vite, React 19, TypeScript, Dexie over IndexedDB, ulidx, lucide-react,
 vite-plugin-pwa. Vitest with jsdom, fake-indexeddb, and fast-check. Roughly
-2,900 lines of source across 40 files, 149 test cases in 12 test files.
+3,670 lines of source across 45 files, 188 test cases in 12 test files.
 
 ## Commands
 
@@ -47,10 +47,21 @@ There is one loop, and no session state outside it.
 where it was. If you are about to add a `useState` that holds session truth,
 stop. It belongs in an event.
 
-A live court's lineup can hold an empty seat, written as `null`. `ActiveGame.pairs`
-is a `Lineup`, `game-started` still carries four real players, and a court with an
-open seat cannot record a winner. See the empty seats section of
-`docs/event-model.md`.
+### Staged, then started
+
+No game starts on its own. A command that frees capacity emits `game-staged`,
+which puts four people on a court with the clock stopped, and the organizer
+taps Start to emit `game-started`. Staged players leave the queue, so a
+checked-in player is in exactly one of three places: the queue, `state.staged`,
+or `state.games`.
+
+### Open seats
+
+A **live** court's lineup can hold an open seat, written as `null`.
+`ActiveGame.pairs` is a `Lineup`; `staged` stays `Pairs`, because a staged four
+that is wrong gets unstaged rather than emptied. `game-started` still carries
+four real players, and a court with an open seat cannot record a winner. See the
+open seats section of `docs/event-model.md`.
 
 Read `docs/architecture.md` for the full picture and `docs/event-model.md` for
 every event type.
@@ -91,8 +102,8 @@ directly for the history list. Do not add more.
    the pairing among the three possible partitions, never the players. See
    `eligible()` and `nextLineup()` in `src/domain/templates.ts`. This is the
    paddle-rack promise and it is not tradeable for pairing quality. The
-   organizer can still seat anyone by hand through `game-lineup-changed`. That
-   is a manual override, and it does not widen what a mode may do.
+   organizer can override it by hand through `substitutePlayer`, `swapQueue`,
+   or `seatPlayer`; a mode still never does.
 6. **Never change the meaning of an existing event type or template id.** Old
    logs must replay identically. Widen unions, add cases, add optional fields.
    Do not repurpose.
@@ -110,7 +121,9 @@ directly for the history list. Do not add more.
    return `state` unchanged when the event does not apply.
 4. `src/domain/commands.ts`: add the command that emits it, returning `null`
    when refused, and add a label to `describeEvent()` so the undo pill reads
-   properly.
+   properly. If a command emits it as an automatic fill rather than an
+   organizer's intent, mark it the way `game-staged` marks `auto`, so
+   `undoTarget()` skips it and one undo still reverts one action.
 5. Wire the UI through `src/App.tsx`.
 
 The Dexie schema does not change. Events are one table with one shape.

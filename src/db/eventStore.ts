@@ -63,6 +63,22 @@ export async function lastSessionAttendees(db: UpnextDB = defaultDb): Promise<st
   return replay(await loadSession(last.sessionId, db)).checkedIn;
 }
 
+/**
+ * startedAt of the newest ended session each player attended, over the last few
+ * nights. Orders the check-in grid so the regulars sit at the top. Capped so a
+ * long history never means replaying every log ever written.
+ */
+export async function attendanceRecency(db: UpnextDB = defaultDb, nights = 5): Promise<Record<string, number>> {
+  const recent = (await listSessions(db)).filter((s) => s.endedAt !== null).slice(0, nights);
+  const out: Record<string, number> = {};
+  for (const s of recent) {
+    for (const id of replay(await loadSession(s.sessionId, db)).checkedIn) {
+      out[id] = out[id] ?? s.startedAt; // listSessions is newest first
+    }
+  }
+  return out;
+}
+
 export interface SessionExport {
   format: 'upnext-session';
   v: 1;

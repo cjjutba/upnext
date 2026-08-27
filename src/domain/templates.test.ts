@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { freshFill, nextChallengers, nextLineup, upNextPreview } from './templates';
+import { freshFill, nextChallengers, nextLineup, previewLineups, upNextPreview } from './templates';
 import { emptyState } from './types';
 import type { SessionState, Pairs, FinishedGame } from './types';
 
@@ -207,5 +207,37 @@ describe('upNextPreview across every mode', () => {
       const four = p!.kind === 'lineup' ? [...p!.pairs[0], ...p!.pairs[1]].sort() : [];
       expect(four).toEqual(['a', 'b', 'c', 'd']);
     }
+  });
+});
+
+describe('previewLineups', () => {
+  const lineup = (pairs: Pairs) => ({ kind: 'lineup', pairs });
+
+  it('chunks the waiting players into fours and leads with upNextPreview', () => {
+    const s = state({ queue: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'] });
+    const chunks = previewLineups(s, {});
+    expect(chunks).toHaveLength(2); // nine waiting is two fours plus a leftover
+    expect(chunks[0]).toEqual(upNextPreview(s, {}));
+    expect(chunks[1]).toEqual(lineup([['e', 'g'], ['f', 'h']]));
+  });
+
+  it('skips sitting-out players and stops at max', () => {
+    const s = state({ queue: ['a', 'x', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], sittingOut: ['x'] });
+    expect(previewLineups(s, {})).toEqual([lineup([['a', 'c'], ['b', 'd']]), lineup([['e', 'g'], ['f', 'h']])]);
+    expect(previewLineups(s, {}, 1)).toHaveLength(1);
+  });
+
+  it('returns nothing with fewer than four waiting', () => {
+    expect(previewLineups(state({ queue: ['a', 'b', 'c'] }), {})).toEqual([]);
+  });
+
+  it('honours the balanced pairing on the first four', () => {
+    const s = state({ rule: { template: 'balanced', winCap: 3 }, queue: ['a', 'b', 'c', 'd', 'e'] });
+    expect(previewLineups(s, { a: 5, b: 5, c: 1, d: 1 })[0]).toEqual(lineup([['a', 'c'], ['b', 'd']]));
+  });
+
+  it('stops at the challengers in a winners template, which cannot name a four', () => {
+    const s = state({ rule: { template: 'winners-stay', winCap: 3 }, queue: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] });
+    expect(previewLineups(s, {})).toEqual([{ kind: 'challengers', pair: ['a', 'b'] }]);
   });
 });

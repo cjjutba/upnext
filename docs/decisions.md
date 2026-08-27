@@ -124,7 +124,7 @@ transitions. All three were dropped.
 
 The lime read generic. The dark default became one light theme, on the
 argument that dark mode deserves to be designed rather than inverted. Motion
-went because the product should feel instant, and a court refilling with a
+went because the product should feel instant, and a court restaging with a
 150ms slide is 150ms of an organizer waiting.
 
 ## 12. Sitting out freezes the queue spot
@@ -146,3 +146,38 @@ The UI already prevents these, so this is not the primary defense. It is there
 so a log imported from another device, or written by a newer build with an
 event type this one has never seen, degrades instead of crashing. A v1 build
 reading a v1.1 log skips `court-added` and keeps working.
+
+## 14. Staging is automatic, starting is not
+
+Filling a court and starting its clock used to be one event. Tapping "Team 1
+wins" ended the game and started the next one in the same batch, so the timer
+was running before anyone had walked over.
+
+They are now two events. `game-staged` still fires automatically, from every
+command that frees capacity, because an organizer should never have to ask the
+app who is next. `game-started` only comes from the Start button.
+
+The gap between them is the whole point. It is where a wrong name gets fixed,
+a substitute gets swapped in, and the four get called over. Splitting it also
+made the court call honest: it speaks when people should actually walk on,
+rather than when the software decided a game existed.
+
+The cost is one more tap per game. That was judged cheaper than a clock that
+starts on an empty court.
+
+## 15. Staged is a field, not a flag on the game
+
+`SessionState` carries `staged: Record<number, Pairs>` alongside `games`,
+rather than a `status` on `ActiveGame`.
+
+`isPlaying()`, `standings.ts`, `pairHistory()`, and the summary all iterate
+`state.games` and assume the clock is running. A flag would have put a check in
+every one of them, and the first one anybody forgot would have counted a game
+that never happened. A separate record leaves all of them correct without an
+edit.
+
+Staged players leave the queue, exactly like players in a live game, so the
+conservation invariant stays sharp: a checked-in player is in exactly one of
+three places. The cost is that `player-departed` and `player-sat-out` refuse a
+staged player, so those commands pull them back into the queue first. The
+guards enforcing that is a feature: a stale staged entry can never appear.

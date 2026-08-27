@@ -66,6 +66,11 @@ export type EventPayload =
   | { type: 'player-sat-out'; playerId: string }
   | { type: 'player-returned'; playerId: string }
   | { type: 'game-started'; court: number; pairs: Pairs }
+  /** Four assigned to a court, clock not running. `auto` marks a fill a command emitted, which is what undo skips over. */
+  | { type: 'game-staged'; court: number; pairs: Pairs; auto?: true }
+  | { type: 'game-unstaged'; court: number }
+  | { type: 'queue-swapped'; playerA: string; playerB: string }
+  /** Only a live court can go short handed, so this is the one payload that carries an open seat. */
   | { type: 'game-lineup-changed'; court: number; pairs: Lineup }
   | { type: 'game-finished'; court: number; winnerPair?: 0 | 1; score?: string }
   | { type: 'court-closed'; court: number }
@@ -110,6 +115,12 @@ export interface SessionState {
   queue: string[];
   /** Active game per court number. Absent key = empty court. */
   games: Record<number, ActiveGame>;
+  /**
+   * Four waiting on a court for the organizer to start them. Kept out of games so
+   * nothing that reads games has to ask whether the clock is running. Always a full
+   * four: a staged court that is wrong gets unstaged, only a live one goes short handed.
+   */
+  staged: Record<number, Pairs>;
   closedCourts: number[];
   gamesPlayed: Record<string, number>;
   wins: Record<string, number>;
@@ -134,6 +145,7 @@ export function emptyState(): SessionState {
     departed: [],
     queue: [],
     games: {},
+    staged: {},
     closedCourts: [],
     gamesPlayed: {},
     wins: {},

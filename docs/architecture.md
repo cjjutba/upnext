@@ -85,11 +85,16 @@ from `src/db/eventStore.ts` to render session history. Do not add more.
 
 ### `src/components`
 
-Nineteen presentational components: `Button`, `CheckinTile`, `CountBadge`,
-`CourtCard`, `CourtDiagram`, `Icon`, `IconButton`, `ModeChangeModal`,
-`ModeMenu`, `PlayerChip`, `PlayerPickerModal`, `QueueRow`, `RuleCard`,
-`SlotMenu`, `StandingsModal`, `StatusBadge`, `Stepper`, `TimerDisplay`,
-`UndoPill`. Rules in `src/components/CLAUDE.md`.
+Twenty one presentational components: `Button`, `CheckinTile`, `CountBadge`,
+`CourtCard`, `CourtDiagram`, `Icon`, `IconButton`, `LineupEditor`,
+`ModeChangeModal`, `ModeMenu`, `PlayerChip`, `PlayerPicker`,
+`PlayerPickerModal`, `QueuePanel`, `QueueRow`, `RuleCard`, `StandingsModal`,
+`StatusBadge`, `Stepper`, `TimerDisplay`, `UndoPill`. Rules in
+`src/components/CLAUDE.md`.
+
+`PlayerPicker` is what a tap on a name opens: swap, sit out, off the court, or
+out for the night. `PlayerPickerModal` is the other direction, filling an open
+seat, and it is the only surface that can create a roster player mid-session.
 
 ### `src/screens`
 
@@ -123,7 +128,7 @@ Three details carry weight:
 **Commands simulate their own events.** `simulate()` runs an event through
 `applyEvent` with a fake envelope so the command can see the state its first
 event produces and decide what follows. A check-in that brings the queue to
-four has to know the player is queued before it can fill a court. The sim
+four has to know the player is queued before it can stage a court. The sim
 envelopes never leave the module, so the module-level counter behind them is
 unobservable.
 
@@ -132,28 +137,40 @@ intent does not apply: departing a player who is mid-game, finishing an empty
 court, re-selecting the mode that is already active. `dispatch` accepts null
 and warns in dev. This is how double taps and stale state stay harmless.
 
-**Fill order is load bearing.** `fillEvents()` takes an optional `onCourt`
-and fills that court first, and it is the only court that sees `lastFinished`.
+**Stage order is load bearing.** `stageEvents()` takes an optional `onCourt`
+and stages that court first, and it is the only court that sees `lastFinished`.
 Without that, winners who won on court 2 would be handed to court 1 because
 court 1 happens to be numbered lower. `src/domain/commands.test.ts` pins this
 with a test that engineers court 1 empty while court 2 holds the game.
 
-## Auto-fill
+## Auto-staging, manual starting
 
-Every command that could free or add capacity ends by calling `fillEvents()`:
+Every command that could free or add capacity ends by calling `stageEvents()`:
 `startSession`, `finishGame`, `checkInPlayer`, `returnPlayer`, `closeCourt`,
-`reopenCourt`, `addCourt`, `changeRule`, `seatPlayer`. Courts fill eagerly, so a
+`reopenCourt`, `addCourt`, `changeRule`, `seatPlayer`. Courts stage eagerly, so a
 court is never left empty while four eligible players wait.
 
 `removeFromLineup` is the one exception, and it is on purpose. It frees a player
-to the queue front, so an eager fill would take that same player straight onto
+to the queue front, so an eager stage would take that same player straight onto
 another court, which is not what lifting someone off a court means. The seat
 stays open until the organizer fills it or taps Fill court.
 
+Staging is where the automation stops. `game-staged` puts four people on a
+court with the clock stopped; only `startStagedGame`, which the organizer
+triggers with the Start button, emits `game-started`. That gap is the point:
+it is the moment to fix a wrong name, swap someone in, or call the four over
+before anything is on the clock.
+
 `changeRule` is the defensive one. Every capacity-increasing command already
-filled, so it is normally a no-op. That is deliberate: a mode switch governs
-the next fill and never rewrites a court already playing. `ModeChangeModal`
-confirms the switch before it is appended and says so in as many words.
+staged, so it is normally a no-op. That is deliberate. A mode switch governs
+the next stage and never rewrites a court already playing or already staged.
+`ModeChangeModal` confirms the switch before it is appended and says so in as
+many words.
+
+One more consequence to know about: `unstageCourt` clears a court on purpose
+and does not stage it again, but the next command that frees capacity will.
+That is what makes "remove a player and the court refills itself" work, and it
+means a bare clear does not stay cleared.
 
 ## Persistence
 

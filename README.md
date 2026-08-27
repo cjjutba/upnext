@@ -23,10 +23,18 @@ standings table with wins, losses, and win rate for everyone checked in.
 - npm test: unit and property tests
 - npm run build && npm run preview: production build, offline capable
 
-## v1.1 candidates (event model already supports them)
+## Shipped in v1.2
 
-- Optional score entry on game-finished
-- Hand-composed lineups (pull a chosen player onto a court)
-- Recent-frequency ordering for the check-in grid
-- Search on the check-in grid for the long tail of the roster
-- PNG apple-touch-icon for iOS home screens
+- Phone portrait layouts: the board, setup, and summary stack below 840px
+- Two-tap end session, plus Reopen and View actions on session history
+- Hand-composed lineups from a pencil on each court card
+- Optional score entry on the win tap; the score rides the event log
+- Check-in search past a dozen names, with regulars sorted first
+- PNG install icons for iOS home screens and Android maskable shapes
+
+## Later, if a night proves the need
+
+- Roster delete and merge for duplicate players
+- A warning when the browser denies persistent storage, plus export-all
+- Manual queue reorder (needs its own event type)
+- A guard against two tabs writing one log

@@ -10,15 +10,15 @@ describe('useSession', () => {
       await result.current.dispatch(startSession({ courts: 1, template: 'all-off', winCap: 3 }, ['a', 'b', 'c', 'd', 'e']));
     });
     await waitFor(() => expect(result.current.state.started).toBe(true));
-    expect(result.current.state.games[1]).toBeDefined();
+    expect(result.current.state.staged[1]).toBeDefined();
     expect(result.current.state.queue).toEqual(['e']);
-    // undo targets the newest primary action (e's check-in), never the fill; the fill of a-d survives
+    // undo targets the newest primary action (e's check-in), never the auto stage; the stage of a-d survives
     expect(result.current.undoLabel).toContain('check-in');
     await act(async () => {
       await result.current.undo();
     });
     await waitFor(() => expect(result.current.state.queue).toEqual([]));
-    expect(result.current.state.games[1]).toBeDefined();
+    expect(result.current.state.staged[1]).toBeDefined();
     expect(result.current.canRedo).toBe(true);
     await act(async () => {
       await result.current.redo();
@@ -50,18 +50,18 @@ describe('useSession', () => {
     await act(async () => {
       await result.current.dispatch(startSession({ courts: 1, template: 'all-off', winCap: 3 }, ['a', 'b', 'c', 'd', 'e']));
     });
-    await waitFor(() => expect(result.current.state.games[1]).toBeDefined());
+    await waitFor(() => expect(result.current.state.staged[1]).toBeDefined());
     await act(async () => {
       await Promise.all([result.current.undo(), result.current.undo()]);
     });
-    // first undo removed e's check-in; the second removed d's, which dissolves the fill that needed d
-    await waitFor(() => expect(result.current.state.games[1]).toBeUndefined());
+    // first undo removed e's check-in; the second removed d's, which dissolves the stage that needed d
+    await waitFor(() => expect(result.current.state.staged[1]).toBeUndefined());
     expect(result.current.state.queue).toEqual(['a', 'b', 'c']);
     await act(async () => {
       await result.current.redo();
     });
-    // redo reinstates d's check-in, which revalidates the fill of a-d
-    await waitFor(() => expect(result.current.state.games[1]).toBeDefined());
+    // redo reinstates d's check-in, which revalidates the stage of a-d
+    await waitFor(() => expect(result.current.state.staged[1]).toBeDefined());
     expect(result.current.state.queue).toEqual([]);
   });
 });
