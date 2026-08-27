@@ -3,10 +3,12 @@ import { replay } from './reducer';
 import {
   startSession, finishGame, checkInPlayer, sitOutPlayer, returnPlayer,
   departPlayer, closeCourt, reopenCourt, changeRule, changeLineup, endSession, addCourt,
+  removeFromLineup, seatPlayer, fillCourt,
   undoTarget, redoTarget, describeEvent, type CommandEvent,
 } from './commands';
 import { nextLineup } from './templates';
-import type { SessionEvent, EventPayload, Pairs, RuleTemplate } from './types';
+import { fullLineup } from './types';
+import type { SessionEvent, EventPayload, Lineup, RuleTemplate } from './types';
 
 let n = 0;
 /** Give command events real looking envelopes so replay can consume them. */
@@ -88,7 +90,7 @@ describe('finishGame', () => {
     let s = replay(log);
     expect(s.games[1]).toBeUndefined();
     expect(s.games[2]).toBeDefined();
-    const winners = s.games[2]!.pairs[0];
+    const winners = fullLineup(s.games[2]!.pairs)![0];
     log = [...log, ...seal(finishGame(s, 2, 0)!)];
     s = replay(log);
     expect(s.games[2]?.pairs[0]).toEqual(winners); // the winning pair stayed on court 2
@@ -98,7 +100,7 @@ describe('finishGame', () => {
   it('a balanced finish carries the winner and counts the win', () => {
     let log = boot(['a', 'b', 'c', 'd', 'e'], 'balanced', 1);
     const s = replay(log);
-    const winners = s.games[1]!.pairs[1];
+    const winners = fullLineup(s.games[1]!.pairs)![1];
     const events = finishGame(s, 1, 1);
     expect(events).not.toBeNull();
     const finish = events!.find((e) => e.type === 'game-finished')!;
@@ -115,7 +117,7 @@ describe('finishGame', () => {
   it('balanced counts the picked winner without starting a streak, and the waiting four take the court', () => {
     let log = boot(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], 'balanced', 1);
     const before = replay(log);
-    const winners = before.games[1]!.pairs[0];
+    const winners = fullLineup(before.games[1]!.pairs)![0];
     log = [...log, ...seal(finishGame(before, 1, 0)!)];
     const after = replay(log);
     expect(after.wins).toEqual({ [winners[0]]: 1, [winners[1]]: 1 });
@@ -224,7 +226,7 @@ describe('changeLineup', () => {
     let s = replay(log);
     expect(changeLineup(s, 2, s.games[1]!.pairs)).toBeNull();
     const g = s.games[1]!.pairs;
-    const swapped: Pairs = [[g[0][0], g[1][0]], [g[0][1], g[1][1]]];
+    const swapped: Lineup = [[g[0][0], g[1][0]], [g[0][1], g[1][1]]];
     log = [...log, ...seal(changeLineup(s, 1, swapped)!)];
     s = replay(log);
     expect(s.games[1]?.pairs).toEqual(swapped);
@@ -278,5 +280,126 @@ describe('describeEvent', () => {
     expect(describeEvent({ ...started, type: 'game-finished', court: 2 } as SessionEvent)).toBe('Undo: court 2 finished');
     expect(describeEvent({ ...started, type: 'game-finished', court: 1, winnerPair: 1 } as SessionEvent)).toBe('Undo: court 1, team 2 won');
     expect(describeEvent({ ...started, type: 'player-checked-in', playerId: 'x' } as SessionEvent)).toBe('Undo: check-in');
+  });
+});
+
+describe('editing a lineup slot by slot', () => {
+  /** Court 1 holding [[a, c], [b, d]] with e waiting, then a lifted out of slot 0. */
+  const opened = () => {
+    let log = boot(['a', 'b', 'c', 'd', 'e'], 'all-off', 1);
+    log = [...log, ...seal(removeFromLineup(replay(log), 1, 0)!)];
+    return log;
+  };
+
+  it('removeFromLineup opens the slot and sends the player to the queue front', () => {
+    const log = opened();
+    const s = replay(log);
+    expect(s.games[1]?.pairs).toEqual([[null, 'c'], ['b', 'd']]);
+    expect(s.queue).toEqual(['a', 'e']);
+  });
+
+  it('removeFromLineup refuses an already empty slot and a court with no game', () => {
+    const s = replay(opened());
+    expect(removeFromLineup(s, 1, 0)).toBeNull();
+    expect(removeFromLineup(s, 2, 0)).toBeNull();
+  });
+
+  it('seatPlayer drops a waiting player straight into the slot', () => {
+    let log = opened();
+    const out = seatPlayer(replay(log), 1, 0, 'e')!;
+    expect(out.map((e) => e.type)).toEqual(['game-lineup-changed']);
+    log = [...log, ...seal(out)];
+    const s = replay(log);
+    expect(s.games[1]?.pairs).toEqual([['e', 'c'], ['b', 'd']]);
+    expect(s.queue).toEqual(['a']);
+  });
+
+  it('seatPlayer returns a sitting out player first', () => {
+    let log = opened();
+    log = [...log, ...seal(sitOutPlayer(replay(log), 'e')!)];
+    const out = seatPlayer(replay(log), 1, 0, 'e')!;
+    expect(out.map((e) => e.type)).toEqual(['player-returned', 'game-lineup-changed']);
+    const s = replay([...log, ...seal(out)]);
+    expect(s.sittingOut).toEqual([]);
+    expect(s.games[1]?.pairs).toEqual([['e', 'c'], ['b', 'd']]);
+  });
+
+  it('seatPlayer checks in a player who was never checked in', () => {
+    let log = opened();
+    const out = seatPlayer(replay(log), 1, 0, 'z')!;
+    expect(out.map((e) => e.type)).toEqual(['player-checked-in', 'game-lineup-changed']);
+    log = [...log, ...seal(out)];
+    const s = replay(log);
+    expect(s.checkedIn).toContain('z');
+    expect(s.games[1]?.pairs).toEqual([['z', 'c'], ['b', 'd']]);
+    expect(s.queue).toEqual(['a', 'e']);
+  });
+
+  it('seatPlayer replaces whoever was in the slot and fronts them in the queue', () => {
+    let log = boot(['a', 'b', 'c', 'd', 'e'], 'all-off', 1);
+    log = [...log, ...seal(seatPlayer(replay(log), 1, 0, 'e')!)];
+    const s = replay(log);
+    expect(s.games[1]?.pairs).toEqual([['e', 'c'], ['b', 'd']]);
+    expect(s.queue).toEqual(['a']);
+  });
+
+  it('seatPlayer refuses a player already on a court and a court with no game', () => {
+    const s = replay(opened());
+    expect(seatPlayer(s, 1, 0, 'c')).toBeNull();
+    expect(seatPlayer(s, 2, 0, 'e')).toBeNull();
+  });
+
+  it('fillCourt takes the front of the queue into the open seats', () => {
+    let log = opened();
+    log = [...log, ...seal(fillCourt(replay(log), 1)!)];
+    const s = replay(log);
+    expect(s.games[1]?.pairs).toEqual([['a', 'c'], ['b', 'd']]);
+    expect(s.queue).toEqual(['e']);
+  });
+
+  it('fillCourt fills what it can when the queue is short', () => {
+    let log = boot(['a', 'b', 'c', 'd'], 'all-off', 1);
+    log = [...log, ...seal(removeFromLineup(replay(log), 1, 0)!)];
+    log = [...log, ...seal(removeFromLineup(replay(log), 1, 1)!)];
+    log = [...log, ...seal(departPlayer(replay(log), 'a')!)];
+    log = [...log, ...seal(fillCourt(replay(log), 1)!)];
+    const s = replay(log);
+    expect(s.games[1]?.pairs).toEqual([['c', null], ['b', 'd']]);
+    expect(s.queue).toEqual([]);
+  });
+
+  it('fillCourt on an emptied court asks the mode for the pairing', () => {
+    let log = boot(['a', 'b', 'c', 'd', 'e'], 'social', 1);
+    log = [...log, ...seal(changeLineup(replay(log), 1, [[null, null], [null, null]])!)];
+    const s = replay(log);
+    const expected = nextLineup(s, null, {});
+    log = [...log, ...seal(fillCourt(s, 1)!)];
+    expect(replay(log).games[1]?.pairs).toEqual(expected);
+  });
+
+  it('fillCourt refuses a full court and an empty queue', () => {
+    const full = replay(boot(['a', 'b', 'c', 'd'], 'all-off', 1));
+    expect(fillCourt(full, 1)).toBeNull();
+    expect(fillCourt(full, 2)).toBeNull();
+    let log = boot(['a', 'b', 'c', 'd'], 'all-off', 1);
+    log = [...log, ...seal(removeFromLineup(replay(log), 1, 0)!)];
+    log = [...log, ...seal(departPlayer(replay(log), 'a')!)];
+    expect(fillCourt(replay(log), 1)).toBeNull();
+  });
+
+  it('finishGame refuses a short handed court, so an open seat cannot record a winner', () => {
+    const s = replay(opened());
+    expect(finishGame(s, 1, 0)).toBeNull();
+    expect(finishGame(s, 1)).toBeNull();
+  });
+
+  it('auto-fill never seats anyone on a court that has an open seat', () => {
+    let log = boot(['a', 'b', 'c', 'd', 'e'], 'all-off', 2);
+    log = [...log, ...seal(removeFromLineup(replay(log), 1, 0)!)];
+    log = [...log, ...seal(checkInPlayer(replay(log), 'f')!)];
+    log = [...log, ...seal(checkInPlayer(replay(log), 'g')!)];
+    const s = replay(log);
+    expect(s.games[1]?.pairs).toEqual([[null, 'c'], ['b', 'd']]);
+    expect(s.games[2]).toBeDefined();
   });
 });

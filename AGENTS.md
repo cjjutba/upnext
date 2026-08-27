@@ -47,6 +47,11 @@ There is one loop, and no session state outside it.
 where it was. If you are about to add a `useState` that holds session truth,
 stop. It belongs in an event.
 
+A live court's lineup can hold an empty seat, written as `null`. `ActiveGame.pairs`
+is a `Lineup`, `game-started` still carries four real players, and a court with an
+open seat cannot record a winner. See the empty seats section of
+`docs/event-model.md`.
+
 Read `docs/architecture.md` for the full picture and `docs/event-model.md` for
 every event type.
 
@@ -85,7 +90,9 @@ directly for the history list. Do not add more.
 5. **The front four eligible players always play.** A matching mode chooses
    the pairing among the three possible partitions, never the players. See
    `eligible()` and `nextLineup()` in `src/domain/templates.ts`. This is the
-   paddle-rack promise and it is not tradeable for pairing quality.
+   paddle-rack promise and it is not tradeable for pairing quality. The
+   organizer can still seat anyone by hand through `game-lineup-changed`. That
+   is a manual override, and it does not widen what a mode may do.
 6. **Never change the meaning of an existing event type or template id.** Old
    logs must replay identically. Widen unions, add cases, add optional fields.
    Do not repurpose.

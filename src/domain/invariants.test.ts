@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
 import { replay, isPlaying } from './reducer';
 import * as cmd from './commands';
-import type { SessionEvent, SessionState } from './types';
+import { seated } from './types';
+import type { SessionEvent, SessionState, SlotIndex } from './types';
 
 const PLAYERS = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10'];
 
@@ -15,14 +16,18 @@ function seal(events: cmd.CommandEvent[]): SessionEvent[] {
 }
 
 interface Op {
-  kind: 'finish' | 'checkin' | 'sit' | 'return' | 'depart' | 'close' | 'reopen' | 'undo' | 'addcourt';
+  kind: 'finish' | 'checkin' | 'sit' | 'return' | 'depart' | 'close' | 'reopen' | 'undo' | 'addcourt'
+    | 'removeslot' | 'seat' | 'fillcourt';
   pick: number;
+  slot: SlotIndex;
   winner: 0 | 1;
 }
 
 const opArb = fc.record({
-  kind: fc.constantFrom<Op['kind']>('finish', 'checkin', 'sit', 'return', 'depart', 'close', 'reopen', 'undo', 'addcourt'),
+  kind: fc.constantFrom<Op['kind']>('finish', 'checkin', 'sit', 'return', 'depart', 'close', 'reopen', 'undo', 'addcourt',
+    'removeslot', 'seat', 'fillcourt'),
   pick: fc.nat(29),
+  slot: fc.constantFrom<SlotIndex>(0, 1, 2, 3),
   winner: fc.constantFrom<0 | 1>(0, 1),
 });
 
@@ -85,6 +90,23 @@ function run(ops: Op[], tpl: 'all-off' | 'winners-stay' | 'winners-split' | 'bal
         out = cmd.addCourt(s);
         break;
       }
+      case 'removeslot': {
+        const court = from(Object.keys(s.games).map(Number));
+        if (court !== undefined) out = cmd.removeFromLineup(s, court, op.slot);
+        break;
+      }
+      case 'seat': {
+        const court = from(Object.keys(s.games).map(Number));
+        const p = from(PLAYERS.filter((x) => !isPlaying(s, x)));
+        if (court !== undefined && p) out = cmd.seatPlayer(s, court, op.slot, p);
+        break;
+      }
+      case 'fillcourt': {
+        const courts = Array.from({ length: s.courtCount }, (_, i) => i + 1);
+        const c = from(courts);
+        if (c !== undefined) out = cmd.fillCourt(s, c);
+        break;
+      }
     }
     if (out) log = [...log, ...seal(out)];
   }
@@ -92,13 +114,14 @@ function run(ops: Op[], tpl: 'all-off' | 'winners-stay' | 'winners-split' | 'bal
 }
 
 function checkInvariants(s: SessionState): void {
-  const playing = Object.values(s.games).flatMap((g) => [g.pairs[0][0], g.pairs[0][1], g.pairs[1][0], g.pairs[1][1]]);
+  const playing = Object.values(s.games).flatMap((g) => seated(g.pairs));
   // no player on two courts at once
   expect(new Set(playing).size).toBe(playing.length);
-  // every open court has exactly four distinct players
+  // an open court holds at most four, and never the same person in two seats
   for (const g of Object.values(s.games)) {
-    const four = [g.pairs[0][0], g.pairs[0][1], g.pairs[1][0], g.pairs[1][1]];
-    expect(new Set(four).size).toBe(4);
+    const on = seated(g.pairs);
+    expect(on.length).toBeLessThanOrEqual(4);
+    expect(new Set(on).size).toBe(on.length);
   }
   // queue and courts are disjoint
   for (const p of playing) expect(s.queue).not.toContain(p);

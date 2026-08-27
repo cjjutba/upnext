@@ -5,7 +5,9 @@ import { CheckinTile, type TileState } from '../components/CheckinTile';
 import { UndoPill } from '../components/UndoPill';
 import { Button } from '../components/Button';
 import { IconButton } from '../components/IconButton';
-import type { Pairs, Player, SessionState } from '../domain/types';
+import { PlayerPickerModal } from '../components/PlayerPickerModal';
+import type { Pairs, Player, SessionState, SlotIndex } from '../domain/types';
+import { slotAt } from '../domain/types';
 import { isPlaying } from '../domain/reducer';
 
 // wall clock on purpose: timers derive from event ts so resume replays exactly; a mid-session OS clock change can jump timers, accepted trade-off
@@ -23,6 +25,7 @@ export { fmt };
 export function SessionBoard({
   state, players, undoLabel, onUndo, canRedo, onRedo, onWin, onCloseCourt, onReopenCourt,
   onToggleSit, onToggleCheck, onAddCourt, onAddPlayer, nextUp, onCallUpNext, canCallUpNext,
+  onRemoveFromCourt, onSeatPlayer, onCreateAndSeat, onFillCourt,
 }: {
   state: SessionState;
   players: Player[];
@@ -41,9 +44,15 @@ export function SessionBoard({
   onCallUpNext: () => void;
   /** False while muted, when the call button would do nothing. */
   canCallUpNext: boolean;
+  onRemoveFromCourt: (court: number, slot: SlotIndex) => void;
+  onSeatPlayer: (court: number, slot: SlotIndex, playerId: string) => void;
+  onCreateAndSeat: (court: number, slot: SlotIndex, name: string) => void;
+  onFillCourt: (court: number) => void;
 }) {
   const [now, setNow] = useState(() => Date.now());
   const [newName, setNewName] = useState('');
+  // which seat the organizer is editing. View state, not session truth, so it never outlives a tap
+  const [editing, setEditing] = useState<{ court: number; slot: SlotIndex; replacing: string | null } | null>(null);
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
@@ -72,10 +81,16 @@ export function SessionBoard({
             const game = state.games[n];
             const elapsed = game ? (now - game.startedAt) / 1000 : 0;
             const status = state.closedCourts.includes(n) ? 'danger' : !game ? 'neutral' : elapsed > LONG_GAME_SECONDS ? 'warn' : 'live';
-            const pairs = game ? ([game.pairs[0].map(nameOf), game.pairs[1].map(nameOf)] as SessionState['games'][number]['pairs']) : null;
+            // an empty court needs a full four; a court with open seats takes whoever is waiting
+            const canFill = game ? eligibleQueue.length > 0 : eligibleQueue.length >= 4;
             return (
-              <CourtCard key={n} court={n} status={status} pairs={pairs} elapsed={fmt(elapsed)}
-                onWin={(w) => onWin(n, w)} onClose={() => onCloseCourt(n)} onReopen={() => onReopenCourt(n)} />
+              <CourtCard key={n} court={n} status={status} lineup={game ? game.pairs : null} nameOf={nameOf}
+                elapsed={fmt(elapsed)} canFill={canFill}
+                onWin={(w) => onWin(n, w)} onClose={() => onCloseCourt(n)} onReopen={() => onReopenCourt(n)}
+                onFill={() => onFillCourt(n)}
+                onAdd={(slot) => setEditing({ court: n, slot, replacing: null })}
+                onReplace={(slot) => setEditing({ court: n, slot, replacing: game ? slotAt(game.pairs, slot) : null })}
+                onRemove={(slot) => onRemoveFromCourt(n, slot)} />
             );
           })}
         </div>
@@ -137,6 +152,20 @@ export function SessionBoard({
           </div>
         </section>
       </aside>
+      {editing ? (
+        <PlayerPickerModal
+          title={editing.replacing
+            ? `Replace ${nameOf(editing.replacing)} on court ${editing.court}`
+            : `Add a player to court ${editing.court}`}
+          waiting={eligibleQueue}
+          sittingOut={state.queue.filter((p) => state.sittingOut.includes(p))}
+          notCheckedIn={players.filter((p) => !state.queue.includes(p.id) && !isPlaying(state, p.id)).map((p) => p.id)}
+          nameOf={nameOf}
+          gamesOf={(id) => state.gamesPlayed[id] ?? 0}
+          onPick={(id) => { onSeatPlayer(editing.court, editing.slot, id); setEditing(null); }}
+          onCreate={(name) => { onCreateAndSeat(editing.court, editing.slot, name); setEditing(null); }}
+          onClose={() => setEditing(null)} />
+      ) : null}
       {undoLabel || canRedo ? (
         <div style={{ position: 'fixed', left: 'var(--space-4)', bottom: 'var(--space-4)', zIndex: 50, display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           {undoLabel ? <UndoPill label={undoLabel} onUndo={onUndo} /> : null}

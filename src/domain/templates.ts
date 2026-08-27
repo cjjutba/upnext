@@ -1,4 +1,4 @@
-import type { Pairs, SessionState } from './types';
+import type { Lineup, Pairs, SessionState } from './types';
 
 export interface LastFinished {
   pairs: Pairs;
@@ -26,9 +26,12 @@ function gamesTogether(state: SessionState, four: [string, string, string, strin
 function pairHistory(state: SessionState): PairHistory {
   const partners = new Map<string, number>();
   const opponents = new Map<string, number>();
-  const record = (pairs: Pairs) => {
-    for (const [p, q] of pairs) partners.set(pairKey(p, q), (partners.get(pairKey(p, q)) ?? 0) + 1);
-    for (const p of pairs[0]) for (const q of pairs[1]) opponents.set(pairKey(p, q), (opponents.get(pairKey(p, q)) ?? 0) + 1);
+  // a live court may hold an open seat, and an open seat has partnered with nobody
+  const record = (pairs: Lineup) => {
+    for (const [p, q] of pairs) if (p && q) partners.set(pairKey(p, q), (partners.get(pairKey(p, q)) ?? 0) + 1);
+    for (const p of pairs[0]) for (const q of pairs[1]) {
+      if (p && q) opponents.set(pairKey(p, q), (opponents.get(pairKey(p, q)) ?? 0) + 1);
+    }
   };
   for (const g of state.finishedGames) record(g.pairs);
   for (const g of Object.values(state.games)) record(g.pairs);

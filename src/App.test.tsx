@@ -67,6 +67,9 @@ async function startSession(mode: RegExp) {
 /** The card div that owns a court's close button. */
 const courtCard = (n: number) => screen.getByLabelText(`Close court ${n}`).closest('div')!.parentElement!;
 
+/** The queue rail, in waiting order. */
+const queueList = () => screen.getByText('Queue').closest('section')!;
+
 const openStandings = async () => {
   await click(btn('Live standings'));
   return screen.findByRole('dialog', { name: 'Live standings' });
@@ -181,6 +184,46 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await screen.findByText('Session summary');
     await waitFor(() => expect(said()).toHaveLength(4));
     expect(said().filter((l) => l.startsWith('Session complete.'))).toHaveLength(1);
+  });
+
+  it('lifts a player off a court, offers the open seat, and seats whoever is picked', async () => {
+    render(<App />);
+    await startSession(/^Balanced/);
+    // balanced with eight unrated players takes the front four in roster order
+    expect(btn(/Team 1 wins/, courtCard(1))).toBeInTheDocument();
+
+    await click(btn('Alice on court 1. Replace or remove.', courtCard(1)));
+    await click(btn('Remove from court', courtCard(1)));
+    await screen.findByLabelText('Add a player to court 1, team 1, seat 1');
+
+    const opened = courtCard(1);
+    expect(within(opened).getByText('Tap to add player')).toBeInTheDocument();
+    expect(within(opened).queryByRole('button', { name: /Team 1 wins/ })).not.toBeInTheDocument();
+    expect(within(opened).queryByRole('button', { name: /Team 2 wins/ })).not.toBeInTheDocument();
+    expect(btn('Fill court 1', opened)).toBeInTheDocument();
+    // Alice went to the front of the queue, ahead of everyone who was already waiting
+    expect(within(queueList()).getAllByText(/^(Alice|Eve)$/).map((n) => n.textContent)).toEqual(['Alice', 'Eve']);
+
+    await click(btn('Add a player to court 1, team 1, seat 1', courtCard(1)));
+    const dialog = await screen.findByRole('dialog', { name: 'Add a player to court 1' });
+    await click(within(dialog).getByText('Eve').closest('button')!);
+
+    await waitFor(() => expect(btn('Eve on court 1. Replace or remove.', courtCard(1))).toBeInTheDocument());
+    expect(btn(/Team 1 wins/, courtCard(1))).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: /Add a player/ })).not.toBeInTheDocument();
+  });
+
+  it('fills an open seat straight from the front of the queue', async () => {
+    render(<App />);
+    await startSession(/^Balanced/);
+
+    await click(btn('Bob on court 1. Replace or remove.', courtCard(1)));
+    await click(btn('Remove from court', courtCard(1)));
+    await screen.findByLabelText('Fill court 1');
+    await click(btn('Fill court 1', courtCard(1)));
+
+    await waitFor(() => expect(btn('Bob on court 1. Replace or remove.', courtCard(1))).toBeInTheDocument());
+    expect(btn(/Team 2 wins/, courtCard(1))).toBeInTheDocument();
   });
 
   it('has no up next call in Winners mode, where the next lineup is not known yet', async () => {

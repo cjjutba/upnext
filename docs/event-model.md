@@ -33,8 +33,8 @@ another device or a newer build must never crash replay.
 | `player-sat-out` | `playerId` | in queue, not already sitting | Adds to `sittingOut`. The queue position is kept |
 | `player-returned` | `playerId` | currently sitting out | Removes from `sittingOut` |
 | `game-started` | `court`, `pairs` | started, not ended; court empty, not closed, within `1..courtCount`; four distinct players; all queued and none sitting out | Removes the four from the queue, creates the active game with `startedAt = ts` |
-| `game-lineup-changed` | `court`, `pairs` | court has an active game; four distinct; any added player is queued and not sitting out | Swaps the pairs. Replaced players go to the queue front. `startedAt` is untouched, so the timer keeps running |
-| `game-finished` | `court`, `winnerPair?`, `score?` | court has an active game; `winnerPair` is `undefined`, `0`, or `1` | Ends the game, bumps `gamesPlayed` for all four, appends to `finishedGames`, then places the four in the queue by mode. See below |
+| `game-lineup-changed` | `court`, `pairs` | court has an active game; no player named twice; any added player is queued and not sitting out | Replaces the lineup, which may leave a seat empty (`null`). Players who came off go to the queue front. `startedAt` is untouched, so the timer keeps running |
+| `game-finished` | `court`, `winnerPair?`, `score?` | court has an active game; `winnerPair` is `undefined`, `0`, or `1`; every seat is filled | Ends the game, bumps `gamesPlayed` for all four, appends to `finishedGames`, then places the four in the queue by mode. See below |
 | `court-closed` | `court` | not already closed; within `1..courtCount` | Voids any game in progress without counting it and sends its four to the queue **front**, resets their streaks, adds to `closedCourts` |
 | `court-reopened` | `court` | currently closed | Clears the closed flag. The command then refills |
 | `court-added` | none | started, not ended | `courtCount + 1`. Courts are only ever added. Closing covers taking one out of service |
@@ -42,6 +42,35 @@ another device or a newer build must never crash replay.
 | `session-ended` | none | started, not ended | `ended = true`, `endedAt = ts` |
 
 `score` is on the `game-finished` payload and no UI writes it yet.
+
+## Empty seats
+
+`ActiveGame.pairs` is a `Lineup` rather than `Pairs`. Each of the four seats
+holds a player id or `null`. Only `game-lineup-changed` can write a `null`, and only the
+organizer's own edits produce one. `game-started` still carries four real
+players, because a matching mode never picks fewer.
+
+A court with an open seat is live but unfinishable. `game-finished` no-ops on
+it and `finishGame()` refuses, which is why the board swaps the two win buttons
+for a single Fill court button. Everything else works normally: the timer keeps
+running from the original `game-started`, closing the court sends whoever is
+seated to the queue front, and `isPlaying()` reads only real players.
+
+`fullLineup(l)` in `src/domain/types.ts` narrows a complete lineup back to
+`Pairs` and returns `null` otherwise. It is what lets `FinishedGame.pairs`,
+`standings.ts`, and the finished-game announcements stay four-player types with
+no null handling of their own. `seated(l)` returns just the ids, in seat order.
+
+Three commands in `src/domain/commands.ts` drive the seats:
+
+| Command | Events |
+|---|---|
+| `removeFromLineup(state, court, slot)` | One `game-lineup-changed` nulling that seat. No trailing fill on purpose. The player lands at the queue front, and an eager refill would drop them straight onto another court |
+| `seatPlayer(state, court, slot, playerId)` | `player-returned` or `player-checked-in` when needed, then `game-lineup-changed`, then any fill the added body unblocks |
+| `fillCourt(state, court)` | One `game-lineup-changed` taking the front of the queue into the open seats, or `game-started` when the court is empty. A court emptied to all four seats asks `nextLineup()` for the pairing |
+
+Seating a player who was never checked in appends two events, so one undo
+returns them to the queue and a second undo reverts the check-in.
 
 ## Queue placement on finish
 
@@ -76,7 +105,7 @@ Every field is derived by replay and none is stored. From
 | `sittingOut` | Players who keep a queue spot but are skipped when forming games |
 | `departed` | Left for the night. A later check-in clears this |
 | `queue` | Waiting order, front first. Sitting-out players stay in place |
-| `games` | `Record<court, ActiveGame>`. A missing key means an empty court |
+| `games` | `Record<court, ActiveGame>`. A missing key means an empty court. `pairs` is a `Lineup`, so a seat can be `null` |
 | `closedCourts` | Out of service. Never filled |
 | `gamesPlayed`, `wins` | Per player counters |
 | `consecutiveWins` | Current streak on court, for the win cap. Reset when a player leaves the court |

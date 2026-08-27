@@ -19,7 +19,7 @@ import { nextLineup } from './domain/templates';
 import { leaderPhrase, upNextPhrase } from './domain/announce';
 import { standings } from './domain/standings';
 import { isWinnersTemplate } from './domain/types';
-import type { Pairs, RuleTemplate } from './domain/types';
+import type { Pairs, RuleTemplate, SlotIndex } from './domain/types';
 
 export default function App() {
   const session = useSession();
@@ -106,6 +106,12 @@ export default function App() {
   const addAndCheckIn = async (name: string) => {
     const player = await roster.addPlayer(name);
     if (player) await dispatch(cmd.checkInPlayer(state, player.id, roster.ratings));
+  };
+
+  const createAndSeat = async (court: number, slot: SlotIndex, name: string) => {
+    const player = await roster.addPlayer(name);
+    // addPlayer refuses a duplicate name, so a collision leaves the seat open rather than seating the wrong person
+    if (player) await dispatch(cmd.seatPlayer(state, court, slot, player.id, roster.ratings));
   };
 
   const end = async () => {
@@ -203,6 +209,10 @@ export default function App() {
           nextUp={nextUp}
           onCallUpNext={() => nextUp && speech.speak(upNextPhrase(nextUp, nameOf))}
           canCallUpNext={speech.supported && speech.enabled}
+          onRemoveFromCourt={(court, slot) => void dispatch(cmd.removeFromLineup(state, court, slot))}
+          onSeatPlayer={(court, slot, id) => void dispatch(cmd.seatPlayer(state, court, slot, id, roster.ratings))}
+          onCreateAndSeat={(court, slot, name) => void createAndSeat(court, slot, name)}
+          onFillCourt={(court) => void dispatch(cmd.fillCourt(state, court, roster.ratings))}
         />
       ) : (
         <SessionSummary

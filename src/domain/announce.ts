@@ -1,4 +1,5 @@
 import type { Pair, Pairs, SessionEvent, SessionState } from './types';
+import { fullLineup } from './types';
 import type { Standing } from './standings';
 
 export type NameOf = (playerId: string) => string;
@@ -34,9 +35,13 @@ export function announceBatch(batch: SessionEvent[], stateAfter: SessionState, n
       case 'game-started':
         out.push(courtPhrase(e.court, e.pairs, nameOf));
         break;
-      case 'game-lineup-changed':
-        out.push(`Court ${e.court}. Lineup change. ${matchup(e.pairs, nameOf)}.`);
+      case 'game-lineup-changed': {
+        // stay quiet while a court is mid-edit. A remove and the add that follows
+        // would otherwise read out as two half sentences
+        const lineup = fullLineup(e.pairs);
+        if (lineup) out.push(`Court ${e.court}. Lineup change. ${matchup(lineup, nameOf)}.`);
         break;
+      }
       case 'game-finished': {
         if (e.winnerPair === undefined) {
           // finishGame emits the refill in the same batch, so the court call already says the game ended
