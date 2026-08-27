@@ -14,6 +14,14 @@ interface PairHistory {
   opponents: Map<string, number>;
 }
 
+/** Finished games whose four players are exactly this four. Stable between a preview and the fill it promises. */
+function gamesTogether(state: SessionState, four: [string, string, string, string]): number {
+  return state.finishedGames.filter((g) => {
+    const players = [...g.pairs[0], ...g.pairs[1]];
+    return four.every((p) => players.includes(p));
+  }).length;
+}
+
 /** Partnership and opponent counts from finished plus active games. */
 function pairHistory(state: SessionState): PairHistory {
   const partners = new Map<string, number>();
@@ -52,7 +60,7 @@ function pickPairing(state: SessionState, four: [string, string, string, string]
   const opts = partitions(...four);
   const scores = opts.map(score);
   const allEqual = scores.every((s) => s[0] === scores[0][0] && s[1] === scores[0][1] && s[2] === scores[0][2]);
-  if (allEqual) return opts[state.pairingCycle % 3];
+  if (allEqual) return opts[gamesTogether(state, four) % 3];
   let best = opts[0];
   let bestScore = scores[0];
   for (let i = 1; i < opts.length; i += 1) {
@@ -74,7 +82,9 @@ const eligible = (state: SessionState): string[] =>
 /**
  * Fill a court from the queue. Positions 1 and 3 versus 2 and 4, which mixes
  * people who arrived together. With exactly four eligible players the three
- * possible pairings rotate via pairingCycle so the same pairs never repeat.
+ * possible pairings rotate by how many games this exact four has already
+ * played together, so the same pairs never repeat and a preview computed
+ * before a finish always matches the fill that finish produces.
  */
 export function freshFill(state: SessionState): Pairs | null {
   const e = eligible(state);
@@ -86,7 +96,7 @@ export function freshFill(state: SessionState): Pairs | null {
       [[a, b], [c, d]],
       [[a, d], [b, c]],
     ];
-    return variants[state.pairingCycle % 3];
+    return variants[gamesTogether(state, [a, b, c, d]) % 3];
   }
   return [[a, c], [b, d]];
 }

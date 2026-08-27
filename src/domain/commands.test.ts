@@ -5,6 +5,7 @@ import {
   departPlayer, closeCourt, reopenCourt, changeRule, changeLineup, endSession, addCourt,
   undoTarget, redoTarget, describeEvent, type CommandEvent,
 } from './commands';
+import { nextLineup } from './templates';
 import type { SessionEvent, EventPayload, Pairs, RuleTemplate } from './types';
 
 let n = 0;
@@ -102,6 +103,31 @@ describe('finishGame', () => {
     expect(finish.type === 'game-finished' && finish.winnerPair !== undefined).toBe(false);
     log = [...log, ...seal(events!)];
     expect(replay(log).wins).toEqual({});
+  });
+});
+
+describe('rotation fairness and preview stability', () => {
+  it('a closed four under balanced partners every combination equally over six games', () => {
+    let log = boot(['a', 'b', 'c', 'd'], 'balanced', 1);
+    const partnerCounts: Record<string, number> = {};
+    for (let i = 0; i < 6; i += 1) {
+      const s = replay(log);
+      const pairs = s.games[1]!.pairs;
+      for (const [x, y] of pairs) {
+        const k = [x, y].sort().join('|');
+        partnerCounts[k] = (partnerCounts[k] ?? 0) + 1;
+      }
+      log = [...log, ...seal(finishGame(s, 1)!)];
+    }
+    expect(Object.values(partnerCounts).sort()).toEqual([2, 2, 2, 2, 2, 2]);
+  });
+
+  it('the up next preview equals the fill a finish produces', () => {
+    let log = boot(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], 'social', 1);
+    const before = replay(log);
+    const preview = nextLineup(before, null, {});
+    log = [...log, ...seal(finishGame(before, 1)!)];
+    expect(replay(log).games[1]?.pairs).toEqual(preview);
   });
 });
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { freshFill, nextLineup } from './templates';
 import { emptyState } from './types';
-import type { SessionState, Pairs } from './types';
+import type { SessionState, Pairs, FinishedGame } from './types';
 
 function state(over: Partial<SessionState>): SessionState {
   return { ...emptyState(), started: true, sessionId: 's', courtCount: 1, ...over };
@@ -23,12 +23,14 @@ describe('freshFill', () => {
     expect(freshFill(s)).toEqual([['a', 'c'], ['b', 'd']]);
   });
 
-  it('rotates the three pairings when exactly four players remain', () => {
+  it('rotates the three pairings by games played together when exactly four remain', () => {
     const four = { queue: ['a', 'b', 'c', 'd'] };
-    expect(freshFill(state({ ...four, pairingCycle: 0 }))).toEqual([['a', 'c'], ['b', 'd']]);
-    expect(freshFill(state({ ...four, pairingCycle: 1 }))).toEqual([['a', 'b'], ['c', 'd']]);
-    expect(freshFill(state({ ...four, pairingCycle: 2 }))).toEqual([['a', 'd'], ['b', 'c']]);
-    expect(freshFill(state({ ...four, pairingCycle: 3 }))).toEqual([['a', 'c'], ['b', 'd']]);
+    const games = (n: number): FinishedGame[] =>
+      Array.from({ length: n }, (_, i) => ({ court: 1, pairs: [['a', 'c'], ['b', 'd']] as Pairs, startedAt: i, endedAt: i + 1 }));
+    expect(freshFill(state({ ...four }))).toEqual([['a', 'c'], ['b', 'd']]);
+    expect(freshFill(state({ ...four, finishedGames: games(1) }))).toEqual([['a', 'b'], ['c', 'd']]);
+    expect(freshFill(state({ ...four, finishedGames: games(2) }))).toEqual([['a', 'd'], ['b', 'c']]);
+    expect(freshFill(state({ ...four, finishedGames: games(3) }))).toEqual([['a', 'c'], ['b', 'd']]);
   });
 });
 
@@ -124,12 +126,5 @@ describe('balanced and social pairing', () => {
     const pairs = nextLineup(s, null, ratings)!;
     const players = [...pairs[0], ...pairs[1]].sort();
     expect(players).toEqual(['a', 'b', 'c', 'd']); // e and f wait their turn no matter their ratings
-  });
-
-  it('exact ties rotate with pairingCycle so a closed four never oscillates', () => {
-    const four = { rule: { template: 'balanced' as const, winCap: 3 }, queue: ['a', 'b', 'c', 'd'] };
-    expect(nextLineup(state({ ...four, pairingCycle: 0 }), null, {})).toEqual([['a', 'c'], ['b', 'd']]);
-    expect(nextLineup(state({ ...four, pairingCycle: 1 }), null, {})).toEqual([['a', 'b'], ['c', 'd']]);
-    expect(nextLineup(state({ ...four, pairingCycle: 2 }), null, {})).toEqual([['a', 'd'], ['b', 'c']]);
   });
 });
