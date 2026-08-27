@@ -201,14 +201,6 @@ export function SessionBoard({
                 border: '1px solid var(--border)', borderRadius: 'var(--radius-control)', background: 'var(--bg)', color: 'var(--text)',
               }} />
           ) : null}
-          {players.length > 12 ? (
-            <input
-              value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search players" aria-label="Search players"
-              style={{
-                minWidth: 0, height: 'var(--tap-min)', padding: '0 var(--space-3)', font: '400 16px var(--font-sans)',
-                border: '1px solid var(--border)', borderRadius: 'var(--radius-control)', background: 'var(--bg)', color: 'var(--text)',
-              }} />
-          ) : null}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
             {grid.map((p) => (
               <CheckinTile key={p.id} name={p.name} state={tileState(p)}
