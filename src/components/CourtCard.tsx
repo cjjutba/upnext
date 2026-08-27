@@ -3,7 +3,7 @@ import { Button } from './Button';
 import { IconButton } from './IconButton';
 import { StatusBadge, type BadgeStatus } from './StatusBadge';
 import { CourtDiagram } from './CourtDiagram';
-import type { Pairs } from '../domain/types';
+import { fullLineup, type Lineup, type SlotIndex } from '../domain/types';
 
 export type CourtPhase = 'live' | 'staged' | 'empty' | 'closed';
 
@@ -11,14 +11,14 @@ const badge: Record<CourtPhase, BadgeStatus> = { live: 'live', staged: 'neutral'
 
 export function CourtCard({
   court, phase, longGame, pairs, elapsed, nameOf,
-  onWin, onStart, onCall, onShuffle, onStage, onPlayerTap, onEdit, onClose, onReopen, canStage,
+  onWin, onStart, onCall, onShuffle, onStage, onPlayerTap, onSeatTap, onFill, onEdit, onClose, onReopen, canStage, canFill,
 }: {
   court: number;
   phase: CourtPhase;
   /** Live game past the long-game threshold. Only changes the badge. */
   longGame?: boolean;
-  /** The four on the court, live or staged. Null on an empty or closed court. */
-  pairs: Pairs | null;
+  /** The four on the court, live or staged. Null on an empty or closed court. A live court may hold an open seat. */
+  pairs: Lineup | null;
   elapsed: string;
   nameOf: (playerId: string) => string;
   onWin: (winnerPair: 0 | 1, score?: string) => void;
@@ -27,15 +27,21 @@ export function CourtCard({
   onShuffle: () => void;
   onStage: () => void;
   onPlayerTap: (playerId: string) => void;
+  onSeatTap: (slot: SlotIndex) => void;
+  onFill: () => void;
   onEdit: () => void;
   onClose: () => void;
   onReopen: () => void;
   /** Four or more waiting, so an empty court can be filled by hand. */
   canStage: boolean;
+  /** At least one waiting, so an open seat can be filled from the queue. */
+  canFill: boolean;
 }) {
   // per game: the parent keys this card by the game, so a refill starts blank
   const [score, setScore] = useState('');
   const win = (pair: 0 | 1) => onWin(pair, score.trim() || undefined);
+  // an open seat means this was never a game of four, so there is no winner to record
+  const short = phase === 'live' && pairs !== null && fullLineup(pairs) === null;
   return (
     <div data-court={court} style={{
       display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', padding: '20px',
@@ -64,8 +70,19 @@ export function CourtCard({
       </div>
       {pairs ? (
         <>
-          <CourtDiagram pairs={pairs} nameOf={nameOf} onPlayerTap={onPlayerTap} />
-          {phase === 'live' ? (
+          <CourtDiagram
+            pairs={pairs} nameOf={nameOf} onPlayerTap={onPlayerTap}
+            onSeatTap={phase === 'live' ? onSeatTap : undefined} seatContext={'court ' + court} />
+          {short ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              <Button size="lg" block icon="user-plus" disabled={!canFill} onClick={onFill} ariaLabel={'Fill court ' + court}>
+                Fill court
+              </Button>
+              <span style={{ font: '400 14px/1.4 var(--font-sans)', color: 'var(--text-tertiary)', textAlign: 'center' }}>
+                {canFill ? 'Fill every seat to record a winner.' : 'Nobody is waiting. Check a player in to fill this court.'}
+              </span>
+            </div>
+          ) : phase === 'live' ? (
             <>
               {/* every mode records the winner so standings mean something */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>

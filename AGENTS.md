@@ -55,6 +55,14 @@ taps Start to emit `game-started`. Staged players leave the queue, so a
 checked-in player is in exactly one of three places: the queue, `state.staged`,
 or `state.games`.
 
+### Open seats
+
+A **live** court's lineup can hold an open seat, written as `null`.
+`ActiveGame.pairs` is a `Lineup`; `staged` stays `Pairs`, because a staged four
+that is wrong gets unstaged rather than emptied. `game-started` still carries
+four real players, and a court with an open seat cannot record a winner. See the
+open seats section of `docs/event-model.md`.
+
 Read `docs/architecture.md` for the full picture and `docs/event-model.md` for
 every event type.
 
@@ -94,8 +102,8 @@ directly for the history list. Do not add more.
    the pairing among the three possible partitions, never the players. See
    `eligible()` and `nextLineup()` in `src/domain/templates.ts`. This is the
    paddle-rack promise and it is not tradeable for pairing quality. The
-   organizer can override it by hand through `substitutePlayer` or
-   `swapQueue`; a mode still never does.
+   organizer can override it by hand through `substitutePlayer`, `swapQueue`,
+   or `seatPlayer`; a mode still never does.
 6. **Never change the meaning of an existing event type or template id.** Old
    logs must replay identically. Widen unions, add cases, add optional fields.
    Do not repurpose.

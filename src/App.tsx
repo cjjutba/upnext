@@ -23,7 +23,8 @@ import { previewLineups, upNextPreview } from './domain/templates';
 import { challengersPhrase, getReadyPhrase, leaderPhrase } from './domain/announce';
 import { standings } from './domain/standings';
 import { isStaged, stagedCourtOf } from './domain/reducer';
-import type { RuleConfig, RuleTemplate, SessionState } from './domain/types';
+import { fullLineup, slotAt } from './domain/types';
+import type { RuleConfig, RuleTemplate, SessionState, SlotIndex } from './domain/types';
 import type { Ratings } from './domain/templates';
 
 /** What the proposed rule would form next, said in the board's own words. Pure, so it costs nothing to compute per render. */
@@ -157,6 +158,13 @@ export default function App() {
   };
 
   /** Everyone who could take the tapped player's spot: waiting, not sitting out, not already there. */
+  // only a live court can go short handed, so Off the court is offered there and nowhere else
+  const liftSlot: SlotIndex | null = picking && picking.court !== null
+    ? (([0, 1, 2, 3] as SlotIndex[]).find(
+        (i) => state.games[picking.court!] && slotAt(state.games[picking.court!].pairs, i) === picking.playerId,
+      ) ?? null)
+    : null;
+
   const candidates = picking
     ? roster.players.filter((p) => state.queue.includes(p.id) && !state.sittingOut.includes(p.id) && p.id !== picking.playerId)
     : [];
@@ -164,6 +172,12 @@ export default function App() {
   const addAndCheckIn = async (name: string) => {
     const player = await roster.addPlayer(name);
     if (player) await dispatch(cmd.checkInPlayer(state, player.id, roster.ratings));
+  };
+
+  const createAndSeat = async (court: number, slot: SlotIndex, name: string) => {
+    const player = await roster.addPlayer(name);
+    // addPlayer refuses a duplicate name, so a collision leaves the seat open rather than seating the wrong person
+    if (player) await dispatch(cmd.seatPlayer(state, court, slot, player.id, roster.ratings));
   };
 
   const end = async () => {
@@ -290,7 +304,8 @@ export default function App() {
           onStage={(court) => void dispatch(cmd.stageCourt(state, court, roster.ratings))}
           onShuffle={(court) => void dispatch(cmd.shufflePairing(state, court))}
           onCallCourt={(court) => {
-            const pairs = state.staged[court] ?? state.games[court]?.pairs;
+            const lineup = state.staged[court] ?? state.games[court]?.pairs;
+            const pairs = lineup && fullLineup(lineup);
             if (pairs) speech.speak(getReadyPhrase(pairs, nameOf, court));
           }}
           onCallUpNext={() => {
@@ -301,6 +316,9 @@ export default function App() {
           previews={previews}
           narrow={narrow}
           recency={recency}
+          onSeatPlayer={(court, slot, id) => void dispatch(cmd.seatPlayer(state, court, slot, id, roster.ratings))}
+          onCreateAndSeat={(court, slot, name) => void createAndSeat(court, slot, name)}
+          onFillCourt={(court) => void dispatch(cmd.fillCourt(state, court, roster.ratings))}
         />
       ) : (
         <SessionSummary
@@ -328,6 +346,10 @@ export default function App() {
             setPicking(null);
           }}
           onRemove={() => { void dispatch(cmd.departPlayer(state, picking.playerId)); setPicking(null); }}
+          onLift={liftSlot === null ? undefined : () => {
+            void dispatch(cmd.removeFromLineup(state, picking.court!, liftSlot));
+            setPicking(null);
+          }}
           onClose={() => setPicking(null)}
         />
       ) : null}

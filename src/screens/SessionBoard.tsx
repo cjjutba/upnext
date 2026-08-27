@@ -5,7 +5,8 @@ import { QueueRow } from '../components/QueueRow';
 import { CheckinTile, type TileState } from '../components/CheckinTile';
 import { UndoPill } from '../components/UndoPill';
 import { Button } from '../components/Button';
-import type { Player, SessionState } from '../domain/types';
+import { PlayerPickerModal } from '../components/PlayerPickerModal';
+import type { Player, SessionState, SlotIndex } from '../domain/types';
 import type { UpNextPreview } from '../domain/templates';
 import { modeLabel } from '../domain/modes';
 import { isPlaying, isStaged } from '../domain/reducer';
@@ -26,6 +27,7 @@ export function SessionBoard({
   state, players, undoLabel, onUndo, canRedo, onRedo, onWin, onCloseCourt, onReopenCourt,
   onToggleSit, onToggleCheck, onAddCourt, onAddPlayer, onRemovePlayer, onCourtPlayerTap, onQueuePlayerTap,
   onStart, onStage, onShuffle, onCallCourt, onCallUpNext, onEditLineup, previews, narrow, recency,
+  onSeatPlayer, onCreateAndSeat, onFillCourt,
 }: {
   state: SessionState;
   players: Player[];
@@ -57,10 +59,15 @@ export function SessionBoard({
   narrow: boolean;
   /** startedAt of the newest ended session each player attended; regulars sort first. */
   recency: Record<string, number>;
+  onSeatPlayer: (court: number, slot: SlotIndex, playerId: string) => void;
+  onCreateAndSeat: (court: number, slot: SlotIndex, name: string) => void;
+  onFillCourt: (court: number) => void;
 }) {
   const [now, setNow] = useState(() => Date.now());
   const [newName, setNewName] = useState('');
   const [query, setQuery] = useState('');
+  // which open seat the organizer is filling. View state, not session truth, so it never outlives a tap
+  const [seating, setSeating] = useState<{ court: number; slot: SlotIndex } | null>(null);
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
@@ -123,9 +130,11 @@ export function SessionBoard({
                 <CourtCard key={n + ':' + (game?.startedEventId ?? 'open')} court={n} phase={phase} longGame={elapsed > LONG_GAME_SECONDS}
                   pairs={phase === 'closed' ? null : game?.pairs ?? staged ?? null}
                   elapsed={fmt(elapsed)} nameOf={nameOf} canStage={eligibleQueue.length >= 4}
+                  canFill={eligibleQueue.length > 0}
                   onWin={(w, score) => onWin(n, w, score)} onStart={() => onStart(n)} onCall={() => onCallCourt(n)}
                   onShuffle={() => onShuffle(n)} onStage={() => onStage(n)}
                   onPlayerTap={(id) => onCourtPlayerTap(n, id)} onEdit={() => onEditLineup(n)}
+                  onSeatTap={(slot) => setSeating({ court: n, slot })} onFill={() => onFillCourt(n)}
                   onClose={() => onCloseCourt(n)} onReopen={() => onReopenCourt(n)} />
               );
             })}
@@ -210,6 +219,20 @@ export function SessionBoard({
           </div>
         </section>
       </aside>
+      {seating ? (
+        <PlayerPickerModal
+          title={`Add a player to court ${seating.court}`}
+          waiting={eligibleQueue}
+          sittingOut={state.queue.filter((p) => state.sittingOut.includes(p))}
+          notCheckedIn={players
+            .filter((p) => !state.queue.includes(p.id) && !isPlaying(state, p.id) && !isStaged(state, p.id))
+            .map((p) => p.id)}
+          nameOf={nameOf}
+          gamesOf={(id) => state.gamesPlayed[id] ?? 0}
+          onPick={(id) => { onSeatPlayer(seating.court, seating.slot, id); setSeating(null); }}
+          onCreate={(name) => { onCreateAndSeat(seating.court, seating.slot, name); setSeating(null); }}
+          onClose={() => setSeating(null)} />
+      ) : null}
       {undoLabel || canRedo ? (
         <div style={{ position: 'fixed', left: 'var(--space-4)', bottom: 'var(--space-4)', zIndex: 50, display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           {undoLabel ? <UndoPill label={undoLabel} onUndo={onUndo} /> : null}

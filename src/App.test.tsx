@@ -224,6 +224,61 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     expect(said().filter((l) => l.startsWith('Session complete.'))).toHaveLength(1);
   });
 
+  it('lifts a player off a live court, offers the open seat, and seats whoever is picked', async () => {
+    render(<App />);
+    await startMatch(/^Balanced/);
+    expect(btn(/Team 1 wins/, courtCard(1))).toBeInTheDocument();
+
+    await click(chip('Alice', courtCard(1)));
+    await click(btn('Off the court', dialog(/Change Alice/)));
+    await screen.findByLabelText('Add a player to court 1, team 1, seat 1');
+
+    const opened = courtCard(1);
+    expect(within(opened).getByText('Tap to add player')).toBeInTheDocument();
+    expect(within(opened).queryByRole('button', { name: /Team 1 wins/ })).not.toBeInTheDocument();
+    expect(within(opened).queryByRole('button', { name: /Team 2 wins/ })).not.toBeInTheDocument();
+    expect(btn('Fill court 1', opened)).toBeInTheDocument();
+    expect(chipOrder(opened)).toEqual(['Carol', 'Bob', 'Dave']); // three left on court
+
+    await click(btn('Add a player to court 1, team 1, seat 1', courtCard(1)));
+    const picker = await screen.findByRole('dialog', { name: 'Add a player to court 1' });
+    await click(within(picker).getByText('Eve').closest('button')!);
+
+    await waitFor(() => expect(chipOrder(courtCard(1))).toEqual(['Eve', 'Carol', 'Bob', 'Dave']));
+    expect(btn(/Team 1 wins/, courtCard(1))).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: /Add a player/ })).not.toBeInTheDocument();
+  });
+
+  it('fills an open seat straight from the front of the queue', async () => {
+    render(<App />);
+    await startMatch(/^Balanced/);
+
+    await click(chip('Bob', courtCard(1)));
+    await click(btn('Off the court', dialog(/Change Bob/)));
+    await screen.findByLabelText('Fill court 1');
+    await click(btn('Fill court 1', courtCard(1)));
+
+    // Bob went to the queue front when he came off, so filling puts him straight back
+    await waitFor(() => expect(chipOrder(courtCard(1))).toEqual(['Alice', 'Carol', 'Bob', 'Dave']));
+    expect(btn(/Team 2 wins/, courtCard(1))).toBeInTheDocument();
+  });
+
+  it('offers Off the court only on a live court, never on a staged one', async () => {
+    render(<App />);
+    await openBoard(/^Balanced/);
+
+    await click(chip('Alice', courtCard(1)));
+    const staged = dialog(/Change Alice/);
+    expect(within(staged).queryByRole('button', { name: 'Off the court' })).not.toBeInTheDocument();
+    expect(btn('Remove from session', staged)).toBeInTheDocument();
+    await click(btn('Close player options', staged));
+
+    await click(btn('Start match on court 1'));
+    await screen.findByLabelText('Team 1 wins on court 1');
+    await click(chip('Alice', courtCard(1)));
+    expect(btn('Off the court', dialog(/Change Alice/))).toBeInTheDocument();
+  });
+
   it('ends the session only on the second tap', async () => {
     render(<App />);
     await startMatch(/^Balanced/);

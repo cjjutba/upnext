@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
 import { replay, isPlaying, stagedCourtOf } from './reducer';
 import * as cmd from './commands';
-import type { RuleTemplate, SessionEvent, SessionState } from './types';
+import { seated } from './types';
+import type { RuleTemplate, SessionEvent, SessionState, SlotIndex } from './types';
 
 const PLAYERS = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10'];
 
@@ -16,9 +17,11 @@ function seal(events: cmd.CommandEvent[]): SessionEvent[] {
 
 interface Op {
   kind: 'start' | 'finish' | 'checkin' | 'sit' | 'return' | 'depart' | 'close' | 'reopen' | 'undo' | 'addcourt'
-    | 'rule' | 'unstage' | 'stage' | 'sub' | 'shuffle' | 'swapqueue';
+    | 'rule' | 'unstage' | 'stage' | 'sub' | 'shuffle' | 'swapqueue'
+    | 'removeslot' | 'seat' | 'fillcourt';
   pick: number;
   pick2: number;
+  slot: SlotIndex;
   winner: 0 | 1;
   template: RuleTemplate;
 }
@@ -31,10 +34,11 @@ const opArb = fc.record({
   // 'start' is load bearing: without it nothing ever goes live and 'finish' can never fire
   kind: fc.constantFrom<Op['kind']>(
     'start', 'start', 'finish', 'finish', 'checkin', 'sit', 'return', 'depart', 'close', 'reopen', 'undo', 'addcourt',
-    'rule', 'unstage', 'stage', 'sub', 'shuffle', 'swapqueue',
+    'rule', 'unstage', 'stage', 'sub', 'shuffle', 'swapqueue', 'removeslot', 'seat', 'fillcourt',
   ),
   pick: fc.nat(29),
   pick2: fc.nat(29),
+  slot: fc.constantFrom<SlotIndex>(0, 1, 2, 3),
   winner: fc.constantFrom<0 | 1>(0, 1),
   template,
 });
@@ -88,6 +92,22 @@ function run(ops: Op[], tpl: RuleTemplate): SessionEvent[] {
         const a = s.queue[op.pick % Math.max(s.queue.length, 1)];
         const b = s.queue[op.pick2 % Math.max(s.queue.length, 1)];
         if (a && b) out = cmd.swapQueue(s, a, b);
+        break;
+      }
+      case 'removeslot': {
+        const court = from(Object.keys(s.games).map(Number));
+        if (court !== undefined) out = cmd.removeFromLineup(s, court, op.slot);
+        break;
+      }
+      case 'seat': {
+        const court = from(Object.keys(s.games).map(Number));
+        const p = from(PLAYERS.filter((x) => !isPlaying(s, x) && stagedCourtOf(s, x) === null));
+        if (court !== undefined && p) out = cmd.seatPlayer(s, court, op.slot, p);
+        break;
+      }
+      case 'fillcourt': {
+        const court = from(Object.keys(s.games).map(Number));
+        if (court !== undefined) out = cmd.fillCourt(s, court);
         break;
       }
       case 'checkin': {
@@ -144,16 +164,18 @@ function run(ops: Op[], tpl: RuleTemplate): SessionEvent[] {
 }
 
 function checkInvariants(s: SessionState): void {
-  const four = (pairs: SessionState['games'][number]['pairs']) => [pairs[0][0], pairs[0][1], pairs[1][0], pairs[1][1]];
-  const playing = Object.values(s.games).flatMap((g) => four(g.pairs));
-  const staged = Object.values(s.staged).flatMap(four);
+  const playing = Object.values(s.games).flatMap((g) => seated(g.pairs));
+  const staged = Object.values(s.staged).flatMap(seated);
   // no player on two courts at once, live or staged
   expect(new Set(playing).size).toBe(playing.length);
   expect(new Set(staged).size).toBe(staged.length);
   expect(new Set([...playing, ...staged]).size).toBe(playing.length + staged.length);
-  // every occupied court, live or staged, has exactly four distinct players
-  for (const pairs of [...Object.values(s.games).map((g) => g.pairs), ...Object.values(s.staged)]) {
-    expect(new Set(four(pairs)).size).toBe(4);
+  // a staged court is always a full four; a live one may hold an open seat but never the same person twice
+  for (const pairs of Object.values(s.staged)) expect(seated(pairs).length).toBe(4);
+  for (const g of Object.values(s.games)) {
+    const on = seated(g.pairs);
+    expect(on.length).toBeLessThanOrEqual(4);
+    expect(new Set(on).size).toBe(on.length);
   }
   // the queue and the courts are disjoint
   for (const p of [...playing, ...staged]) expect(s.queue).not.toContain(p);

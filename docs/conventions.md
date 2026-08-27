@@ -117,7 +117,7 @@ you did not think of. `invariants.test.ts` drives random command sequences
 through the real command layer and asserts things that must never be false:
 
 - No player is on two courts at once.
-- Every occupied court has exactly four distinct players.
+- An occupied court holds at most four players, never the same one twice.
 - The queue and the courts are disjoint.
 - Every checked-in, non-departed player is in exactly one place.
 - Sitting-out players keep a queue spot.

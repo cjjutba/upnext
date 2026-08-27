@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { replay } from './reducer';
-import type { EventPayload, SessionEvent, Pairs, RuleTemplate } from './types';
+import { isPlaying, replay } from './reducer';
+import type { EventPayload, Lineup, SessionEvent, Pairs, RuleTemplate } from './types';
 
 const SID = 'session-1';
 let counter = 0;
@@ -236,6 +236,71 @@ describe('court-added', () => {
     expect(s.courtCount).toBe(3);
     const before = replay([ev({ type: 'court-added' })]);
     expect(before.courtCount).toBe(0);
+  });
+});
+
+describe('lineups with an open seat', () => {
+  const four: Pairs = [['a', 'c'], ['b', 'd']];
+  const base = () => [start(), checkIn('a'), checkIn('b'), checkIn('c'), checkIn('d'), checkIn('e')];
+  const lineup = (court: number, pairs: Lineup) => ev({ type: 'game-lineup-changed', court, pairs });
+
+  it('opening a seat leaves three on court and sends the removed player to the queue front', () => {
+    const s = replay([...base(), game(1, four), lineup(1, [['a', 'c'], [null, 'd']])]);
+    expect(s.games[1]?.pairs).toEqual([['a', 'c'], [null, 'd']]);
+    expect(s.queue).toEqual(['b', 'e']);
+    expect(isPlaying(s, 'b')).toBe(false);
+  });
+
+  it('seating a queued player into the open seat takes them out of the queue', () => {
+    const s = replay([...base(), game(1, four),
+      lineup(1, [['a', 'c'], [null, 'd']]),
+      lineup(1, [['a', 'c'], ['e', 'd']])]);
+    expect(s.games[1]?.pairs).toEqual([['a', 'c'], ['e', 'd']]);
+    expect(s.queue).toEqual(['b']);
+  });
+
+  it('a lineup naming the same player twice is a no-op', () => {
+    const s = replay([...base(), game(1, four), lineup(1, [['a', 'c'], ['a', 'd']])]);
+    expect(s.games[1]?.pairs).toEqual(four);
+    expect(s.queue).toEqual(['e']);
+  });
+
+  it('a lineup pulling in a sitting out player is a no-op', () => {
+    const s = replay([...base(), game(1, four),
+      ev({ type: 'player-sat-out', playerId: 'e' }),
+      lineup(1, [['a', 'c'], ['e', 'd']])]);
+    expect(s.games[1]?.pairs).toEqual(four);
+    expect(s.queue).toEqual(['e']);
+  });
+
+  it('emptying every slot leaves the court live and everyone back at the queue front', () => {
+    const s = replay([...base(), game(1, four), lineup(1, [[null, null], [null, null]])]);
+    expect(s.games[1]).toBeDefined();
+    expect(s.queue).toEqual(['a', 'c', 'b', 'd', 'e']);
+  });
+
+  it('game-finished on a short handed court is a no-op, so an open seat cannot record a winner', () => {
+    const s = replay([...base(), game(1, four), lineup(1, [['a', 'c'], [null, 'd']]), finish(1, 0)]);
+    expect(s.games[1]?.pairs).toEqual([['a', 'c'], [null, 'd']]);
+    expect(s.finishedGames).toHaveLength(0);
+    expect(s.gamesPlayed).toEqual({});
+    expect(s.wins).toEqual({});
+  });
+
+  it('closing a short handed court sends only the seated players to the queue front', () => {
+    const s = replay([...base(), game(1, four),
+      lineup(1, [['a', 'c'], [null, 'd']]),
+      ev({ type: 'court-closed', court: 1 })]);
+    expect(s.games[1]).toBeUndefined();
+    expect(s.queue).toEqual(['a', 'c', 'd', 'b', 'e']);
+  });
+
+  it('the timer survives every edit, since startedAt is never touched', () => {
+    const started = game(1, four);
+    const s = replay([...base(), started,
+      lineup(1, [['a', 'c'], [null, 'd']]),
+      lineup(1, [['a', 'c'], ['e', 'd']])]);
+    expect(s.games[1]?.startedAt).toBe(started.ts);
   });
 });
 
