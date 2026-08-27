@@ -22,7 +22,7 @@ import { useRailCollapsed } from './lib/useRailCollapsed';
 import { shareSessionFile, importSessionFile } from './lib/exportFile';
 import * as cmd from './domain/commands';
 import { previewLineups, upNextPreview } from './domain/templates';
-import { challengersPhrase, getReadyPhrase, leaderPhrase } from './domain/announce';
+import { challengersPhrase, getReadyPhrase, leaderPhrase, matchReadyPhrase } from './domain/announce';
 import { standings } from './domain/standings';
 import { isStaged, stagedCourtOf } from './domain/reducer';
 import { fullLineup, slotAt } from './domain/types';
@@ -282,7 +282,6 @@ export default function App() {
           onRedo={() => void session.redo()}
           onWin={(court, w, score) => void dispatch(cmd.finishGame(state, court, w, roster.ratings, score))}
           onCloseCourt={(court) => void dispatch(cmd.closeCourt(state, court, roster.ratings))}
-          onReopenCourt={(court) => void dispatch(cmd.reopenCourt(state, court, roster.ratings))}
           onToggleSit={(id) => void dispatch(state.sittingOut.includes(id) ? cmd.returnPlayer(state, id, roster.ratings) : cmd.sitOutPlayer(state, id))}
           onToggleCheck={toggleBoardCheck}
           onAddCourt={() => void dispatch(cmd.addCourt(state, roster.ratings))}
@@ -298,9 +297,9 @@ export default function App() {
             const pairs = lineup && fullLineup(lineup);
             if (pairs) speech.speak(getReadyPhrase(pairs, nameOf, court));
           }}
-          onCallUpNext={() => {
-            const next = previews[0];
-            if (next) speech.speak(next.kind === 'lineup' ? getReadyPhrase(next.pairs, nameOf) : challengersPhrase(next.pair, nameOf));
+          onCallPreview={(i) => {
+            const next = previews[i];
+            if (next) speech.speak(next.kind === 'lineup' ? matchReadyPhrase(next.pairs, nameOf, i) : challengersPhrase(next.pair, nameOf));
           }}
           onEditLineup={setEditingCourt}
           previews={previews}

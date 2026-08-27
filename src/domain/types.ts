@@ -38,6 +38,12 @@ export function fullLineup(l: Lineup): Pairs | null {
   return a !== null && b !== null && c !== null && d !== null ? [[a, b], [c, d]] : null;
 }
 
+/** The court numbers in service. The board draws these, and the queue previews are capped by how many there are. */
+export function openCourts(state: SessionState): number[] {
+  return Array.from({ length: state.courtCount }, (_, i) => i + 1)
+    .filter((n) => !state.closedCourts.includes(n));
+}
+
 export interface Player {
   id: string; // UUID, never autoincrement
   name: string;

@@ -38,6 +38,8 @@ function installSpeechStub() {
 const said = () => spoken.filter((s) => s !== '[cancel]');
 
 const NAMES = ['Alice', 'Bob', 'Carol', 'Dave', 'Eve', 'Frank', 'Grace', 'Henry'];
+/** Eight more, for the cases that need a queue deeper than one court can hold. */
+const MORE_NAMES = ['Ivy', 'Jack', 'Kate', 'Liam', 'Mia', 'Noah', 'Olive', 'Pete'];
 
 async function reset() {
   await db.players.clear();
@@ -434,7 +436,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     expect(within(courtCard(1)).getByText('Alice')).toBeInTheDocument();
   });
 
-  it('removes a closed court card and reopens it from the chip row', async () => {
+  it('removes a closed court card and leaves no chip to reopen it', async () => {
     render(<App />);
     await screen.findByText('Roster');
     await click(btn('Check in all'));
@@ -446,10 +448,63 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await click(screen.getByLabelText('Close court 2'));
     await waitFor(() => expect(screen.queryByLabelText('Close court 2')).not.toBeInTheDocument());
     expect(screen.getByLabelText('Close court 1')).toBeInTheDocument();
-
-    await click(await screen.findByRole('button', { name: 'Reopen court 2' }));
-    await screen.findByLabelText('Close court 2');
+    expect(screen.queryByText('Closed courts')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Reopen court 2' })).not.toBeInTheDocument();
+  });
+
+  it('drops the queue with the last court and keeps Add court reachable', async () => {
+    render(<App />);
+    await openBoard(/^Balanced/);
+    expect(screen.getByText('Queue')).toBeInTheDocument();
+
+    await click(screen.getByLabelText('Close court 1'));
+    await waitFor(() => expect(screen.queryByLabelText('Close court 1')).not.toBeInTheDocument());
+    // no court means nothing for a waiting four to wait for
+    expect(screen.queryByText('Queue')).not.toBeInTheDocument();
+    expect(screen.queryByText('Up next')).not.toBeInTheDocument();
+    expect(screen.getByText('No courts open. Add a court to keep playing.')).toBeInTheDocument();
+    expect(btn('Add court')).toBeEnabled(); // the only way back now that reopening is gone
+
+    // court 1 stays closed for good, so Add court hands over a fresh number
+    await click(btn('Add court'));
+    await screen.findByLabelText('Close court 2');
+    expect(screen.getByText('Queue')).toBeInTheDocument();
+  });
+});
+
+describe('App: the queue panels track the courts', () => {
+  beforeEach(async () => {
+    installSpeechStub();
+    await reset();
+    const now = Date.now();
+    await db.players.bulkPut(MORE_NAMES.map((name, i) => ({ id: `q-${i}`, name, createdAt: now + 100 + i, updatedAt: now + 100 + i })));
+  });
+  afterEach(cleanup);
+
+  it('shows one waiting match per open court, however long the queue is', async () => {
+    render(<App />);
+    await openBoard(/^Balanced/); // one court, sixteen checked in, so twelve wait behind the staged four
+    expect(screen.getByText('12 waiting')).toBeInTheDocument();
+    expect(screen.getByText('Up next')).toBeInTheDocument();
+    expect(screen.queryByText('Then, match 2')).not.toBeInTheDocument();
+
+    await click(btn('Add court'));
+    await screen.findByLabelText('Close court 2');
+    await screen.findByText('Then, match 2');
+    expect(screen.queryByText('Then, match 3')).not.toBeInTheDocument();
+  });
+
+  it('calls each waiting match from its own button', async () => {
+    render(<App />);
+    await openBoard(/^Balanced/);
+    await click(btn('Add court'));
+    await screen.findByText('Then, match 2');
+
+    await click(btn('Call players up next'));
+    expect(said().at(-1)).toMatch(/^Get ready\. Up next\. Team one, /);
+
+    await click(btn('Call players for match 2'));
+    expect(said().at(-1)).toMatch(/^Get ready\. Match 2\. Team one, /);
   });
 });
 

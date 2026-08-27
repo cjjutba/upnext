@@ -214,21 +214,34 @@ describe('previewLineups', () => {
   const lineup = (pairs: Pairs) => ({ kind: 'lineup', pairs });
 
   it('chunks the waiting players into fours and leads with upNextPreview', () => {
-    const s = state({ queue: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'] });
+    const s = state({ courtCount: 3, queue: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'] });
     const chunks = previewLineups(s, {});
     expect(chunks).toHaveLength(2); // nine waiting is two fours plus a leftover
     expect(chunks[0]).toEqual(upNextPreview(s, {}));
     expect(chunks[1]).toEqual(lineup([['e', 'g'], ['f', 'h']]));
   });
 
-  it('skips sitting-out players and stops at max', () => {
-    const s = state({ queue: ['a', 'x', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], sittingOut: ['x'] });
+  it('skips sitting-out players', () => {
+    const s = state({ courtCount: 2, queue: ['a', 'x', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], sittingOut: ['x'] });
     expect(previewLineups(s, {})).toEqual([lineup([['a', 'c'], ['b', 'd']]), lineup([['e', 'g'], ['f', 'h']])]);
-    expect(previewLineups(s, {}, 1)).toHaveLength(1);
   });
 
   it('returns nothing with fewer than four waiting', () => {
     expect(previewLineups(state({ queue: ['a', 'b', 'c'] }), {})).toEqual([]);
+  });
+
+  it('gives one panel per open court, never more', () => {
+    const twelve = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l'];
+    expect(previewLineups(state({ courtCount: 3, queue: twelve }), {})).toHaveLength(3);
+    expect(previewLineups(state({ courtCount: 1, queue: twelve }), {})).toHaveLength(1);
+    expect(previewLineups(state({ courtCount: 3, closedCourts: [2], queue: twelve }), {})).toHaveLength(2);
+  });
+
+  it('promises nothing when every court is closed, in any mode', () => {
+    const twelve = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l'];
+    expect(previewLineups(state({ courtCount: 2, closedCourts: [1, 2], queue: twelve }), {})).toEqual([]);
+    const winners = state({ rule: { template: 'winners-stay', winCap: 3 }, courtCount: 1, closedCourts: [1], queue: twelve });
+    expect(previewLineups(winners, {})).toEqual([]);
   });
 
   it('honours the balanced pairing on the first four', () => {
@@ -237,7 +250,7 @@ describe('previewLineups', () => {
   });
 
   it('stops at the challengers in a winners template, which cannot name a four', () => {
-    const s = state({ rule: { template: 'winners-stay', winCap: 3 }, queue: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] });
+    const s = state({ rule: { template: 'winners-stay', winCap: 3 }, courtCount: 2, queue: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] });
     expect(previewLineups(s, {})).toEqual([{ kind: 'challengers', pair: ['a', 'b'] }]);
   });
 });

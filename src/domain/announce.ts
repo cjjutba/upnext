@@ -17,13 +17,27 @@ export function courtPhrase(court: number, pairs: Pairs, nameOf: NameOf): string
   return `Court ${court}. ${matchup(pairs, nameOf)}. Please proceed to court ${court}.`;
 }
 
+const teamsPhrase = (pairs: Pairs, nameOf: NameOf): string =>
+  `Team one, ${pairPhrase(pairs[0], nameOf)}. Versus team two, ${pairPhrase(pairs[1], nameOf)}.`;
+
 /**
  * The Call players button. Staging is silent, so this is the only way four
  * people hear their names before a match starts.
  */
 export function getReadyPhrase(pairs: Pairs, nameOf: NameOf, court?: number): string {
-  const teams = `Team one, ${pairPhrase(pairs[0], nameOf)}. Versus team two, ${pairPhrase(pairs[1], nameOf)}.`;
+  const teams = teamsPhrase(pairs, nameOf);
   return court === undefined ? `Get ready. Up next. ${teams}` : `Get ready. Court ${court}. ${teams}`;
+}
+
+/**
+ * Every waiting panel has its own call button, so a later one has to name
+ * itself. Three calls that all opened with "Up next" would send twelve people
+ * to the same court.
+ */
+export function matchReadyPhrase(pairs: Pairs, nameOf: NameOf, index: number): string {
+  return index === 0
+    ? getReadyPhrase(pairs, nameOf)
+    : `Get ready. Match ${index + 1}. ${teamsPhrase(pairs, nameOf)}`;
 }
 
 /**
