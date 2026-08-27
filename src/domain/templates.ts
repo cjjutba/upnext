@@ -1,5 +1,5 @@
 import type { Lineup, Pair, Pairs, SessionState } from './types';
-import { isWinnersTemplate } from './types';
+import { isWinnersTemplate, openCourts } from './types';
 
 export interface LastFinished {
   pairs: Pairs;
@@ -168,8 +168,13 @@ export function upNextPreview(state: SessionState, ratings: Ratings = {}): UpNex
  * what the mode can actually promise. A winners template stops there: it cannot
  * name a four before a winner exists, so it certainly cannot name the one after
  * that. Later entries partition queue order and are indicative.
+ *
+ * One panel per open court, never more. A waiting match is a claim on a court,
+ * so a board with no courts open promises nothing at all.
  */
-export function previewLineups(state: SessionState, ratings: Ratings = {}, max = 3): UpNextPreview[] {
+export function previewLineups(state: SessionState, ratings: Ratings = {}): UpNextPreview[] {
+  const max = openCourts(state).length;
+  if (max < 1) return [];
   const first = upNextPreview(state, ratings);
   if (!first) return [];
   if (first.kind === 'challengers') return [first];

@@ -63,6 +63,14 @@ that is wrong gets unstaged rather than emptied. `game-started` still carries
 four real players, and a court with an open seat cannot record a winner. See the
 open seats section of `docs/event-model.md`.
 
+### The queue mirrors the courts
+
+`previewLineups()` draws one waiting match per open court, never a fixed
+number, and returns `[]` when every court is closed. The board hides the whole
+queue section in that case. Do not reintroduce a hardcoded cap: a waiting four
+is a claim on a court, and without a court there is nothing to claim. Closing a
+court is permanent for the session; `addCourt` hands out a fresh number.
+
 Read `docs/architecture.md` for the full picture and `docs/event-model.md` for
 every event type.
 

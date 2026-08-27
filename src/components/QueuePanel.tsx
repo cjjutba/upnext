@@ -8,15 +8,17 @@ import type { UpNextPreview } from '../domain/templates';
  * winners template can only promise the two challengers, so its panel draws
  * them against a placeholder rather than inventing opponents.
  */
-export function QueuePanel({ title, positions, preview, nameOf, onPlayerTap, onCall }: {
+export function QueuePanel({ title, positions, preview, nameOf, onPlayerTap, onCall, callLabel }: {
   title: string;
   /** "1 to 4". Queue positions the four occupy, so the panel matches the waiting list. */
   positions: string;
   preview: UpNextPreview;
   nameOf: (playerId: string) => string;
   onPlayerTap: (playerId: string) => void;
-  /** Absent on every panel but the first: only the next four get called. */
-  onCall?: () => void;
+  /** Every panel calls its own four, so a court freeing up never waits on the panel above it. */
+  onCall: () => void;
+  /** Says which match is being called, because the button reads the same on every panel. */
+  callLabel: string;
 }) {
   return (
     <div style={{
@@ -27,9 +29,7 @@ export function QueuePanel({ title, positions, preview, nameOf, onPlayerTap, onC
         <span className="display" style={{ fontSize: 'var(--text-h3)', lineHeight: 1 }}>{title}</span>
         <span className="mono" style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>{positions}</span>
         <span style={{ flex: 1 }} />
-        {onCall ? (
-          <Button variant="secondary" icon="megaphone" onClick={onCall} ariaLabel="Call players up next">Call players</Button>
-        ) : null}
+        <Button variant="secondary" icon="megaphone" onClick={onCall} ariaLabel={callLabel}>Call players</Button>
       </div>
       <CourtDiagram
         pairs={preview.kind === 'lineup' ? preview.pairs : [preview.pair, null]}

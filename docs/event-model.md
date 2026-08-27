@@ -39,7 +39,7 @@ another device or a newer build must never crash replay.
 | `game-lineup-changed` | `court`, `pairs` | court has an active game; no player named twice; any added player is queued and not sitting out | Replaces the lineup, which may leave a seat open (`null`). Players who came off go to the queue front. `startedAt` is untouched, so the timer keeps running |
 | `game-finished` | `court`, `winnerPair?`, `score?` | court has an active game; `winnerPair` is `undefined`, `0`, or `1`; every seat is filled | Ends the game, bumps `gamesPlayed` for all four, appends to `finishedGames`, then places the four in the queue by mode. See below |
 | `court-closed` | `court` | not already closed; within `1..courtCount` | Voids any game in progress without counting it, sends whoever is seated plus any staged four to the queue **front**, resets the playing players' streaks, adds to `closedCourts` |
-| `court-reopened` | `court` | currently closed | Clears the closed flag. The command then refills |
+| `court-reopened` | `court` | currently closed | Clears the closed flag. The command then refills. No UI emits this any more: closing is permanent for the session and `addCourt` is the way back. Kept so old logs replay |
 | `court-added` | none | started, not ended | `courtCount + 1`. Courts are only ever added. Closing covers taking one out of service |
 | `event-undone` | `targetEventId` | none | No direct effect. `replay()` handles it through `computeSkipped()` |
 | `session-ended` | none | started, not ended | `ended = true`, `endedAt = ts` |
@@ -225,11 +225,17 @@ That counter matters more than it looks. It is stable across an unrelated
 court finishing, so the Up next preview always equals the lineup it promises.
 Using the session-global `pairingCycle` here was a real bug, fixed in `c2db7ef`.
 
-`previewLineups(state, ratings, max)` feeds the queue section under the courts.
+`previewLineups(state, ratings)` feeds the queue section under the courts.
 The first chunk is `nextLineup(state, null, ratings)` verbatim, so it is exactly
 what staging a court would produce. Later chunks partition the following fours
 as `[[a,c],[b,d]]` and are indicative: what they actually play depends on
 results that have not happened yet.
+
+The count is `openCourts(state).length`, never a fixed number. A waiting match
+is a claim on a court, so twelve waiting players behind one court draw one
+panel and the rest fall to the Also waiting rows. With every court closed the
+function returns `[]` in every mode, and the board drops the queue section
+entirely.
 
 ## Dexie schema
 

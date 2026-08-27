@@ -7,6 +7,7 @@ import { UndoPill } from '../components/UndoPill';
 import { Button } from '../components/Button';
 import { PlayerPickerModal } from '../components/PlayerPickerModal';
 import type { Player, SessionState, SlotIndex } from '../domain/types';
+import { openCourts } from '../domain/types';
 import type { UpNextPreview } from '../domain/templates';
 import { modeLabel } from '../domain/modes';
 import { isPlaying, isStaged } from '../domain/reducer';
@@ -24,9 +25,9 @@ const fmt = (totalSeconds: number): string => {
 export { fmt };
 
 export function SessionBoard({
-  state, players, undoLabel, onUndo, canRedo, onRedo, onWin, onCloseCourt, onReopenCourt,
+  state, players, undoLabel, onUndo, canRedo, onRedo, onWin, onCloseCourt,
   onToggleSit, onToggleCheck, onAddCourt, onAddPlayer, onRemovePlayer, onCourtPlayerTap, onQueuePlayerTap,
-  onStart, onStage, onShuffle, onCallCourt, onCallUpNext, onEditLineup, previews, narrow, railCollapsed, recency,
+  onStart, onStage, onShuffle, onCallCourt, onCallPreview, onEditLineup, previews, narrow, railCollapsed, recency,
   onSeatPlayer, onCreateAndSeat, onFillCourt,
 }: {
   state: SessionState;
@@ -37,7 +38,6 @@ export function SessionBoard({
   onRedo: () => void;
   onWin: (court: number, winnerPair: 0 | 1, score?: string) => void;
   onCloseCourt: (court: number) => void;
-  onReopenCourt: (court: number) => void;
   onToggleSit: (playerId: string) => void;
   onToggleCheck: (playerId: string) => void;
   onAddCourt: () => void;
@@ -51,7 +51,8 @@ export function SessionBoard({
   onStage: (court: number) => void;
   onShuffle: (court: number) => void;
   onCallCourt: (court: number) => void;
-  onCallUpNext: () => void;
+  /** Call the four on waiting panel i. Every panel has its own button. */
+  onCallPreview: (index: number) => void;
   onEditLineup: (court: number) => void;
   /** Waiting matches, four at a time. The first promises only what the mode can: a lineup, or two challengers. */
   previews: UpNextPreview[];
@@ -76,8 +77,7 @@ export function SessionBoard({
   }, []);
 
   const nameOf = (id: string) => players.find((p) => p.id === id)?.name ?? 'Unknown';
-  const openCourts = Array.from({ length: state.courtCount }, (_, i) => i + 1).filter((n) => !state.closedCourts.includes(n));
-  const closedCourts = [...state.closedCourts].sort((a, b) => a - b);
+  const courts = openCourts(state);
   const eligibleQueue = state.queue.filter((p) => !state.sittingOut.includes(p));
   // checkedIn only grows, so anyone who left has to be subtracted rather than looked up there
   const present = state.checkedIn.filter((id) => !state.departed.includes(id));
@@ -122,27 +122,16 @@ export function SessionBoard({
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
             <span className="micro-label">Courts</span>
             <span style={{ flex: 1 }} />
-            <Button variant="primary" icon="plus" onClick={onAddCourt} disabled={eligibleQueue.length < 4} ariaLabel="Add court">Add court</Button>
+            {/* with no courts open there is nothing left to undo into, so the button has to stay live even for a short queue */}
+            <Button variant="primary" icon="plus" onClick={onAddCourt} disabled={courts.length > 0 && eligibleQueue.length < 4} ariaLabel="Add court">Add court</Button>
           </div>
-          {closedCourts.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              <span className="micro-label">Closed courts</span>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
-                {closedCourts.map((n) => (
-                  <Button key={n} variant="secondary" icon="rotate-cw" onClick={() => onReopenCourt(n)} ariaLabel={'Reopen court ' + n}>
-                    Court {n}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          ) : null}
-          {openCourts.length === 0 ? (
+          {courts.length === 0 ? (
             <div style={{ padding: 'var(--space-3)', font: '400 15px var(--font-sans)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-card)' }}>
-              All courts are closed. Reopen one above to keep playing.
+              No courts open. Add a court to keep playing.
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 480px), 1fr))', gap: 'var(--space-4)', alignContent: 'start' }}>
-              {openCourts.map((n) => {
+              {courts.map((n) => {
                 const game = state.games[n];
                 const staged = state.staged[n];
                 const elapsed = game ? (now - game.startedAt) / 1000 : 0;
@@ -164,44 +153,48 @@ export function SessionBoard({
           )}
         </section>
 
-        <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-            <span className="micro-label">Queue</span>
-            {/* the pairings below are a mode's decision, so the mode is named next to them */}
-            <span style={{ font: '400 13px/1 var(--font-sans)', color: 'var(--text-tertiary)' }}>{modeLabel(state.rule.template)}</span>
-            <span style={{ flex: 1 }} />
-            <span className="mono" style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>{eligibleQueue.length} waiting</span>
-          </div>
-          <div style={queueGrid}>
-            {previews.length === 0 ? (
-              <div style={{ padding: 'var(--space-3)', font: '400 15px var(--font-sans)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-card)' }}>
-                {state.queue.length === 0
-                  ? 'Queue is empty: everyone is on a court.'
-                  : 'Fewer than four waiting, so there is no next match yet.'}
-              </div>
-            ) : previews.map((preview, i) => (
-              <QueuePanel key={positions(preview, i)} positions={positions(preview, i)}
-                title={preview.kind === 'challengers' ? 'Next challengers' : i === 0 ? 'Up next' : `Then, match ${i + 1}`}
-                preview={preview} nameOf={nameOf} onPlayerTap={onQueuePlayerTap}
-                onCall={i === 0 ? onCallUpNext : undefined} />
-            ))}
-          </div>
-          {leftovers.length > 0 ? (
+        {/* the queue exists because courts do: with none open there is nothing for a waiting four to be waiting for */}
+        {courts.length === 0 ? null : (
+          <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+              <span className="micro-label">Queue</span>
+              {/* the pairings below are a mode's decision, so the mode is named next to them */}
+              <span style={{ font: '400 13px/1 var(--font-sans)', color: 'var(--text-tertiary)' }}>{modeLabel(state.rule.template)}</span>
+              <span style={{ flex: 1 }} />
+              <span className="mono" style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>{eligibleQueue.length} waiting</span>
+            </div>
             <div style={queueGrid}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                <span className="micro-label">Also waiting</span>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  {leftovers.map((id) => (
-                    <QueueRow key={id} position={state.queue.indexOf(id) + 1} name={nameOf(id)} games={state.gamesPlayed[id] ?? 0}
-                      sitOut={state.sittingOut.includes(id)}
-                      onToggleSit={() => onToggleSit(id)} onRemove={() => onRemovePlayer(id)}
-                      onOptions={() => onQueuePlayerTap(id)} />
-                  ))}
+              {previews.length === 0 ? (
+                <div style={{ padding: 'var(--space-3)', font: '400 15px var(--font-sans)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-card)' }}>
+                  {state.queue.length === 0
+                    ? 'Queue is empty: everyone is on a court.'
+                    : 'Fewer than four waiting, so there is no next match yet.'}
+                </div>
+              ) : previews.map((preview, i) => (
+                <QueuePanel key={positions(preview, i)} positions={positions(preview, i)}
+                  title={preview.kind === 'challengers' ? 'Next challengers' : i === 0 ? 'Up next' : `Then, match ${i + 1}`}
+                  preview={preview} nameOf={nameOf} onPlayerTap={onQueuePlayerTap}
+                  onCall={() => onCallPreview(i)}
+                  callLabel={i === 0 ? 'Call players up next' : `Call players for match ${i + 1}`} />
+              ))}
+            </div>
+            {leftovers.length > 0 ? (
+              <div style={queueGrid}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                  <span className="micro-label">Also waiting</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    {leftovers.map((id) => (
+                      <QueueRow key={id} position={state.queue.indexOf(id) + 1} name={nameOf(id)} games={state.gamesPlayed[id] ?? 0}
+                        sitOut={state.sittingOut.includes(id)}
+                        onToggleSit={() => onToggleSit(id)} onRemove={() => onRemovePlayer(id)}
+                        onOptions={() => onQueuePlayerTap(id)} />
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : null}
-        </section>
+            ) : null}
+          </section>
+        )}
       </main>
       {/* wide and collapsed drops the rail entirely, so the courts grid gets the whole width */}
       {railCollapsed && !narrow ? null : (
