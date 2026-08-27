@@ -91,6 +91,15 @@ const chipOrder = (scope: HTMLElement) =>
 
 const dialog = (name: string | RegExp) => screen.getByRole('dialog', { name });
 
+/** The end confirmation, whose confirm shares the header button's name and so must be scoped. */
+const endDialog = () => screen.getByRole('dialog', { name: /end the session/ });
+
+/** Open the confirmation and go through with it, which is the only way out of a live session. */
+const endSession = async () => {
+  await click(btn('End session'));
+  await click(btn('End session', endDialog()));
+};
+
 const openStandings = async () => {
   await click(btn('Live standings'));
   return screen.findByRole('dialog', { name: 'Live standings' });
@@ -184,8 +193,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await click(btn(/Team 1 wins/, courtCard(1)));
     await waitFor(() => expect(said()).toHaveLength(2));
 
-    await click(btn('End session'));
-    await click(btn('Tap again to end'));
+    await endSession();
     await screen.findByText('Session summary');
     await waitFor(() => expect(said().at(-1)).toContain('Session complete. In first place,'));
     expect(said().at(-1)).toContain('with 1 win from 1 game, 100 percent.');
@@ -217,8 +225,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await click(btn(/Team 1 wins/, courtCard(1)));
     await waitFor(() => expect(said()).toHaveLength(2));
 
-    await click(btn('End session'));
-    await click(btn('Tap again to end'));
+    await endSession();
     await screen.findByText('Session summary');
     await waitFor(() => expect(said()).toHaveLength(3));
     expect(said().filter((l) => l.startsWith('Session complete.'))).toHaveLength(1);
@@ -279,13 +286,21 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     expect(btn('Off the court', dialog(/Change Alice/))).toBeInTheDocument();
   });
 
-  it('ends the session only on the second tap', async () => {
+  it('asks before ending the session, and names the courts still playing', async () => {
     render(<App />);
     await startMatch(/^Balanced/);
 
     await click(btn('End session'));
-    expect(screen.queryByText('Session summary')).not.toBeInTheDocument(); // still live, armed
-    await click(btn('Tap again to end'));
+    const asking = endDialog();
+    expect(within(asking).getByText(/Court 1 is still playing/)).toBeInTheDocument();
+    expect(within(asking).getByText('No games recorded yet.')).toBeInTheDocument();
+    expect(screen.queryByText('Session summary')).not.toBeInTheDocument(); // nothing appended yet
+
+    await click(btn('Keep playing', asking));
+    expect(screen.queryByRole('dialog', { name: /end the session/ })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Team 1 wins on court 1')).toBeInTheDocument(); // still live
+
+    await endSession();
     await screen.findByText('Session summary');
   });
 
@@ -294,8 +309,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await startMatch(/^Balanced/);
     await click(btn(/Team 1 wins/, courtCard(1)));
 
-    await click(btn('End session'));
-    await click(btn('Tap again to end'));
+    await endSession();
     await screen.findByText('Session summary');
     await click(btn('New session'));
     await screen.findByText('Roster');
@@ -312,8 +326,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await startMatch(/^Balanced/);
     await click(btn(/Team 1 wins/, courtCard(1)));
 
-    await click(btn('End session'));
-    await click(btn('Tap again to end'));
+    await endSession();
     await screen.findByText('Session summary');
     await click(btn('New session'));
     await screen.findByText('Roster');

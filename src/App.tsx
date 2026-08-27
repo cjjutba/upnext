@@ -7,6 +7,7 @@ import { SessionBoard, fmt } from './screens/SessionBoard';
 import { SessionSummary } from './screens/SessionSummary';
 import { ModeMenu } from './components/ModeMenu';
 import { ModeChangeModal } from './components/ModeChangeModal';
+import { EndSessionModal } from './components/EndSessionModal';
 import { Button } from './components/Button';
 import { IconButton } from './components/IconButton';
 import { StandingsModal } from './components/StandingsModal';
@@ -50,22 +51,12 @@ export default function App() {
   /** The tapped chip. `court` is null when the tap came from the queue section, where a swap reorders instead of substituting. */
   const [picking, setPicking] = useState<{ playerId: string; court: number | null } | null>(null);
   const [editingCourt, setEditingCourt] = useState<number | null>(null);
-  const [endArmed, setEndArmed] = useState(false);
+  const [endOpen, setEndOpen] = useState(false);
   /** The rule the organizer is proposing. Nothing is appended until the modal confirms it. */
   const [pendingRule, setPendingRule] = useState<RuleConfig | null>(null);
   const narrow = useNarrow();
   const rail = useRailCollapsed();
   const { state, dispatch } = session;
-
-  // an armed end button disarms itself; an accidental tap must not linger as a one-tap landmine
-  useEffect(() => {
-    if (!endArmed) return;
-    const t = setTimeout(() => setEndArmed(false), 4000);
-    return () => clearTimeout(t);
-  }, [endArmed]);
-  useEffect(() => {
-    setEndArmed(false);
-  }, [route]);
 
   useEffect(() => {
     void (async () => {
@@ -184,17 +175,9 @@ export default function App() {
 
   const end = async () => {
     speech.cancel(); // a queued court call must not talk over the podium
+    setEndOpen(false);
     await dispatch(cmd.endSession(state));
     navigate('summary');
-  };
-
-  const endTap = () => {
-    if (!endArmed) {
-      setEndArmed(true);
-      return;
-    }
-    setEndArmed(false);
-    void end();
   };
 
   const reopen = async (sessionId: string) => {
@@ -241,9 +224,7 @@ export default function App() {
             onClick={rail.toggle} />
           <IconButton icon="trophy" ariaLabel="Live standings" onClick={() => setStandingsOpen(true)} />
           {muteToggle}
-          <Button variant="danger" onClick={endTap}>
-            {endArmed ? 'Tap again to end' : 'End session'}
-          </Button>
+          <Button variant="danger" onClick={() => setEndOpen(true)}>End session</Button>
         </>
       ) : route === 'summary' ? (
         <>
@@ -373,6 +354,15 @@ export default function App() {
             void dispatch(cmd.changeRule(state, pendingRule.template, pendingRule.winCap, roster.ratings));
             setPendingRule(null);
           }}
+        />
+      ) : null}
+      {endOpen && route === 'board' && !state.ended ? (
+        <EndSessionModal
+          liveCourts={Object.keys(state.games).map(Number).sort((a, b) => a - b)}
+          gamesPlayed={state.finishedGames.length}
+          elapsed={fmt((clock - state.startedAt) / 1000)}
+          onCancel={() => setEndOpen(false)}
+          onConfirm={() => void end()}
         />
       ) : null}
       {standingsOpen ? (
