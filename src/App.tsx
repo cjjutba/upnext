@@ -142,6 +142,11 @@ export default function App() {
     navigate('board');
   };
 
+  const view = async (sessionId: string) => {
+    await session.loadById(sessionId);
+    navigate('summary');
+  };
+
   const fresh = () => {
     speech.cancel();
     session.reset();
@@ -209,6 +214,7 @@ export default function App() {
           onStart={(config) => void start(config)}
           onResume={(sessionId) => void session.loadById(sessionId).then(() => navigate('board'))}
           onReopen={(sessionId) => void reopen(sessionId)}
+          onView={(sessionId) => void view(sessionId)}
           onImport={(file) => void importSessionFile(file).then(() => window.location.reload()).catch(() => window.alert('Import failed: that is not a valid upnext session file'))}
           onSelectAll={() => setSelected(roster.players.map((p) => p.id))}
           onClearAll={() => setSelected([])}
@@ -245,6 +251,7 @@ export default function App() {
           onDone={fresh}
           speak={speech.speak}
           canSpeak={speech.supported && speech.enabled}
+          autoRead={session.lastBatch.some((e) => e.type === 'session-ended')}
         />
       )}
       {standingsOpen ? (

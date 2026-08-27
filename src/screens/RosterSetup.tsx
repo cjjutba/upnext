@@ -17,7 +17,7 @@ const MODE_ICON: Record<MatchingMode, IconName> = {
 };
 
 export function RosterSetup({
-  players, onAddPlayer, selected, onToggle, onStart, onResume, onReopen, onImport,
+  players, onAddPlayer, selected, onToggle, onStart, onResume, onReopen, onView, onImport,
   onSelectAll, onClearAll, returning, onCheckInReturning, onUpdatePlayer, narrow,
 }: {
   players: Player[];
@@ -27,6 +27,7 @@ export function RosterSetup({
   onStart: (config: { courts: number; template: RuleTemplate; winCap: number }) => void;
   onResume: (sessionId: string) => void;
   onReopen: (sessionId: string) => void;
+  onView: (sessionId: string) => void;
   onImport: (file: File) => void;
   onSelectAll: () => void;
   onClearAll: () => void;
@@ -137,7 +138,7 @@ export function RosterSetup({
                 <>
                   {/* only the newest session can reopen: reviving an older one would race the night's real log */}
                   {i === 0 ? <Button variant="ghost" onClick={() => onReopen(h.sessionId)}>Reopen</Button> : null}
-                  <span className="micro-label">Done</span>
+                  <Button variant="ghost" onClick={() => onView(h.sessionId)}>View</Button>
                 </>
               )}
             </div>

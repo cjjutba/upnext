@@ -213,6 +213,26 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await waitFor(() => expect(within(dialog).getAllByText('100%')).toHaveLength(2)); // the win survived
   });
 
+  it('opens an old session summary from history silently, with export still offered', async () => {
+    render(<App />);
+    await startSession(/^Balanced/);
+    await click(btn(/Team 1 wins/, courtCard(1)));
+
+    await click(btn('End session'));
+    await click(btn('Tap again to end'));
+    await screen.findByText('Session summary');
+    await click(btn('New session'));
+    await screen.findByText('Roster');
+
+    spoken.length = 0;
+    await click(await screen.findByRole('button', { name: 'View' }));
+    await screen.findByText('Final standings');
+    expect(btn(/Share summary/)).toBeInTheDocument();
+
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    expect(said()).toEqual([]); // browsing history never reads the podium aloud
+  });
+
   it('has no up next call in Winners mode, where the next lineup is not known yet', async () => {
     render(<App />);
     await startSession(/^Winners/);

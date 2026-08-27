@@ -9,7 +9,7 @@ import { fmt } from './SessionBoard';
 const TOP = 10;
 const COLS = '48px 1fr 88px 64px 64px 88px';
 
-export function SessionSummary({ state, players, onExport, onDone, speak, canSpeak }: {
+export function SessionSummary({ state, players, onExport, onDone, speak, canSpeak, autoRead }: {
   state: SessionState;
   players: Player[];
   onExport: () => void;
@@ -17,6 +17,8 @@ export function SessionSummary({ state, players, onExport, onDone, speak, canSpe
   speak: (text: string) => void;
   /** False while muted, when the podium button would do nothing. */
   canSpeak: boolean;
+  /** True only when a live session just ended here; browsing history stays silent. */
+  autoRead: boolean;
 }) {
   const nameOf = (id: string) => players.find((p) => p.id === id)?.name ?? 'Unknown';
   const rows = useMemo(() => standings(state, nameOf), [state, players]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -29,10 +31,10 @@ export function SessionSummary({ state, players, onExport, onDone, speak, canSpe
 
   const readPodium = () => speak(podiumPhrase(rows, nameOf));
 
-  // the podium reads itself once when the screen opens; a re-render must not repeat it
+  // the podium reads itself once when a live end opens the screen; a re-render must not repeat it
   const readRef = useRef(false);
   useEffect(() => {
-    if (readRef.current) return;
+    if (!autoRead || readRef.current) return;
     readRef.current = true;
     readPodium();
     // eslint-disable-next-line react-hooks/exhaustive-deps
