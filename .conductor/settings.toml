@@ -1,0 +1,29 @@
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+[scripts]
+setup = "npm install --no-audit --no-fund"
+# node_modules and dist are gitignored build artifacts, so an archived
+# workspace can drop both without losing anything tracked.
+archive = "rm -rf \"${CONDUCTOR_WORKSPACE_PATH:-.}/node_modules\" \"${CONDUCTOR_WORKSPACE_PATH:-.}/dist\""
+# Each workspace serves on its own CONDUCTOR_PORT and stores session state in
+# the browser's IndexedDB, so nothing is shared between workspaces.
+run_mode = "concurrent"
+
+[scripts.run.dev]
+command = "npm run dev -- --port $CONDUCTOR_PORT --strictPort"
+available_in = [ "local" ]
+default = true
+icon = "play"
+
+[scripts.run.test]
+# --watch is explicit because run scripts get a non-interactive shell, where
+# vitest would otherwise fall back to a single run.
+command = "npm run test:watch -- --watch"
+icon = "test-tube"
+
+[scripts.run.preview]
+# The only way to check the PWA and offline behavior. Uses the second
+# allocated port so it can sit alongside the dev server.
+command = "npm run build && npm run preview -- --port $((CONDUCTOR_PORT + 1)) --strictPort"
+available_in = [ "local" ]
+icon = "package"
