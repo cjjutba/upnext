@@ -1,7 +1,7 @@
 import type { EventPayload, Pairs, RuleTemplate, SessionEvent, SessionState } from './types';
-import { emptyState } from './types';
+import { emptyState, isWinnersTemplate } from './types';
 import { applyEvent, computeSkipped, isPlaying } from './reducer';
-import { nextLineup, type LastFinished } from './templates';
+import { nextLineup, type LastFinished, type Ratings } from './templates';
 
 /** A command's output: payload plus sessionId. The event store fills the envelope. */
 export type CommandEvent = EventPayload & { sessionId: string };
@@ -20,14 +20,16 @@ function simulate(state: SessionState, e: CommandEvent): SessionState {
  * winner priority applies to the court the winners actually won on, never to
  * whichever empty court happens to be numbered lowest.
  */
-function fillEvents(state: SessionState, lastFinished: LastFinished | null = null, onCourt?: number): CommandEvent[] {
+function fillEvents(
+  state: SessionState, lastFinished: LastFinished | null = null, onCourt?: number, ratings: Ratings = {},
+): CommandEvent[] {
   const out: CommandEvent[] = [];
   let s = state;
   const courts = Array.from({ length: s.courtCount }, (_, i) => i + 1);
   const order = onCourt === undefined ? courts : [onCourt, ...courts.filter((c) => c !== onCourt)];
   for (const court of order) {
     if (s.games[court] || s.closedCourts.includes(court)) continue;
-    const pairs = nextLineup(s, court === onCourt ? lastFinished : null);
+    const pairs = nextLineup(s, court === onCourt ? lastFinished : null, ratings);
     if (!pairs) break;
     const e: CommandEvent = { type: 'game-started', court, pairs, sessionId: s.sessionId! };
     out.push(e);
@@ -42,7 +44,7 @@ export interface SessionConfig {
   winCap: number;
 }
 
-export function startSession(config: SessionConfig, playerIds: string[]): CommandEvent[] {
+export function startSession(config: SessionConfig, playerIds: string[], ratings: Ratings = {}): CommandEvent[] {
   const sessionId = crypto.randomUUID();
   const events: CommandEvent[] = [
     { type: 'session-started', courts: config.courts, template: config.template, config: { winCap: config.winCap }, sessionId },
@@ -53,26 +55,26 @@ export function startSession(config: SessionConfig, playerIds: string[]): Comman
     events.push(e);
     s = simulate(s, e);
   }
-  return [...events, ...fillEvents(s)];
+  return [...events, ...fillEvents(s, null, undefined, ratings)];
 }
 
-export function finishGame(state: SessionState, court: number, winnerPair?: 0 | 1): CommandEvent[] | null {
+export function finishGame(state: SessionState, court: number, winnerPair?: 0 | 1, ratings: Ratings = {}): CommandEvent[] | null {
   const active = state.games[court];
   if (!active || !state.sessionId || state.ended) return null;
-  const needsWinner = state.rule.template !== 'all-off';
+  const needsWinner = isWinnersTemplate(state.rule.template);
   if (needsWinner && winnerPair === undefined) return null;
   const e: CommandEvent = {
     type: 'game-finished', court, winnerPair: needsWinner ? winnerPair : undefined, sessionId: state.sessionId,
   };
   const after = simulate(state, e);
-  return [e, ...fillEvents(after, { pairs: active.pairs, winnerPair: e.winnerPair }, court)];
+  return [e, ...fillEvents(after, { pairs: active.pairs, winnerPair: e.winnerPair }, court, ratings)];
 }
 
-export function checkInPlayer(state: SessionState, playerId: string): CommandEvent[] | null {
+export function checkInPlayer(state: SessionState, playerId: string, ratings: Ratings = {}): CommandEvent[] | null {
   if (!state.sessionId || state.ended) return null;
   if (state.queue.includes(playerId) || isPlaying(state, playerId)) return null;
   const e: CommandEvent = { type: 'player-checked-in', playerId, sessionId: state.sessionId };
-  return [e, ...fillEvents(simulate(state, e))];
+  return [e, ...fillEvents(simulate(state, e), null, undefined, ratings)];
 }
 
 export function departPlayer(state: SessionState, playerId: string): CommandEvent[] | null {
@@ -85,30 +87,37 @@ export function sitOutPlayer(state: SessionState, playerId: string): CommandEven
   return [{ type: 'player-sat-out', playerId, sessionId: state.sessionId }];
 }
 
-export function returnPlayer(state: SessionState, playerId: string): CommandEvent[] | null {
+export function returnPlayer(state: SessionState, playerId: string, ratings: Ratings = {}): CommandEvent[] | null {
   if (!state.sessionId || !state.sittingOut.includes(playerId)) return null;
   const e: CommandEvent = { type: 'player-returned', playerId, sessionId: state.sessionId };
-  return [e, ...fillEvents(simulate(state, e))];
+  return [e, ...fillEvents(simulate(state, e), null, undefined, ratings)];
 }
 
-export function closeCourt(state: SessionState, court: number): CommandEvent[] | null {
+export function closeCourt(state: SessionState, court: number, ratings: Ratings = {}): CommandEvent[] | null {
   if (!state.sessionId || state.closedCourts.includes(court)) return null;
   const e: CommandEvent = { type: 'court-closed', court, sessionId: state.sessionId };
   // closing frees four players, other courts may now fill
-  return [e, ...fillEvents(simulate(state, e))];
+  return [e, ...fillEvents(simulate(state, e), null, undefined, ratings)];
 }
 
-export function reopenCourt(state: SessionState, court: number): CommandEvent[] | null {
+export function reopenCourt(state: SessionState, court: number, ratings: Ratings = {}): CommandEvent[] | null {
   if (!state.sessionId || !state.closedCourts.includes(court)) return null;
   const e: CommandEvent = { type: 'court-reopened', court, sessionId: state.sessionId };
-  return [e, ...fillEvents(simulate(state, e))];
+  return [e, ...fillEvents(simulate(state, e), null, undefined, ratings)];
 }
 
-export function changeRule(state: SessionState, template: RuleTemplate, winCap: number): CommandEvent[] | null {
+export function addCourt(state: SessionState, ratings: Ratings = {}): CommandEvent[] | null {
+  if (!state.sessionId || !state.started || state.ended) return null;
+  const e: CommandEvent = { type: 'court-added', sessionId: state.sessionId };
+  return [e, ...fillEvents(simulate(state, e), null, undefined, ratings)];
+}
+
+export function changeRule(state: SessionState, template: RuleTemplate, winCap: number, ratings: Ratings = {}): CommandEvent[] | null {
   if (!state.sessionId || state.ended) return null;
+  if (template === state.rule.template && winCap === state.rule.winCap) return null;
   const e: CommandEvent = { type: 'rule-changed', template, config: { winCap }, sessionId: state.sessionId };
   // defensive: every capacity increasing command already fills eagerly, so this is normally a no-op
-  return [e, ...fillEvents(simulate(state, e))];
+  return [e, ...fillEvents(simulate(state, e), null, undefined, ratings)];
 }
 
 export function changeLineup(state: SessionState, court: number, pairs: Pairs): CommandEvent[] | null {
@@ -157,6 +166,7 @@ export function describeEvent(e: SessionEvent): string {
     case 'player-returned': return 'Undo: return';
     case 'court-closed': return `Undo: court ${e.court} closed`;
     case 'court-reopened': return `Undo: court ${e.court} reopened`;
+    case 'court-added': return 'Undo: court added';
     case 'rule-changed': return 'Undo: rule change';
     case 'session-ended': return 'Undo: end session';
     default: return 'Undo';

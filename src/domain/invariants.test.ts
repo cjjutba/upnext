@@ -15,20 +15,22 @@ function seal(events: cmd.CommandEvent[]): SessionEvent[] {
 }
 
 interface Op {
-  kind: 'finish' | 'checkin' | 'sit' | 'return' | 'depart' | 'close' | 'reopen' | 'undo';
+  kind: 'finish' | 'checkin' | 'sit' | 'return' | 'depart' | 'close' | 'reopen' | 'undo' | 'addcourt';
   pick: number;
   winner: 0 | 1;
 }
 
 const opArb = fc.record({
-  kind: fc.constantFrom<Op['kind']>('finish', 'checkin', 'sit', 'return', 'depart', 'close', 'reopen', 'undo'),
+  kind: fc.constantFrom<Op['kind']>('finish', 'checkin', 'sit', 'return', 'depart', 'close', 'reopen', 'undo', 'addcourt'),
   pick: fc.nat(29),
   winner: fc.constantFrom<0 | 1>(0, 1),
 });
 
-const template = fc.constantFrom<'all-off' | 'winners-stay' | 'winners-split'>('all-off', 'winners-stay', 'winners-split');
+const template = fc.constantFrom<'all-off' | 'winners-stay' | 'winners-split' | 'balanced' | 'social'>(
+  'all-off', 'winners-stay', 'winners-split', 'balanced', 'social',
+);
 
-function run(ops: Op[], tpl: 'all-off' | 'winners-stay' | 'winners-split'): SessionEvent[] {
+function run(ops: Op[], tpl: 'all-off' | 'winners-stay' | 'winners-split' | 'balanced' | 'social'): SessionEvent[] {
   let log = seal(cmd.startSession({ courts: 2, template: tpl, winCap: 2 }, PLAYERS.slice(0, 6)));
   for (const op of ops) {
     const s = replay(log);
@@ -78,6 +80,11 @@ function run(ops: Op[], tpl: 'all-off' | 'winners-stay' | 'winners-split'): Sess
         if (t && s.sessionId) out = [{ type: 'event-undone', targetEventId: t, sessionId: s.sessionId }];
         break;
       }
+      case 'addcourt': {
+        if (Object.keys(s.games).length + s.closedCourts.length >= 6) break; // keep runs bounded
+        out = cmd.addCourt(s);
+        break;
+      }
     }
     if (out) log = [...log, ...seal(out)];
   }
@@ -103,6 +110,8 @@ function checkInvariants(s: SessionState): void {
   for (const p of s.sittingOut) expect(s.queue).toContain(p);
   // closed courts are never occupied
   for (const c of s.closedCourts) expect(s.games[c]).toBeUndefined();
+  // closed courts never exceed the live court count
+  for (const c of s.closedCourts) expect(c).toBeLessThanOrEqual(s.courtCount);
 }
 
 describe('invariants over random command sequences', () => {

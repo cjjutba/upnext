@@ -4,29 +4,25 @@ import { useRoster } from './state/useRoster';
 import { RosterSetup } from './screens/RosterSetup';
 import { SessionBoard, fmt } from './screens/SessionBoard';
 import { SessionSummary } from './screens/SessionSummary';
-import { StatusBadge } from './components/StatusBadge';
+import { ModeMenu } from './components/ModeMenu';
 import { Button } from './components/Button';
-import { append, listSessions } from './db/eventStore';
+import { append, lastSessionAttendees, listSessions } from './db/eventStore';
 import { useWakeLock } from './lib/useWakeLock';
+import { useRoute } from './lib/useRoute';
 import { shareSessionFile, importSessionFile } from './lib/exportFile';
 import * as cmd from './domain/commands';
+import { nextLineup } from './domain/templates';
+import { isWinnersTemplate } from './domain/types';
 import type { Pairs, RuleTemplate } from './domain/types';
-
-type Screen = 'setup' | 'board' | 'summary';
-
-const RULE_LABEL: Record<RuleTemplate, string> = {
-  'all-off': 'All four off',
-  'winners-stay': 'Winners stay',
-  'winners-split': 'Winners split',
-};
 
 export default function App() {
   const session = useSession();
   const roster = useRoster();
-  const [screen, setScreen] = useState<Screen>('setup');
+  const [route, navigate] = useRoute();
   const [selected, setSelected] = useState<string[]>([]);
   const [clock, setClock] = useState(() => Date.now());
   const [resuming, setResuming] = useState(true);
+  const [returningIds, setReturningIds] = useState<string[]>([]);
   const { state, dispatch } = session;
 
   useEffect(() => {
@@ -35,7 +31,7 @@ export default function App() {
       const live = sessions.find((s) => s.endedAt === null); // listSessions returns newest first
       if (live) {
         await session.loadById(live.sessionId);
-        setScreen('board');
+        navigate('board');
       }
       setResuming(false);
     })();
@@ -43,27 +39,43 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (screen !== 'board') return;
+    if (route === 'setup') void lastSessionAttendees().then(setReturningIds);
+  }, [route]);
+
+  const returning = roster.players.filter((p) => returningIds.includes(p.id) && !selected.includes(p.id));
+
+  useEffect(() => {
+    if (route !== 'board') return;
     setClock(Date.now());
     const t = setInterval(() => setClock(Date.now()), 1000);
     return () => clearInterval(t);
-  }, [screen]);
+  }, [route]);
 
-  useWakeLock(screen === 'board');
+  useWakeLock(route === 'board');
+
+  const misrouted = (route === 'board' || route === 'summary') && !state.started;
+  useEffect(() => {
+    if (!resuming && misrouted) navigate('setup', { replace: true });
+  }, [resuming, misrouted, navigate]);
 
   const start = async (config: { courts: number; template: RuleTemplate; winCap: number }) => {
     // close out any dangling live session so history never holds two in-progress logs
     const dangling = (await listSessions()).filter((s) => s.endedAt === null);
     for (const s of dangling) await append({ type: 'session-ended', sessionId: s.sessionId });
     session.reset(); // a start must never append into a previous session's in-memory log
-    await dispatch(cmd.startSession(config, selected));
-    setScreen('board');
+    await dispatch(cmd.startSession(config, selected, roster.ratings));
+    navigate('board');
   };
 
   const toggleBoardCheck = (playerId: string) => {
     // On the board a tap checks a player in, or departs a waiting player. Playing players are untouchable.
     if (state.queue.includes(playerId)) void dispatch(cmd.departPlayer(state, playerId));
-    else void dispatch(cmd.checkInPlayer(state, playerId));
+    else void dispatch(cmd.checkInPlayer(state, playerId, roster.ratings));
+  };
+
+  const addAndCheckIn = async (name: string) => {
+    const player = await roster.addPlayer(name);
+    if (player) await dispatch(cmd.checkInPlayer(state, player.id, roster.ratings));
   };
 
   const swapPartners = (court: number) => {
@@ -74,39 +86,30 @@ export default function App() {
     void dispatch(cmd.changeLineup(state, court, next));
   };
 
-  const nextTemplate: Record<RuleTemplate, RuleTemplate> = {
-    'all-off': 'winners-stay',
-    'winners-stay': 'winners-split',
-    'winners-split': 'all-off',
-  };
-  const cycleRule = () => void dispatch(cmd.changeRule(state, nextTemplate[state.rule.template], state.rule.winCap));
-
   const end = async () => {
     await dispatch(cmd.endSession(state));
-    setScreen('summary');
+    navigate('summary');
   };
 
   const fresh = () => {
     session.reset();
     setSelected([]);
-    setScreen('setup');
+    navigate('setup');
   };
 
   const header = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '12px var(--space-4)', borderBottom: '1px solid var(--border)', background: 'var(--bg)', position: 'sticky', top: 0, zIndex: 10 }}>
       <span className="display" style={{ fontSize: 'var(--text-h1)', fontWeight: 600 }}>upnext</span>
-      {screen === 'board' ? (
+      {route === 'board' ? (
         <>
-          <button type="button" onClick={cycleRule} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', minHeight: 'var(--tap-min)', minWidth: 'var(--tap-min)', display: 'inline-flex', alignItems: 'center', borderRadius: 'var(--radius-full)' }} aria-label="Change house rule">
-            <StatusBadge status="neutral" label={RULE_LABEL[state.rule.template]} />
-          </button>
+          <ModeMenu rule={state.rule} onChange={(t, cap) => void dispatch(cmd.changeRule(state, t, cap, roster.ratings))} />
           <span style={{ flex: 1 }} />
           <span className="mono" style={{ fontSize: '20px', color: 'var(--text-secondary)' }}>
             {fmt((clock - state.startedAt) / 1000)}
           </span>
           <Button variant="secondary" onClick={() => void end()}>End session</Button>
         </>
-      ) : screen === 'summary' ? (
+      ) : route === 'summary' ? (
         <>
           <span className="micro-label">Session summary</span>
           <span style={{ flex: 1 }} />
@@ -114,28 +117,36 @@ export default function App() {
       ) : (
         <>
           <span className="micro-label">Open play</span>
+          <span className="mono" style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+            {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+          </span>
           <span style={{ flex: 1 }} />
         </>
       )}
     </div>
   );
 
-  if (resuming) return <div style={{ minHeight: '100vh', background: 'var(--bg)' }} />;
+  if (resuming || misrouted) return <div style={{ minHeight: '100vh', background: 'var(--bg)' }} />;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       {header}
-      {screen === 'setup' ? (
+      {route === 'setup' ? (
         <RosterSetup
           players={roster.players}
           onAddPlayer={(name) => void roster.addPlayer(name)}
           selected={selected}
           onToggle={(id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))}
           onStart={(config) => void start(config)}
-          onResume={(sessionId) => void session.loadById(sessionId).then(() => setScreen('board'))}
+          onResume={(sessionId) => void session.loadById(sessionId).then(() => navigate('board'))}
           onImport={(file) => void importSessionFile(file).then(() => window.location.reload()).catch(() => window.alert('Import failed: that is not a valid upnext session file'))}
+          onSelectAll={() => setSelected(roster.players.map((p) => p.id))}
+          onClearAll={() => setSelected([])}
+          returning={returning}
+          onCheckInReturning={() => setSelected((s) => [...s, ...returning.map((p) => p.id)])}
+          onUpdatePlayer={(id, changes) => void roster.updatePlayer(id, changes)}
         />
-      ) : screen === 'board' ? (
+      ) : route === 'board' ? (
         <SessionBoard
           state={state}
           players={roster.players}
@@ -143,13 +154,16 @@ export default function App() {
           onUndo={() => void session.undo()}
           canRedo={session.canRedo}
           onRedo={() => void session.redo()}
-          onFinish={(court) => void dispatch(cmd.finishGame(state, court))}
-          onWin={(court, w) => void dispatch(cmd.finishGame(state, court, w))}
-          onCloseCourt={(court) => void dispatch(cmd.closeCourt(state, court))}
-          onReopenCourt={(court) => void dispatch(cmd.reopenCourt(state, court))}
-          onToggleSit={(id) => void dispatch(state.sittingOut.includes(id) ? cmd.returnPlayer(state, id) : cmd.sitOutPlayer(state, id))}
+          onFinish={(court) => void dispatch(cmd.finishGame(state, court, undefined, roster.ratings))}
+          onWin={(court, w) => void dispatch(cmd.finishGame(state, court, w, roster.ratings))}
+          onCloseCourt={(court) => void dispatch(cmd.closeCourt(state, court, roster.ratings))}
+          onReopenCourt={(court) => void dispatch(cmd.reopenCourt(state, court, roster.ratings))}
+          onToggleSit={(id) => void dispatch(state.sittingOut.includes(id) ? cmd.returnPlayer(state, id, roster.ratings) : cmd.sitOutPlayer(state, id))}
           onToggleCheck={toggleBoardCheck}
           onSwap={swapPartners}
+          onAddCourt={() => void dispatch(cmd.addCourt(state, roster.ratings))}
+          onAddPlayer={(n) => void addAndCheckIn(n)}
+          nextUp={isWinnersTemplate(state.rule.template) ? null : nextLineup(state, null, roster.ratings)}
         />
       ) : (
         <SessionSummary

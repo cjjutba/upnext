@@ -6,6 +6,7 @@ import {
   listSessions,
   exportSession,
   importSession,
+  lastSessionAttendees,
   type SessionExport,
 } from './eventStore';
 
@@ -82,5 +83,23 @@ describe('export and import', () => {
     const older: SessionExport = { ...dump, players: [{ id: 'p1', name: 'Stale', createdAt: 1, updatedAt: 2 }] };
     await importSession(older, db);
     expect((await db.players.get('p1'))?.name).toBe('New Name');
+  });
+});
+
+describe('lastSessionAttendees', () => {
+  it('returns the checked-in player ids of the newest ended session', async () => {
+    await append({ type: 'session-started', sessionId: 'old', courts: 1, template: 'all-off', config: { winCap: 3 } }, db, 1000);
+    await append({ type: 'player-checked-in', sessionId: 'old', playerId: 'p1' }, db, 1001);
+    await append({ type: 'session-ended', sessionId: 'old' }, db, 1002);
+    await append({ type: 'session-started', sessionId: 'new', courts: 1, template: 'all-off', config: { winCap: 3 } }, db, 2000);
+    await append({ type: 'player-checked-in', sessionId: 'new', playerId: 'p2' }, db, 2001);
+    await append({ type: 'player-checked-in', sessionId: 'new', playerId: 'p3' }, db, 2002);
+    await append({ type: 'session-ended', sessionId: 'new' }, db, 2003);
+    await append({ type: 'session-started', sessionId: 'live', courts: 1, template: 'all-off', config: { winCap: 3 } }, db, 3000);
+    expect(await lastSessionAttendees(db)).toEqual(['p2', 'p3']);
+  });
+
+  it('returns empty with no ended sessions', async () => {
+    expect(await lastSessionAttendees(db)).toEqual([]);
   });
 });

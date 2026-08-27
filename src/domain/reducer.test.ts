@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { replay } from './reducer';
-import type { EventPayload, SessionEvent, Pairs } from './types';
+import type { EventPayload, SessionEvent, Pairs, RuleTemplate } from './types';
 
 const SID = 'session-1';
 let counter = 0;
@@ -19,7 +19,7 @@ function ev(payload: EventPayload, ts = 0): SessionEvent {
   } as SessionEvent;
 }
 
-const start = (courts = 2, template: 'all-off' | 'winners-stay' | 'winners-split' = 'all-off', winCap = 2) =>
+const start = (courts = 2, template: RuleTemplate = 'all-off', winCap = 2) =>
   ev({ type: 'session-started', courts, template, config: { winCap } });
 const checkIn = (p: string) => ev({ type: 'player-checked-in', playerId: p });
 const game = (court: number, pairs: Pairs) => ev({ type: 'game-started', court, pairs });
@@ -166,6 +166,14 @@ describe('games', () => {
       ev({ type: 'player-departed', playerId: 'a' })]);
     expect(s.consecutiveWins['a']).toBe(0);
   });
+
+  it('balanced and social finishes send all four to the back even if a winnerPair sneaks in', () => {
+    const s = replay([start(1, 'balanced', 3), checkIn('a'), checkIn('b'), checkIn('c'), checkIn('d'), checkIn('e'),
+      game(1, four), finish(1, 0)]);
+    expect(s.queue).toEqual(['e', 'a', 'c', 'b', 'd']);
+    expect(s.wins).toEqual({});
+    expect(s.consecutiveWins).toEqual({ a: 0, b: 0, c: 0, d: 0 });
+  });
 });
 
 describe('courts', () => {
@@ -212,5 +220,14 @@ describe('undo', () => {
     const u3 = ev({ type: 'event-undone', targetEventId: u1.id });
     const s = replay([start(), c, u1, u2, u3]);
     expect(s.queue).toEqual([]);
+  });
+});
+
+describe('court-added', () => {
+  it('increments the court count during a live session only', () => {
+    const s = replay([start(2), ev({ type: 'court-added' })]);
+    expect(s.courtCount).toBe(3);
+    const before = replay([ev({ type: 'court-added' })]);
+    expect(before.courtCount).toBe(0);
   });
 });

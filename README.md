@@ -2,7 +2,9 @@
 
 Courtside pickleball open play manager. Offline-first PWA: one organizer
 device runs the whole session. Check players in, manage the paddle queue,
-form games of four, rotate by house rules, undo anything.
+form games of four, rotate by house rules, undo anything. Four matching
+modes: Balanced (recommended), Social mix, Classic queue, and Winners with
+a split toggle.
 
 - Spec: docs/superpowers/specs/2026-08-26-upnext-open-play-design.md
 - Design: docs/design/claude-design-brief.md (light mode only, monochrome, zero motion)
@@ -21,5 +23,4 @@ form games of four, rotate by house rules, undo anything.
 - Hand-composed lineups (pull a chosen player onto a court)
 - Recent-frequency ordering for the check-in grid
 - Search on the check-in grid for the long tail of the roster
-- Player rename and level tags (the level field already exists on Player)
 - PNG apple-touch-icon for iOS home screens

@@ -1,4 +1,6 @@
-export type RuleTemplate = 'all-off' | 'winners-stay' | 'winners-split';
+export type RuleTemplate = 'all-off' | 'winners-stay' | 'winners-split' | 'balanced' | 'social';
+
+export const isWinnersTemplate = (t: RuleTemplate): boolean => t === 'winners-stay' || t === 'winners-split';
 
 export interface RuleConfig {
   template: RuleTemplate;
@@ -13,6 +15,8 @@ export interface Player {
   id: string; // UUID, never autoincrement
   name: string;
   level?: string;
+  /** 1 to 5 stars, absent = unrated. Balanced pairing treats unrated as 3. */
+  rating?: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -39,6 +43,7 @@ export type EventPayload =
   | { type: 'game-finished'; court: number; winnerPair?: 0 | 1; score?: string }
   | { type: 'court-closed'; court: number }
   | { type: 'court-reopened'; court: number }
+  | { type: 'court-added' }
   | { type: 'event-undone'; targetEventId: string }
   | { type: 'session-ended' };
 
@@ -83,7 +88,7 @@ export interface SessionState {
   /** Consecutive wins on court right now, for the win cap. Reset when a player leaves the court. */
   consecutiveWins: Record<string, number>;
   finishedGames: FinishedGame[];
-  /** Cycles the three pairings when exactly four players share one court under all-off. */
+  /** Incremented on every non-winners finish. Kept for event compatibility; pairing rotation now derives from games played together. */
   pairingCycle: number;
 }
 

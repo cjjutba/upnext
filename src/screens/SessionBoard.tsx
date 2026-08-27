@@ -4,7 +4,8 @@ import { QueueRow } from '../components/QueueRow';
 import { CheckinTile, type TileState } from '../components/CheckinTile';
 import { UndoPill } from '../components/UndoPill';
 import { Button } from '../components/Button';
-import type { Player, SessionState } from '../domain/types';
+import type { Pairs, Player, SessionState } from '../domain/types';
+import { isWinnersTemplate } from '../domain/types';
 import { isPlaying } from '../domain/reducer';
 
 // wall clock on purpose: timers derive from event ts so resume replays exactly; a mid-session OS clock change can jump timers, accepted trade-off
@@ -19,7 +20,10 @@ const fmt = (totalSeconds: number): string => {
 };
 export { fmt };
 
-export function SessionBoard({ state, players, undoLabel, onUndo, canRedo, onRedo, onFinish, onWin, onCloseCourt, onReopenCourt, onToggleSit, onToggleCheck, onSwap }: {
+export function SessionBoard({
+  state, players, undoLabel, onUndo, canRedo, onRedo, onFinish, onWin, onCloseCourt, onReopenCourt,
+  onToggleSit, onToggleCheck, onSwap, onAddCourt, onAddPlayer, nextUp,
+}: {
   state: SessionState;
   players: Player[];
   undoLabel: string | null;
@@ -33,15 +37,19 @@ export function SessionBoard({ state, players, undoLabel, onUndo, canRedo, onRed
   onToggleSit: (playerId: string) => void;
   onToggleCheck: (playerId: string) => void;
   onSwap: (court: number) => void;
+  onAddCourt: () => void;
+  onAddPlayer: (name: string) => void;
+  nextUp: Pairs | null;
 }) {
   const [now, setNow] = useState(() => Date.now());
+  const [newName, setNewName] = useState('');
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
 
   const nameOf = (id: string) => players.find((p) => p.id === id)?.name ?? 'Unknown';
-  const needsWinner = state.rule.template !== 'all-off';
+  const needsWinner = isWinnersTemplate(state.rule.template);
   const courts = Array.from({ length: state.courtCount }, (_, i) => i + 1);
   const eligibleQueue = state.queue.filter((p) => !state.sittingOut.includes(p));
   const nextFour = new Set(eligibleQueue.slice(0, 4));
@@ -53,25 +61,40 @@ export function SessionBoard({ state, players, undoLabel, onUndo, canRedo, onRed
   return (
     /* clearance so the fixed undo pill can never cover a court card's bottom action */
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: 'var(--space-4)', padding: 'var(--space-4)', alignItems: 'start', paddingBottom: (undoLabel || canRedo) ? 'calc(var(--tap-primary) + var(--space-5))' : undefined }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-3)' }}>
-        {courts.map((n) => {
-          const game = state.games[n];
-          const elapsed = game ? (now - game.startedAt) / 1000 : 0;
-          const status = state.closedCourts.includes(n) ? 'danger' : !game ? 'neutral' : elapsed > LONG_GAME_SECONDS ? 'warn' : 'live';
-          const pairs = game ? ([game.pairs[0].map(nameOf), game.pairs[1].map(nameOf)] as SessionState['games'][number]['pairs']) : null;
-          return (
-            <CourtCard key={n} court={n} status={status} pairs={pairs} elapsed={fmt(elapsed)} needsWinner={needsWinner}
-              onFinish={() => onFinish(n)} onWin={(w) => onWin(n, w)} onClose={() => onCloseCourt(n)} onReopen={() => onReopenCourt(n)}
-              onSwap={() => onSwap(n)} />
-          );
-        })}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <span className="micro-label">Courts</span>
+          <span style={{ flex: 1 }} />
+          <Button variant="ghost" icon="plus" onClick={onAddCourt} ariaLabel="Add court">Add court</Button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-3)' }}>
+          {courts.map((n) => {
+            const game = state.games[n];
+            const elapsed = game ? (now - game.startedAt) / 1000 : 0;
+            const status = state.closedCourts.includes(n) ? 'danger' : !game ? 'neutral' : elapsed > LONG_GAME_SECONDS ? 'warn' : 'live';
+            const pairs = game ? ([game.pairs[0].map(nameOf), game.pairs[1].map(nameOf)] as SessionState['games'][number]['pairs']) : null;
+            return (
+              <CourtCard key={n} court={n} status={status} pairs={pairs} elapsed={fmt(elapsed)} needsWinner={needsWinner}
+                onFinish={() => onFinish(n)} onWin={(w) => onWin(n, w)} onClose={() => onCloseCourt(n)} onReopen={() => onReopenCourt(n)}
+                onSwap={() => onSwap(n)} compact={state.courtCount >= 3} />
+            );
+          })}
+        </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
         <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-card)', padding: 'var(--space-2)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px var(--space-3)' }}>
-            <span className="micro-label">Up next</span>
+            <span className="micro-label">Queue</span>
             <span className="mono" style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{state.queue.length} waiting</span>
           </div>
+          {nextUp ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '4px var(--space-3) 8px' }}>
+              <span className="micro-label">Up next</span>
+              <span className="display" style={{ fontSize: '15px' }}>
+                {nextUp[0].map(nameOf).join(' + ')} vs {nextUp[1].map(nameOf).join(' + ')}
+              </span>
+            </div>
+          ) : null}
           {state.queue.map((id, i) => (
             <QueueRow key={id} position={i + 1} name={nameOf(id)} games={state.gamesPlayed[id] ?? 0}
               sitOut={state.sittingOut.includes(id)} nextFour={nextFour.has(id)} nextUpLabel={eligibleQueue[0] === id}
@@ -85,6 +108,17 @@ export function SessionBoard({ state, players, undoLabel, onUndo, canRedo, onRed
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           <span className="micro-label" style={{ padding: '0 var(--space-1)' }}>Check-in</span>
+          <form
+            style={{ display: 'flex', gap: 'var(--space-2)' }}
+            onSubmit={(e) => { e.preventDefault(); if (newName.trim()) { onAddPlayer(newName.trim()); setNewName(''); } }}>
+            <input
+              value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Add player" aria-label="Add player"
+              style={{
+                flex: 1, height: 'var(--tap-min)', padding: '0 var(--space-3)', font: '400 16px var(--font-sans)',
+                border: '1px solid var(--border)', borderRadius: 'var(--radius-control)', background: 'var(--bg)', color: 'var(--text)',
+              }} />
+            <Button variant="secondary" icon="user-plus" onClick={() => { if (newName.trim()) { onAddPlayer(newName.trim()); setNewName(''); } }}>Add</Button>
+          </form>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
             {grid.map((p) => (
               <CheckinTile key={p.id} name={p.name} state={tileState(p)}
