@@ -613,21 +613,51 @@ describe('App: hiding the check-in rail', () => {
   });
   afterEach(cleanup);
 
-  /** jsdom has no matchMedia, so useNarrow is false and this is the wide two-column board. */
-  it('drops the rail on the toggle and brings it back', async () => {
+  /**
+   * jsdom has no matchMedia, so useNarrow is false and this is the wide board.
+   * The rail stays mounted at zero width for the animation, so the assertions
+   * are on the width and on inert, not on the markup being gone.
+   */
+  it('slides the rail shut on the toggle and back open', async () => {
     render(<App />);
     await openBoard(/^Balanced/);
-    expect(screen.getByLabelText('Add player')).toBeInTheDocument();
+    const rail = document.querySelector('aside')!;
+    expect(rail).toHaveStyle({ width: '360px' });
+    expect(rail).not.toHaveAttribute('inert');
 
     await click(btn('Hide check-in'));
-    expect(screen.queryByLabelText('Add player')).not.toBeInTheDocument();
-    expect(screen.queryByText('Check-in')).not.toBeInTheDocument();
+    expect(rail).toHaveStyle({ width: '0px' });
+    // a rail nobody can see must not still be tabbable
+    expect(rail).toHaveAttribute('inert');
     // the courts keep the whole width, so nothing about the session changed
     expect(within(courtCard(1)).getByText('Staged')).toBeInTheDocument();
 
     await click(btn('Show check-in'));
+    expect(rail).toHaveStyle({ width: '360px' });
+    expect(rail).not.toHaveAttribute('inert');
     expect(screen.getByLabelText('Add player')).toBeInTheDocument();
-    expect(screen.getByText('Check-in')).toBeInTheDocument();
+  });
+
+  it('animates the rail unless the device asks for reduced motion', async () => {
+    render(<App />);
+    await openBoard(/^Balanced/);
+    expect(document.querySelector('aside')!).toHaveStyle({ transition: 'width 180ms ease, border-left-width 180ms ease' });
+    cleanup();
+
+    // one query object per string, since useViewport asks for two of them
+    const reduced = (q: string) => ({
+      matches: q.includes('reduced-motion'),
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    });
+    Object.defineProperty(window, 'matchMedia', { value: reduced, configurable: true, writable: true });
+    try {
+      render(<App />);
+      await screen.findByLabelText('Close court 1');
+      expect(document.querySelector('aside')!).not.toHaveStyle({ transition: 'width 180ms ease, border-left-width 180ms ease' });
+    } finally {
+      Reflect.deleteProperty(window, 'matchMedia');
+    }
   });
 
   it('offers one search field once the roster passes twelve', async () => {

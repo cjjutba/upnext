@@ -17,7 +17,7 @@ import { append, attendanceRecency, lastSessionAttendees, listSessions } from '.
 import { useWakeLock } from './lib/useWakeLock';
 import { useRoute } from './lib/useRoute';
 import { useSpeech } from './lib/useSpeech';
-import { useNarrow } from './lib/useViewport';
+import { useNarrow, useReducedMotion } from './lib/useViewport';
 import { useRailCollapsed } from './lib/useRailCollapsed';
 import { shareSessionFile, importSessionFile } from './lib/exportFile';
 import * as cmd from './domain/commands';
@@ -56,6 +56,7 @@ export default function App() {
   const [pendingRule, setPendingRule] = useState<RuleConfig | null>(null);
   const narrow = useNarrow();
   const rail = useRailCollapsed();
+  const motion = !useReducedMotion();
   const { state, dispatch } = session;
 
   useEffect(() => {
@@ -304,6 +305,7 @@ export default function App() {
           previews={previews}
           narrow={narrow}
           railCollapsed={rail.collapsed}
+          motion={motion}
           recency={recency}
           onSeatPlayer={(court, slot, id) => void dispatch(cmd.seatPlayer(state, court, slot, id, roster.ratings))}
           onCreateAndSeat={(court, slot, name) => void createAndSeat(court, slot, name)}
