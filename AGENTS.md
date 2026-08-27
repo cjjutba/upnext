@@ -14,7 +14,7 @@ IndexedDB, so cloud sync later is an upload rather than a rewrite.
 
 Stack: Vite, React 19, TypeScript, Dexie over IndexedDB, ulidx, lucide-react,
 vite-plugin-pwa. Vitest with jsdom, fake-indexeddb, and fast-check. Roughly
-2,100 lines of source across 32 files, 78 test cases in 7 test files.
+2,900 lines of source across 40 files, 149 test cases in 12 test files.
 
 ## Commands
 
@@ -124,10 +124,19 @@ The Dexie schema does not change. Events are one table with one shape.
 3. `src/domain/templates.ts`: add the pairing choice in `nextLineup()` or
    `pickPairing()`.
 4. `src/domain/modes.ts`: add the entry to `MODES` plus both mapping
-   functions. `modeLabel()` uses a non-null `find`, so a missing entry throws.
+   functions. `modeLabel()` is total and falls back to the raw id, because
+   `describeEvent()` labels imported logs and must not throw.
 5. `src/screens/RosterSetup.tsx`: add the icon to `MODE_ICON`.
-6. Tests: pairing cases in `templates.test.ts`, and add the id to the
-   `template` arbitrary in `invariants.test.ts` so the property suite covers it.
+6. Tests: pairing cases in `templates.test.ts`, the id in `ALL_TEMPLATES` in
+   `modes.test.ts` (the tripwire for a forgotten `MODES` entry), and the id in
+   `TEMPLATES` in `invariants.test.ts`, which feeds both the boot template and
+   the mid-run `rule` op so the property suite switches into and out of it.
+
+A mode change is confirmed, never immediate. `ModeMenu` reports the requested
+rule upward, `App` holds it as `pendingRule`, and `ModeChangeModal` is what
+dispatches `changeRule`. The switch governs the next fill only: courts already
+playing keep their lineups. The win cap and the split toggle live in the modal,
+so a winners config is one confirmation rather than one per stepper tap.
 
 ### A new screen
 

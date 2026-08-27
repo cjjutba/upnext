@@ -2,6 +2,7 @@ import type { EventPayload, Lineup, RuleTemplate, SessionEvent, SessionState, Sl
 import { emptyState, fullLineup, isWinnersTemplate, slotAt, withSlot } from './types';
 import { applyEvent, computeSkipped, isPlaying } from './reducer';
 import { nextLineup, type LastFinished, type Ratings } from './templates';
+import { modeLabel } from './modes';
 
 /** A command's output: payload plus sessionId. The event store fills the envelope. */
 export type CommandEvent = EventPayload & { sessionId: string };
@@ -229,7 +230,7 @@ export function describeEvent(e: SessionEvent): string {
     case 'court-closed': return `Undo: court ${e.court} closed`;
     case 'court-reopened': return `Undo: court ${e.court} reopened`;
     case 'court-added': return 'Undo: court added';
-    case 'rule-changed': return 'Undo: rule change';
+    case 'rule-changed': return `Undo: ${modeLabel(e.template)} mode`;
     case 'session-ended': return 'Undo: end session';
     default: return 'Undo';
   }

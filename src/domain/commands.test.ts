@@ -252,6 +252,72 @@ describe('rule and session commands', () => {
   });
 });
 
+describe('switching mode mid-session', () => {
+  const EIGHT = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+
+  it.each(['all-off', 'balanced', 'social', 'winners-stay', 'winners-split'] as const)(
+    'switching to %s leaves every court in play exactly as it was',
+    (template) => {
+      let log = boot(EIGHT, 'balanced', 2);
+      const before = replay(log);
+      expect(Object.keys(before.games)).toHaveLength(2); // both courts live, so a fill would be visible
+      if (template === 'balanced') return;
+
+      const events = changeRule(before, template, before.rule.winCap)!;
+      expect(events.map((e) => e.type)).toEqual(['rule-changed']); // nothing else, no refill, no lineup rewrite
+
+      log = [...log, ...seal(events)];
+      const after = replay(log);
+      expect(after.rule.template).toBe(template);
+      expect(after.games).toEqual(before.games);
+      expect(after.queue).toEqual(before.queue);
+      expect(after.gamesPlayed).toEqual(before.gamesPlayed);
+    },
+  );
+
+  it('governs the very next fill: one identical finish, three different pairings', () => {
+    // two full courts, so the four who finish court 1 are the four who refill it
+    const ratings = { a: 5, b: 5, c: 1, d: 1 };
+    const refillUnder = (template: RuleTemplate) => {
+      let log = boot(['a', 'b', 'c', 'd', 'w', 'x', 'y', 'z'], 'all-off', 2, 3);
+      log = [...log, ...seal(changeRule(replay(log), template, 3, ratings) ?? [])];
+      const s = replay(log);
+      expect(s.games[1]!.pairs).toEqual([['a', 'c'], ['b', 'd']]); // identical starting point every time
+      log = [...log, ...seal(finishGame(s, 1, 0, ratings)!)];
+      return replay(log).games[1]!.pairs;
+    };
+    expect(refillUnder('all-off')).toEqual([['a', 'c'], ['b', 'd']]); // paddle order, rotated off the games this four has shared
+    expect(refillUnder('balanced')).toEqual([['a', 'd'], ['c', 'b']]); // 5 + 1 against 5 + 1, and it splits the pair that just partnered
+    expect(refillUnder('social')).toEqual([['a', 'b'], ['c', 'd']]); // ratings ignored, repeat partners and opponents avoided
+  });
+
+  it('a switch into winners-stay keeps the winners on court at the next finish', () => {
+    let log = boot(EIGHT, 'balanced', 1, 3);
+    log = [...log, ...seal(changeRule(replay(log), 'winners-stay', 3)!)];
+    const s = replay(log);
+    const winners = s.games[1]!.pairs[0];
+    log = [...log, ...seal(finishGame(s, 1, 0)!)];
+    expect(replay(log).games[1]!.pairs[0]).toEqual(winners);
+  });
+
+  it('a switch out of winners hands the whole court back to the queue at the next finish', () => {
+    let log = boot(EIGHT, 'winners-stay', 1, 3);
+    log = [...log, ...seal(changeRule(replay(log), 'social', 3)!)];
+    const s = replay(log);
+    const played = [...s.games[1]!.pairs[0], ...s.games[1]!.pairs[1]];
+    log = [...log, ...seal(finishGame(s, 1, 0)!)];
+    const after = replay(log);
+    for (const p of played) expect([...after.games[1]!.pairs[0], ...after.games[1]!.pairs[1]]).not.toContain(p);
+  });
+
+  it('names the mode on the undo pill, so a mistap is recoverable by reading it', () => {
+    let log = boot(EIGHT, 'balanced', 1);
+    log = [...log, ...seal(changeRule(replay(log), 'social', 2)!)];
+    expect(describeEvent(log[log.length - 1])).toBe('Undo: Social mix mode');
+    expect(undoTarget(log)).toBe(log[log.length - 1].id);
+  });
+});
+
 describe('undo and redo targeting', () => {
   it('undo targets the newest effective action, never session-started; redo targets the undo; a new action clears redo', () => {
     let log = boot(['a', 'b'], 'all-off', 1);

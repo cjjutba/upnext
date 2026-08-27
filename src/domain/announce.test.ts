@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { announceBatch, courtPhrase, leaderPhrase, pairPhrase, podiumPhrase, upNextPhrase } from './announce';
+import { announceBatch, challengersPhrase, courtPhrase, leaderPhrase, pairPhrase, podiumPhrase, upNextPhrase } from './announce';
 import { standings } from './standings';
 import { replay } from './reducer';
 import { startSession, finishGame, closeCourt, changeLineup, removeFromLineup, seatPlayer, type CommandEvent } from './commands';
@@ -27,6 +27,10 @@ describe('phrase builders', () => {
     expect(pairPhrase(['a', 'b'], nameOf)).toBe('Alice and Bob');
     expect(courtPhrase(2, [['a', 'b'], ['c', 'd']], nameOf))
       .toBe('Court 2. Alice and Bob versus Carol and Dave. Please proceed to court 2.');
+  });
+
+  it('calls the two challengers a winners template can promise', () => {
+    expect(challengersPhrase(['e', 'f'], nameOf)).toBe('Next challengers. Eve and Frank. Please get ready.');
   });
 
   it('calls the up next four', () => {
