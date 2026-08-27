@@ -1,7 +1,7 @@
 import type { Pair } from '../domain/types';
 
 /** Monochrome pickleball court, portrait, true 20x44 line geometry. */
-export function CourtDiagram({ top, bottom }: { top: Pair; bottom: Pair }) {
+export function CourtDiagram({ top, bottom, height = 260 }: { top: Pair; bottom: Pair; height?: number }) {
   const half = (names: Pair, area: 'top' | 'bottom') => (
     <div style={{
       position: 'absolute', left: 0, right: 0,
@@ -18,8 +18,8 @@ export function CourtDiagram({ top, bottom }: { top: Pair; bottom: Pair }) {
     </div>
   );
   return (
-    <div style={{ position: 'relative', height: '260px', aspectRatio: '20 / 44', margin: '0 auto' }}>
-      <svg viewBox="0 0 20 44" preserveAspectRatio="none" aria-hidden
+    <div style={{ position: 'relative', height: height + 'px', aspectRatio: '20 / 44', margin: '0 auto' }}>
+      <svg viewBox="0 0 20 44" preserveAspectRatio="xMidYMid meet" aria-hidden
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}>
         <rect x="0.35" y="0.35" width="19.3" height="43.3" fill="var(--bg-secondary)" stroke="var(--gray-500)" strokeWidth="0.35" />
         <line x1="0.35" y1="15" x2="19.65" y2="15" stroke="var(--gray-500)" strokeWidth="0.25" />

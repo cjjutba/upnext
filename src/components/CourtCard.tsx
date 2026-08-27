@@ -3,7 +3,7 @@ import { StatusBadge, type BadgeStatus } from './StatusBadge';
 import { CourtDiagram } from './CourtDiagram';
 import type { Pairs } from '../domain/types';
 
-export function CourtCard({ court, status, pairs, elapsed, needsWinner, onFinish, onWin, onClose, onReopen, onSwap }: {
+export function CourtCard({ court, status, pairs, elapsed, needsWinner, onFinish, onWin, onClose, onReopen, onSwap, compact }: {
   court: number;
   status: BadgeStatus; // live | warn | danger (closed) | neutral (open)
   pairs: Pairs | null;
@@ -14,11 +14,12 @@ export function CourtCard({ court, status, pairs, elapsed, needsWinner, onFinish
   onClose: () => void;
   onReopen: () => void;
   onSwap: () => void;
+  compact?: boolean;
 }) {
   const closed = status === 'danger';
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', padding: 'var(--space-4)',
+      display: 'flex', flexDirection: 'column', gap: compact ? 'var(--space-2)' : 'var(--space-3)', padding: compact ? 'var(--space-3)' : 'var(--space-4)',
       background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-card)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -42,7 +43,7 @@ export function CourtCard({ court, status, pairs, elapsed, needsWinner, onFinish
         </div>
       ) : (
         <>
-          <CourtDiagram top={pairs[0]} bottom={pairs[1]} />
+          <CourtDiagram top={pairs[0]} bottom={pairs[1]} height={compact ? 190 : undefined} />
           {needsWinner ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               <Button variant="secondary" size="lg" block onClick={() => onWin(0)}>Top pair won</Button>

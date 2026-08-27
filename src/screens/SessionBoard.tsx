@@ -76,7 +76,7 @@ export function SessionBoard({
             return (
               <CourtCard key={n} court={n} status={status} pairs={pairs} elapsed={fmt(elapsed)} needsWinner={needsWinner}
                 onFinish={() => onFinish(n)} onWin={(w) => onWin(n, w)} onClose={() => onCloseCourt(n)} onReopen={() => onReopenCourt(n)}
-                onSwap={() => onSwap(n)} />
+                onSwap={() => onSwap(n)} compact={state.courtCount >= 3} />
             );
           })}
         </div>

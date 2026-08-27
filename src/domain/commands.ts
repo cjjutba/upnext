@@ -114,6 +114,7 @@ export function addCourt(state: SessionState, ratings: Ratings = {}): CommandEve
 
 export function changeRule(state: SessionState, template: RuleTemplate, winCap: number, ratings: Ratings = {}): CommandEvent[] | null {
   if (!state.sessionId || state.ended) return null;
+  if (template === state.rule.template && winCap === state.rule.winCap) return null;
   const e: CommandEvent = { type: 'rule-changed', template, config: { winCap }, sessionId: state.sessionId };
   // defensive: every capacity increasing command already fills eagerly, so this is normally a no-op
   return [e, ...fillEvents(simulate(state, e), null, undefined, ratings)];

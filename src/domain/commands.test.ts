@@ -223,6 +223,12 @@ describe('rule and session commands', () => {
     expect(s.ended).toBe(true);
     expect(endSession(s)).toBeNull();
   });
+
+  it('re-selecting the active rule is refused as a no-op', () => {
+    const s = replay(boot(['a', 'b', 'c', 'd'], 'all-off', 1));
+    expect(changeRule(s, 'all-off', s.rule.winCap)).toBeNull();
+    expect(changeRule(s, 'all-off', s.rule.winCap + 1)).not.toBeNull();
+  });
 });
 
 describe('undo and redo targeting', () => {
