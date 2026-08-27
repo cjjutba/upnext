@@ -1,6 +1,6 @@
-import type { EventPayload, Pairs, RuleTemplate, SessionEvent, SessionState } from './types';
-import { emptyState, isWinnersTemplate } from './types';
-import { applyEvent, computeSkipped, isPlaying, stagedCourtOf } from './reducer';
+import type { EventPayload, Lineup, Pairs, RuleTemplate, SessionEvent, SessionState, SlotIndex } from './types';
+import { emptyState, fullLineup, isWinnersTemplate, slotAt, withSlot } from './types';
+import { applyEvent, computeSkipped, isPlaying, isStaged, stagedCourtOf } from './reducer';
 import { nextLineup, type LastFinished, type Ratings } from './templates';
 import { modeLabel } from './modes';
 
@@ -91,6 +91,9 @@ export function startSession(config: SessionConfig, playerIds: string[], ratings
 export function finishGame(state: SessionState, court: number, winnerPair?: 0 | 1, ratings: Ratings = {}, score?: string): CommandEvent[] | null {
   const active = state.games[court];
   if (!active || !state.sessionId || state.ended) return null;
+  // an open seat means this was never a game of four, so there is nothing to record
+  const lineup = fullLineup(active.pairs);
+  if (!lineup) return null;
   // Winners templates cannot rotate without a winner; every other mode records one when the organizer taps it and shrugs when they do not.
   if (isWinnersTemplate(state.rule.template) && winnerPair === undefined) return null;
   // score is absent rather than undefined so exported JSON never carries empty keys
@@ -98,7 +101,7 @@ export function finishGame(state: SessionState, court: number, winnerPair?: 0 | 
     ? { type: 'game-finished', court, winnerPair, score, sessionId: state.sessionId }
     : { type: 'game-finished', court, winnerPair, sessionId: state.sessionId };
   const after = simulate(state, e);
-  return [e, ...stageEvents(after, { pairs: active.pairs, winnerPair: e.winnerPair }, court, ratings)];
+  return [e, ...stageEvents(after, { pairs: lineup, winnerPair: e.winnerPair }, court, ratings)];
 }
 
 export function checkInPlayer(state: SessionState, playerId: string, ratings: Ratings = {}): CommandEvent[] | null {
@@ -228,8 +231,64 @@ export function swapQueue(state: SessionState, playerA: string, playerB: string)
   return [{ type: 'queue-swapped', playerA, playerB, sessionId: state.sessionId }];
 }
 
-export function changeLineup(state: SessionState, court: number, pairs: Pairs): CommandEvent[] | null {
+export function changeLineup(state: SessionState, court: number, pairs: Lineup): CommandEvent[] | null {
   if (!state.sessionId || !state.games[court]) return null;
+  return [{ type: 'game-lineup-changed', court, pairs, sessionId: state.sessionId }];
+}
+
+const SLOTS: SlotIndex[] = [0, 1, 2, 3];
+
+/** Lift one player off a court. The seat stays open until somebody fills it. */
+export function removeFromLineup(state: SessionState, court: number, slot: SlotIndex): CommandEvent[] | null {
+  const active = state.games[court];
+  if (!state.sessionId || !active || slotAt(active.pairs, slot) === null) return null;
+  // no trailing fill on purpose. The removed player goes to the queue front, and an eager
+  // refill would drop them straight onto another court, which is not what a remove means
+  return [{ type: 'game-lineup-changed', court, pairs: withSlot(active.pairs, slot, null), sessionId: state.sessionId }];
+}
+
+/**
+ * Put a specific player in a specific seat, checking them in or bringing them
+ * back from sitting out first. Whoever held the seat goes to the queue front.
+ */
+export function seatPlayer(
+  state: SessionState, court: number, slot: SlotIndex, playerId: string, ratings: Ratings = {},
+): CommandEvent[] | null {
+  if (!state.sessionId || state.ended || !state.games[court]) return null;
+  // staged players are out of the queue, so checking one in here would put them in two places at once
+  if (isPlaying(state, playerId) || isStaged(state, playerId)) return null;
+  const out: CommandEvent[] = [];
+  let s = state;
+  const push = (e: CommandEvent) => {
+    out.push(e);
+    s = simulate(s, e);
+  };
+  if (s.sittingOut.includes(playerId)) push({ type: 'player-returned', playerId, sessionId: s.sessionId! });
+  else if (!s.queue.includes(playerId)) push({ type: 'player-checked-in', playerId, sessionId: s.sessionId! });
+  const active = s.games[court];
+  if (!active || !s.queue.includes(playerId)) return null;
+  push({ type: 'game-lineup-changed', court, pairs: withSlot(active.pairs, slot, playerId), sessionId: s.sessionId! });
+  // a check-in or a return adds a body to the pool, which can unblock a different court
+  return [...out, ...stageEvents(s, null, undefined, ratings)];
+}
+
+/**
+ * Fill the open seats on a live court from the front of the queue. An empty
+ * court is `stageCourt`'s job, and a staged one is never short handed.
+ */
+export function fillCourt(state: SessionState, court: number, ratings: Ratings = {}): CommandEvent[] | null {
+  if (!state.sessionId || state.ended || state.closedCourts.includes(court)) return null;
+  if (court < 1 || court > state.courtCount) return null;
+  const active = state.games[court];
+  if (!active) return null;
+  const open = SLOTS.filter((i) => slotAt(active.pairs, i) === null);
+  const waiting = state.queue.filter((p) => !state.sittingOut.includes(p));
+  if (open.length === 0 || waiting.length === 0) return null;
+  // a court with all four seats open is a fresh fill, so the mode picks the pairing
+  const fresh = open.length === 4 ? nextLineup(state, null, ratings) : null;
+  if (fresh) return [{ type: 'game-lineup-changed', court, pairs: fresh, sessionId: state.sessionId }];
+  let pairs: Lineup = active.pairs;
+  for (let i = 0; i < open.length && i < waiting.length; i += 1) pairs = withSlot(pairs, open[i], waiting[i]);
   return [{ type: 'game-lineup-changed', court, pairs, sessionId: state.sessionId }];
 }
 

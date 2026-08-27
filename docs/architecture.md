@@ -85,11 +85,16 @@ from `src/db/eventStore.ts` to render session history. Do not add more.
 
 ### `src/components`
 
-Seventeen presentational components: `Button`, `CheckinTile`, `CountBadge`,
-`CourtCard`, `CourtDiagram`, `Icon`, `IconButton`, `ModeChangeModal`,
-`ModeMenu`, `PlayerChip`, `QueueRow`, `RuleCard`, `StandingsModal`,
+Twenty one presentational components: `Button`, `CheckinTile`, `CountBadge`,
+`CourtCard`, `CourtDiagram`, `Icon`, `IconButton`, `LineupEditor`,
+`ModeChangeModal`, `ModeMenu`, `PlayerChip`, `PlayerPicker`,
+`PlayerPickerModal`, `QueuePanel`, `QueueRow`, `RuleCard`, `StandingsModal`,
 `StatusBadge`, `Stepper`, `TimerDisplay`, `UndoPill`. Rules in
 `src/components/CLAUDE.md`.
+
+`PlayerPicker` is what a tap on a name opens: swap, sit out, off the court, or
+out for the night. `PlayerPickerModal` is the other direction, filling an open
+seat, and it is the only surface that can create a roster player mid-session.
 
 ### `src/screens`
 
@@ -142,8 +147,13 @@ with a test that engineers court 1 empty while court 2 holds the game.
 
 Every command that could free or add capacity ends by calling `stageEvents()`:
 `startSession`, `finishGame`, `checkInPlayer`, `returnPlayer`, `closeCourt`,
-`reopenCourt`, `addCourt`, `changeRule`. Courts stage eagerly, so a court is
-never left empty while four eligible players wait.
+`reopenCourt`, `addCourt`, `changeRule`, `seatPlayer`. Courts stage eagerly, so a
+court is never left empty while four eligible players wait.
+
+`removeFromLineup` is the one exception, and it is on purpose. It frees a player
+to the queue front, so an eager stage would take that same player straight onto
+another court, which is not what lifting someone off a court means. The seat
+stays open until the organizer fills it or taps Fill court.
 
 Staging is where the automation stops. `game-staged` puts four people on a
 court with the clock stopped; only `startStagedGame`, which the organizer

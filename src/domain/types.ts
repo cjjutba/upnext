@@ -11,6 +11,33 @@ export interface RuleConfig {
 export type Pair = [string, string];
 export type Pairs = [Pair, Pair];
 
+/** A seat on a court. null is an open seat the organizer has not filled yet. */
+export type Slot = string | null;
+export type SlotPair = [Slot, Slot];
+/** A live court's four seats, any of which may be open. Pairs is assignable to it. */
+export type Lineup = [SlotPair, SlotPair];
+
+/** Slot order everywhere: 0 and 1 are team 1, 2 and 3 are team 2. */
+export type SlotIndex = 0 | 1 | 2 | 3;
+
+export const slotAt = (l: Lineup, i: SlotIndex): Slot => l[i < 2 ? 0 : 1][i % 2];
+
+export function withSlot(l: Lineup, i: SlotIndex, value: Slot): Lineup {
+  const out: Lineup = [[l[0][0], l[0][1]], [l[1][0], l[1][1]]];
+  out[i < 2 ? 0 : 1][i % 2] = value;
+  return out;
+}
+
+/** The players actually on court, in slot order. Open seats drop out. */
+export const seated = (l: Lineup): string[] =>
+  [l[0][0], l[0][1], l[1][0], l[1][1]].filter((p): p is string => p !== null);
+
+/** Narrows a full court back to Pairs. null when any seat is empty. */
+export function fullLineup(l: Lineup): Pairs | null {
+  const [a, b, c, d] = [l[0][0], l[0][1], l[1][0], l[1][1]];
+  return a !== null && b !== null && c !== null && d !== null ? [[a, b], [c, d]] : null;
+}
+
 export interface Player {
   id: string; // UUID, never autoincrement
   name: string;
@@ -43,7 +70,8 @@ export type EventPayload =
   | { type: 'game-staged'; court: number; pairs: Pairs; auto?: true }
   | { type: 'game-unstaged'; court: number }
   | { type: 'queue-swapped'; playerA: string; playerB: string }
-  | { type: 'game-lineup-changed'; court: number; pairs: Pairs }
+  /** Only a live court can go short handed, so this is the one payload that carries an open seat. */
+  | { type: 'game-lineup-changed'; court: number; pairs: Lineup }
   | { type: 'game-finished'; court: number; winnerPair?: 0 | 1; score?: string }
   | { type: 'court-closed'; court: number }
   | { type: 'court-reopened'; court: number }
@@ -56,7 +84,8 @@ export type EventType = EventPayload['type'];
 
 export interface ActiveGame {
   court: number;
-  pairs: Pairs;
+  /** May hold an open seat. A short handed court keeps its timer and cannot record a winner. */
+  pairs: Lineup;
   startedAt: number; // ts of the game-started event; timers derive from this
   startedEventId: string;
 }
@@ -86,7 +115,11 @@ export interface SessionState {
   queue: string[];
   /** Active game per court number. Absent key = empty court. */
   games: Record<number, ActiveGame>;
-  /** Four waiting on a court for the organizer to start them. Kept out of games so nothing that reads games has to ask whether the clock is running. */
+  /**
+   * Four waiting on a court for the organizer to start them. Kept out of games so
+   * nothing that reads games has to ask whether the clock is running. Always a full
+   * four: a staged court that is wrong gets unstaged, only a live one goes short handed.
+   */
   staged: Record<number, Pairs>;
   closedCourts: number[];
   gamesPlayed: Record<string, number>;

@@ -17,13 +17,15 @@ import { useWakeLock } from './lib/useWakeLock';
 import { useRoute } from './lib/useRoute';
 import { useSpeech } from './lib/useSpeech';
 import { useNarrow } from './lib/useViewport';
+import { useRailCollapsed } from './lib/useRailCollapsed';
 import { shareSessionFile, importSessionFile } from './lib/exportFile';
 import * as cmd from './domain/commands';
 import { previewLineups, upNextPreview } from './domain/templates';
 import { challengersPhrase, getReadyPhrase, leaderPhrase } from './domain/announce';
 import { standings } from './domain/standings';
 import { isStaged, stagedCourtOf } from './domain/reducer';
-import type { RuleConfig, RuleTemplate, SessionState } from './domain/types';
+import { fullLineup, slotAt } from './domain/types';
+import type { RuleConfig, RuleTemplate, SessionState, SlotIndex } from './domain/types';
 import type { Ratings } from './domain/templates';
 
 /** What the proposed rule would form next, said in the board's own words. Pure, so it costs nothing to compute per render. */
@@ -52,6 +54,7 @@ export default function App() {
   /** The rule the organizer is proposing. Nothing is appended until the modal confirms it. */
   const [pendingRule, setPendingRule] = useState<RuleConfig | null>(null);
   const narrow = useNarrow();
+  const rail = useRailCollapsed();
   const { state, dispatch } = session;
 
   // an armed end button disarms itself; an accidental tap must not linger as a one-tap landmine
@@ -157,6 +160,13 @@ export default function App() {
   };
 
   /** Everyone who could take the tapped player's spot: waiting, not sitting out, not already there. */
+  // only a live court can go short handed, so Off the court is offered there and nowhere else
+  const liftSlot: SlotIndex | null = picking && picking.court !== null
+    ? (([0, 1, 2, 3] as SlotIndex[]).find(
+        (i) => state.games[picking.court!] && slotAt(state.games[picking.court!].pairs, i) === picking.playerId,
+      ) ?? null)
+    : null;
+
   const candidates = picking
     ? roster.players.filter((p) => state.queue.includes(p.id) && !state.sittingOut.includes(p.id) && p.id !== picking.playerId)
     : [];
@@ -164,6 +174,12 @@ export default function App() {
   const addAndCheckIn = async (name: string) => {
     const player = await roster.addPlayer(name);
     if (player) await dispatch(cmd.checkInPlayer(state, player.id, roster.ratings));
+  };
+
+  const createAndSeat = async (court: number, slot: SlotIndex, name: string) => {
+    const player = await roster.addPlayer(name);
+    // addPlayer refuses a duplicate name, so a collision leaves the seat open rather than seating the wrong person
+    if (player) await dispatch(cmd.seatPlayer(state, court, slot, player.id, roster.ratings));
   };
 
   const end = async () => {
@@ -217,6 +233,12 @@ export default function App() {
           <span className="mono" style={{ fontSize: '20px' }}>
             {fmt((clock - state.startedAt) / 1000)}
           </span>
+          {/* mid session the organizer is looking at courts, so the rail is the 360px worth giving up */}
+          <IconButton
+            icon={rail.collapsed ? 'panel-right-open' : 'panel-right-close'}
+            ariaLabel={rail.collapsed ? 'Show check-in' : 'Hide check-in'}
+            pressed={rail.collapsed}
+            onClick={rail.toggle} />
           <IconButton icon="trophy" ariaLabel="Live standings" onClick={() => setStandingsOpen(true)} />
           {muteToggle}
           <Button variant="danger" onClick={endTap}>
@@ -290,7 +312,8 @@ export default function App() {
           onStage={(court) => void dispatch(cmd.stageCourt(state, court, roster.ratings))}
           onShuffle={(court) => void dispatch(cmd.shufflePairing(state, court))}
           onCallCourt={(court) => {
-            const pairs = state.staged[court] ?? state.games[court]?.pairs;
+            const lineup = state.staged[court] ?? state.games[court]?.pairs;
+            const pairs = lineup && fullLineup(lineup);
             if (pairs) speech.speak(getReadyPhrase(pairs, nameOf, court));
           }}
           onCallUpNext={() => {
@@ -300,7 +323,11 @@ export default function App() {
           onEditLineup={setEditingCourt}
           previews={previews}
           narrow={narrow}
+          railCollapsed={rail.collapsed}
           recency={recency}
+          onSeatPlayer={(court, slot, id) => void dispatch(cmd.seatPlayer(state, court, slot, id, roster.ratings))}
+          onCreateAndSeat={(court, slot, name) => void createAndSeat(court, slot, name)}
+          onFillCourt={(court) => void dispatch(cmd.fillCourt(state, court, roster.ratings))}
         />
       ) : (
         <SessionSummary
@@ -328,6 +355,10 @@ export default function App() {
             setPicking(null);
           }}
           onRemove={() => { void dispatch(cmd.departPlayer(state, picking.playerId)); setPicking(null); }}
+          onLift={liftSlot === null ? undefined : () => {
+            void dispatch(cmd.removeFromLineup(state, picking.court!, liftSlot));
+            setPicking(null);
+          }}
           onClose={() => setPicking(null)}
         />
       ) : null}

@@ -120,6 +120,17 @@ describe('balanced and social pairing', () => {
     expect(nextLineup(s, null, {})).toEqual([['a', 'c'], ['b', 'd']]); // no relevant history: partition order wins
   });
 
+  it('a court holding an open seat still contributes the partnerships that do exist', () => {
+    // a partnered c on the live court, so social breaks them up here rather than
+    // taking the default partition. The open seat is worth no history at all.
+    const s = state({
+      rule: { template: 'social', winCap: 3 },
+      queue: ['a', 'b', 'c', 'd'],
+      games: { 2: { court: 2, pairs: [['a', 'c'], ['b', null]], startedAt: 0, startedEventId: 'e' } },
+    });
+    expect(nextLineup(s, null, {})).toEqual([['a', 'b'], ['c', 'd']]);
+  });
+
   it('the four players are always the front four eligible, never cherry picked', () => {
     const s = state({ rule: { template: 'balanced', winCap: 3 }, queue: ['a', 'b', 'c', 'd', 'e', 'f'] });
     const ratings = { a: 1, b: 1, c: 1, d: 1, e: 5, f: 5 };

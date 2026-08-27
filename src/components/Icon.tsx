@@ -1,7 +1,7 @@
 import {
   Play, Square, Undo2, Plus, Minus, UserPlus, X, Share2, Clock,
   MoreVertical, RotateCw, Trophy, Shuffle, Download, Star, Sun, Moon, Volume2, VolumeX, Pencil,
-  UserMinus, Megaphone, ArrowLeftRight,
+  UserMinus, Megaphone, ArrowLeftRight, PanelRightClose, PanelRightOpen,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 
@@ -12,6 +12,7 @@ const icons = {
   shuffle: Shuffle, download: Download, star: Star, sun: Sun, moon: Moon,
   'volume-2': Volume2, 'volume-x': VolumeX, pencil: Pencil,
   'user-minus': UserMinus, megaphone: Megaphone, 'arrow-left-right': ArrowLeftRight,
+  'panel-right-close': PanelRightClose, 'panel-right-open': PanelRightOpen,
 } satisfies Record<string, ComponentType<{ size?: number; strokeWidth?: number }>>;
 
 export type IconName = keyof typeof icons;

@@ -2,7 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { announceBatch, challengersPhrase, courtPhrase, getReadyPhrase, leaderPhrase, pairPhrase, podiumPhrase } from './announce';
 import { standings } from './standings';
 import { replay } from './reducer';
-import { startSession, finishGame, closeCourt, changeLineup, startStagedGame, type CommandEvent } from './commands';
+import {
+  startSession, finishGame, closeCourt, changeLineup, startStagedGame,
+  removeFromLineup, seatPlayer, type CommandEvent,
+} from './commands';
 import { emptyState } from './types';
 import type { Pairs, SessionEvent, SessionState } from './types';
 
@@ -101,6 +104,18 @@ describe('announceBatch', () => {
     const close = seal(closeCourt(replay(log), 2)!);
     log = [...log, ...close];
     expect(announceBatch(close, replay(log), nameOf)[0]).toBe('Court 2 is closed.');
+  });
+
+  it('stays silent while a court is mid-edit, then reads the lineup once it is whole again', () => {
+    let log = boot(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], 'balanced', 2);
+    log = [...log, ...seal(startStagedGame(replay(log), 1)!)]; // only a live court can go short handed
+    const open = seal(removeFromLineup(replay(log), 1, 0)!);
+    log = [...log, ...open];
+    expect(announceBatch(open, replay(log), nameOf)).toEqual([]);
+    const seat = seal(seatPlayer(replay(log), 1, 0, 'a')!);
+    log = [...log, ...seat];
+    expect(announceBatch(seat, replay(log), nameOf)).toHaveLength(1);
+    expect(announceBatch(seat, replay(log), nameOf)[0]).toMatch(/^Court 1\. Lineup change\. /);
   });
 
   it('stays silent for check-ins and for undo', () => {
