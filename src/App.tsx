@@ -6,7 +6,7 @@ import { SessionBoard, fmt } from './screens/SessionBoard';
 import { SessionSummary } from './screens/SessionSummary';
 import { StatusBadge } from './components/StatusBadge';
 import { Button } from './components/Button';
-import { append, listSessions } from './db/eventStore';
+import { append, lastSessionAttendees, listSessions } from './db/eventStore';
 import { useWakeLock } from './lib/useWakeLock';
 import { useRoute } from './lib/useRoute';
 import { shareSessionFile, importSessionFile } from './lib/exportFile';
@@ -28,6 +28,7 @@ export default function App() {
   const [selected, setSelected] = useState<string[]>([]);
   const [clock, setClock] = useState(() => Date.now());
   const [resuming, setResuming] = useState(true);
+  const [returningIds, setReturningIds] = useState<string[]>([]);
   const { state, dispatch } = session;
 
   useEffect(() => {
@@ -40,8 +41,11 @@ export default function App() {
       }
       setResuming(false);
     })();
+    void lastSessionAttendees().then(setReturningIds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const returning = roster.players.filter((p) => returningIds.includes(p.id) && !selected.includes(p.id));
 
   useEffect(() => {
     if (route !== 'board') return;
@@ -150,6 +154,11 @@ export default function App() {
           onStart={(config) => void start(config)}
           onResume={(sessionId) => void session.loadById(sessionId).then(() => navigate('board'))}
           onImport={(file) => void importSessionFile(file).then(() => window.location.reload()).catch(() => window.alert('Import failed: that is not a valid upnext session file'))}
+          onSelectAll={() => setSelected(roster.players.map((p) => p.id))}
+          onClearAll={() => setSelected([])}
+          returning={returning}
+          onCheckInReturning={() => setSelected((s) => [...s, ...returning.map((p) => p.id)])}
+          onUpdatePlayer={(id, changes) => void roster.updatePlayer(id, changes)}
         />
       ) : route === 'board' ? (
         <SessionBoard
