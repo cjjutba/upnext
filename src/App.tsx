@@ -238,7 +238,7 @@ export default function App() {
           onUndo={() => void session.undo()}
           canRedo={session.canRedo}
           onRedo={() => void session.redo()}
-          onWin={(court, w) => void dispatch(cmd.finishGame(state, court, w, roster.ratings))}
+          onWin={(court, w, score) => void dispatch(cmd.finishGame(state, court, w, roster.ratings, score))}
           onCloseCourt={(court) => void dispatch(cmd.closeCourt(state, court, roster.ratings))}
           onReopenCourt={(court) => void dispatch(cmd.reopenCourt(state, court, roster.ratings))}
           onToggleSit={(id) => void dispatch(state.sittingOut.includes(id) ? cmd.returnPlayer(state, id, roster.ratings) : cmd.sitOutPlayer(state, id))}

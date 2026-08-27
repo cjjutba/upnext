@@ -30,7 +30,7 @@ export function SessionBoard({
   onUndo: () => void;
   canRedo: boolean;
   onRedo: () => void;
-  onWin: (court: number, winnerPair: 0 | 1) => void;
+  onWin: (court: number, winnerPair: 0 | 1, score?: string) => void;
   onCloseCourt: (court: number) => void;
   onReopenCourt: (court: number) => void;
   onToggleSit: (playerId: string) => void;
@@ -89,8 +89,9 @@ export function SessionBoard({
             const status = state.closedCourts.includes(n) ? 'danger' : !game ? 'neutral' : elapsed > LONG_GAME_SECONDS ? 'warn' : 'live';
             const pairs = game ? ([game.pairs[0].map(nameOf), game.pairs[1].map(nameOf)] as SessionState['games'][number]['pairs']) : null;
             return (
-              <CourtCard key={n} court={n} status={status} pairs={pairs} elapsed={fmt(elapsed)}
-                onWin={(w) => onWin(n, w)} onClose={() => onCloseCourt(n)} onReopen={() => onReopenCourt(n)}
+              // keyed by the game so the score field starts blank on every refill
+              <CourtCard key={n + ':' + (game?.startedEventId ?? 'open')} court={n} status={status} pairs={pairs} elapsed={fmt(elapsed)}
+                onWin={(w, score) => onWin(n, w, score)} onClose={() => onCloseCourt(n)} onReopen={() => onReopenCourt(n)}
                 onEdit={() => onEditLineup(n)} />
             );
           })}
