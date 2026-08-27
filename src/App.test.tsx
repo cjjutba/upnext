@@ -83,6 +83,11 @@ const upNext = () => screen.getByText('Up next').closest('div')!.parentElement!;
 
 const chip = (name: string, scope: HTMLElement) => within(scope).getByRole('button', { name: `${name}, change or remove` });
 
+/** The four names on a court graphic, in slot order: team 1 top and bottom, then team 2. */
+const chipOrder = (scope: HTMLElement) =>
+  within(scope).getAllByRole('button', { name: /, change or remove$/ })
+    .map((b) => b.getAttribute('aria-label')!.replace(', change or remove', ''));
+
 const dialog = (name: string | RegExp) => screen.getByRole('dialog', { name });
 
 const openStandings = async () => {
@@ -265,9 +270,9 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     const d = dialog('Change Eve');
     expect(within(d).getByText('Waiting, position 1')).toBeInTheDocument();
     await click(btn('Henry', d));
-    await waitFor(() => expect(within(upNext()).getByText('Henry')).toBeInTheDocument());
+    // Eve and Henry trade queue places, which re-slots the panel
+    await waitFor(() => expect(chipOrder(upNext())).toEqual(['Henry', 'Grace', 'Frank', 'Eve']));
 
-    // Eve and Henry trade places, so the up next call reads the new order
     await click(btn('Call players up next'));
     expect(said().at(-1)).toBe('Get ready. Up next. Team one, Henry and Grace. Versus team two, Frank and Eve.');
   });

@@ -74,6 +74,16 @@ export function SessionBoard({
   /** Where a preview four sits in the waiting list, so the panels and the rows line up. */
   const positions = (i: number) => `${i * 4 + 1} to ${i * 4 + 4}`;
 
+  /**
+   * The queue section tracks the courts grid, so a panel is a court card's
+   * width and the waiting rows sit under the first one. auto-fill, not
+   * auto-fit: a lone panel would otherwise stretch across the whole column.
+   */
+  const queueGrid = {
+    display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(480px, 1fr))',
+    gap: 'var(--space-4)', alignContent: 'start',
+  } as const;
+
   return (
     <div style={{ display: 'flex', flex: 1, minHeight: 0, alignItems: 'stretch' }}>
       {/* 104px bottom padding keeps the fixed undo pill off the last panel */}
@@ -109,33 +119,33 @@ export function SessionBoard({
             <span style={{ flex: 1 }} />
             <span className="mono" style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>{eligibleQueue.length} waiting</span>
           </div>
-          {previews.length === 0 ? (
-            <div style={{ padding: 'var(--space-3)', font: '400 15px var(--font-sans)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-card)' }}>
-              {state.queue.length === 0
-                ? 'Queue is empty: everyone is on a court.'
-                : 'Fewer than four waiting, so there is no next match yet.'}
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(480px, 1fr))', gap: 'var(--space-4)', alignContent: 'start' }}>
-              {previews.map((pairs, i) => (
-                <QueuePanel key={positions(i)} title={i === 0 ? 'Up next' : `Then, match ${i + 1}`} positions={positions(i)}
-                  pairs={pairs} nameOf={nameOf} onPlayerTap={onQueuePlayerTap}
-                  onCall={i === 0 ? onCallUpNext : undefined} />
-              ))}
-            </div>
-          )}
-          {leftovers.length > 0 ? (
-            <>
-              <span className="micro-label">Also waiting</span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                {leftovers.map((id) => (
-                  <QueueRow key={id} position={state.queue.indexOf(id) + 1} name={nameOf(id)} games={state.gamesPlayed[id] ?? 0}
-                    sitOut={state.sittingOut.includes(id)} nextFour={false} nextUpLabel={false}
-                    onToggleSit={() => onToggleSit(id)} onRemove={() => onRemovePlayer(id)}
-                    onOptions={() => onQueuePlayerTap(id)} />
-                ))}
+          <div style={queueGrid}>
+            {previews.length === 0 ? (
+              <div style={{ padding: 'var(--space-3)', font: '400 15px var(--font-sans)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-card)' }}>
+                {state.queue.length === 0
+                  ? 'Queue is empty: everyone is on a court.'
+                  : 'Fewer than four waiting, so there is no next match yet.'}
               </div>
-            </>
+            ) : previews.map((pairs, i) => (
+              <QueuePanel key={positions(i)} title={i === 0 ? 'Up next' : `Then, match ${i + 1}`} positions={positions(i)}
+                pairs={pairs} nameOf={nameOf} onPlayerTap={onQueuePlayerTap}
+                onCall={i === 0 ? onCallUpNext : undefined} />
+            ))}
+          </div>
+          {leftovers.length > 0 ? (
+            <div style={queueGrid}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                <span className="micro-label">Also waiting</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  {leftovers.map((id) => (
+                    <QueueRow key={id} position={state.queue.indexOf(id) + 1} name={nameOf(id)} games={state.gamesPlayed[id] ?? 0}
+                      sitOut={state.sittingOut.includes(id)} nextFour={false} nextUpLabel={false}
+                      onToggleSit={() => onToggleSit(id)} onRemove={() => onRemovePlayer(id)}
+                      onOptions={() => onQueuePlayerTap(id)} />
+                  ))}
+                </div>
+              </div>
+            </div>
           ) : null}
         </section>
       </main>
