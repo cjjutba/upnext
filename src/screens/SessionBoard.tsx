@@ -14,6 +14,14 @@ import { isPlaying, isStaged } from '../domain/reducer';
 // wall clock on purpose: timers derive from event ts so resume replays exactly; a mid-session OS clock change can jump timers, accepted trade-off
 const LONG_GAME_SECONDS = 900;
 
+/**
+ * The one animation in the app. The rail slides rather than snapping, because
+ * the courts resize with it and an instant jump reads as a repaint bug. Short
+ * enough that a tap still feels answered at once, and skipped entirely when
+ * the device asks for reduced motion.
+ */
+const RAIL_MOTION = '180ms ease';
+
 const fmt = (totalSeconds: number): string => {
   const s = Math.max(0, Math.floor(totalSeconds));
   const h = Math.floor(s / 3600);
@@ -26,7 +34,7 @@ export { fmt };
 export function SessionBoard({
   state, players, undoLabel, onUndo, canRedo, onRedo, onWin, onCloseCourt, onReopenCourt,
   onToggleSit, onToggleCheck, onAddCourt, onAddPlayer, onRemovePlayer, onCourtPlayerTap, onQueuePlayerTap,
-  onStart, onStage, onShuffle, onCallCourt, onCallUpNext, onEditLineup, previews, narrow, railCollapsed, recency,
+  onStart, onStage, onShuffle, onCallCourt, onCallUpNext, onEditLineup, previews, narrow, railCollapsed, motion, recency,
   onSeatPlayer, onCreateAndSeat, onFillCourt,
 }: {
   state: SessionState;
@@ -57,8 +65,10 @@ export function SessionBoard({
   previews: UpNextPreview[];
   /** Phone portrait: the rail stacks under the courts and the page scrolls as one. */
   narrow: boolean;
-  /** The organizer hid check-in to give the courts the full width. Wide drops the rail; narrow keeps its header. */
+  /** The organizer hid check-in to give the courts the full width. Wide slides the rail out; narrow keeps its header. */
   railCollapsed: boolean;
+  /** False when the device asks for reduced motion, which drops the rail transition. */
+  motion: boolean;
   /** startedAt of the newest ended session each player attended; regulars sort first. */
   recency: Record<string, number>;
   onSeatPlayer: (court: number, slot: SlotIndex, playerId: string) => void;
@@ -203,31 +213,49 @@ export function SessionBoard({
           ) : null}
         </section>
       </main>
-      {/* wide and collapsed drops the rail entirely, so the courts grid gets the whole width */}
-      {railCollapsed && !narrow ? null : (
-        <aside style={narrow
+      {/*
+        The rail stays mounted at zero width so the collapse can be animated;
+        an unmounted element has nothing to transition from. `inert` is what
+        keeps the hidden copy out of the tab order and the screen reader.
+      */}
+      <aside
+        aria-label="Check-in"
+        inert={railCollapsed && !narrow ? true : undefined}
+        style={narrow
           ? {
             // the 104px keeps the fixed undo pill off the section, collapsed or not: the count row is the last thing on the page
             borderTop: '1px solid var(--border)', padding: '20px 16px 104px',
             display: 'flex', flexDirection: 'column', gap: '28px', background: 'var(--bg)',
           }
           : {
-            width: '360px', flex: 'none', borderLeft: '1px solid var(--border)', padding: '20px', overflowY: 'auto',
-            display: 'flex', flexDirection: 'column', gap: '28px', background: 'var(--bg)',
+            width: railCollapsed ? '0px' : '360px', flex: 'none', overflow: 'hidden',
+            borderLeft: 'solid var(--border)', borderLeftWidth: railCollapsed ? '0px' : '1px',
+            background: 'var(--bg)',
+            transition: motion ? `width ${RAIL_MOTION}, border-left-width ${RAIL_MOTION}` : undefined,
           }}>
+        <div style={narrow
+          ? { display: 'flex', flexDirection: 'column', gap: '28px' }
+          // a fixed width keeps the names from rewrapping while the rail slides
+          : { width: '360px', height: '100%', padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '28px' }}>
           <section style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
               <span className="micro-label">Check-in</span>
-              {/* collapsed, the count is all that is left, so it has to say who is actually still here */}
-              {railCollapsed ? (
+              {/* on a phone the count is all that is left, so it has to say who is actually still here */}
+              {narrow && railCollapsed ? (
                 <>
                   <span style={{ flex: 1 }} />
                   <span className="mono" style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>{present.length} in</span>
                 </>
               ) : null}
             </div>
-            {railCollapsed ? null : (
-              <>
+            {/* 0fr to 1fr is the one way to animate a height the content decides */}
+            <div
+              inert={railCollapsed ? true : undefined}
+              style={{
+                display: 'grid', gridTemplateRows: narrow && railCollapsed ? '0fr' : '1fr',
+                transition: motion && narrow ? `grid-template-rows ${RAIL_MOTION}` : undefined,
+              }}>
+              <div style={{ minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <form
                   style={{ display: 'flex', gap: 'var(--space-2)' }}
                   onSubmit={(e) => { e.preventDefault(); if (newName.trim()) { onAddPlayer(newName.trim()); setNewName(''); } }}>
@@ -254,11 +282,11 @@ export function SessionBoard({
                       onTap={() => onToggleCheck(p.id)} />
                   ))}
                 </div>
-              </>
-            )}
+              </div>
+            </div>
           </section>
-        </aside>
-      )}
+        </div>
+      </aside>
       {seating ? (
         <PlayerPickerModal
           title={`Add a player to court ${seating.court}`}

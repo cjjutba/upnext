@@ -15,7 +15,7 @@ preference.
 | Structure from borders | 1px black-alpha borders, not shadows. Shadows exist only on menus and modals |
 | Blue is a state signal | `#006bff` for focus rings and text links. Nothing else. Court state is carried by a text badge, never by a hue |
 | Text-only badges | A pill with the word alone. No dots, no circles, no icons, ever. Tinted background, dark same-hue text |
-| Zero motion | No transitions, no easing, no press scale, no slide, no shimmer. Press feedback is an instant one-step background or border change |
+| Near-zero motion | One exception: the check-in rail slides on collapse, 180ms, skipped under `prefers-reduced-motion`. Otherwise no transitions, no easing, no press scale, no shimmer. Press feedback is an instant one-step background or border change |
 | The court is the graphic | A four on a court is drawn on `CourtDiagram`, live or staged or merely next up. The queue section under the courts uses the same graphic on purpose |
 | Type | Geist Sans 400/500/600 and Geist Mono. Mono with tabular numerals for every timer, count, position, and stat column, so digits never shift layout |
 | Radii | 6px controls, 8px cards, 12px modals, 9999px pills |
