@@ -6,6 +6,7 @@ import { RosterSetup } from './screens/RosterSetup';
 import { SessionBoard, fmt } from './screens/SessionBoard';
 import { SessionSummary } from './screens/SessionSummary';
 import { ModeMenu } from './components/ModeMenu';
+import { ModeChangeModal } from './components/ModeChangeModal';
 import { Button } from './components/Button';
 import { IconButton } from './components/IconButton';
 import { StandingsModal } from './components/StandingsModal';
@@ -17,11 +18,20 @@ import { useSpeech } from './lib/useSpeech';
 import { useNarrow } from './lib/useViewport';
 import { shareSessionFile, importSessionFile } from './lib/exportFile';
 import * as cmd from './domain/commands';
-import { nextLineup } from './domain/templates';
-import { leaderPhrase, upNextPhrase } from './domain/announce';
+import { upNextPreview } from './domain/templates';
+import { challengersPhrase, leaderPhrase, upNextPhrase } from './domain/announce';
 import { standings } from './domain/standings';
-import { isWinnersTemplate } from './domain/types';
-import type { Pairs, RuleTemplate } from './domain/types';
+import type { RuleConfig, RuleTemplate, SessionState } from './domain/types';
+import type { Ratings } from './domain/templates';
+
+/** What the proposed rule would form next, said in the board's own words. Pure, so it costs nothing to compute per render. */
+function previewLine(state: SessionState, ratings: Ratings, nameOf: (id: string) => string): string | null {
+  const p = upNextPreview(state, ratings);
+  if (!p) return null;
+  return p.kind === 'lineup'
+    ? `Next game would be ${p.pairs[0].map(nameOf).join(' + ')} vs ${p.pairs[1].map(nameOf).join(' + ')}.`
+    : `Next challengers would be ${p.pair.map(nameOf).join(' and ')}.`;
+}
 
 export default function App() {
   const session = useSession();
@@ -35,6 +45,8 @@ export default function App() {
   const [standingsOpen, setStandingsOpen] = useState(false);
   const [editingCourt, setEditingCourt] = useState<number | null>(null);
   const [endArmed, setEndArmed] = useState(false);
+  /** The rule the organizer is proposing. Nothing is appended until the modal confirms it. */
+  const [pendingRule, setPendingRule] = useState<RuleConfig | null>(null);
   const narrow = useNarrow();
   const { state, dispatch } = session;
 
@@ -88,14 +100,13 @@ export default function App() {
 
   const nameOf = (id: string) => roster.players.find((p) => p.id === id)?.name ?? 'Unknown';
 
-  // null in the winners templates, where the next lineup depends on who wins
-  const nextUp: Pairs | null =
-    route === 'board' && !isWinnersTemplate(state.rule.template) ? nextLineup(state, null, roster.ratings) : null;
+  // one preview path for every mode: a full lineup, or the challengers a winners template can promise
+  const preview = route === 'board' ? upNextPreview(state, roster.ratings) : null;
 
   useAnnouncer({
     lastBatch: session.lastBatch,
     state,
-    nextUp,
+    preview,
     nameOf,
     speak: speech.speak,
     // names come from the roster, so wait for it rather than calling four Unknowns to a court
@@ -174,14 +185,14 @@ export default function App() {
       <span className="display" style={{ fontSize: '22px', fontWeight: 600 }}>upnext</span>
       {route === 'board' ? (
         <>
-          <ModeMenu rule={state.rule} onChange={(t, cap) => void dispatch(cmd.changeRule(state, t, cap, roster.ratings))} />
+          <ModeMenu rule={state.rule} onRequestChange={(template, winCap) => setPendingRule({ template, winCap })} />
           <span style={{ flex: 1 }} />
           <span className="mono" style={{ fontSize: '20px' }}>
             {fmt((clock - state.startedAt) / 1000)}
           </span>
           <IconButton icon="trophy" ariaLabel="Live standings" onClick={() => setStandingsOpen(true)} />
           {muteToggle}
-          <Button variant={endArmed ? 'primary' : 'secondary'} onClick={endTap}>
+          <Button variant="danger" onClick={endTap}>
             {endArmed ? 'Tap again to end' : 'End session'}
           </Button>
         </>
@@ -245,8 +256,10 @@ export default function App() {
           onToggleCheck={toggleBoardCheck}
           onAddCourt={() => void dispatch(cmd.addCourt(state, roster.ratings))}
           onAddPlayer={(n) => void addAndCheckIn(n)}
-          nextUp={nextUp}
-          onCallUpNext={() => nextUp && speech.speak(upNextPhrase(nextUp, nameOf))}
+          preview={preview}
+          onCallUpNext={() => preview && speech.speak(
+            preview.kind === 'lineup' ? upNextPhrase(preview.pairs, nameOf) : challengersPhrase(preview.pair, nameOf),
+          )}
           canCallUpNext={speech.supported && speech.enabled}
           narrow={narrow}
           onEditLineup={setEditingCourt}
@@ -264,6 +277,19 @@ export default function App() {
           narrow={narrow}
         />
       )}
+      {pendingRule && !state.ended ? (
+        <ModeChangeModal
+          from={state.rule}
+          draft={pendingRule}
+          onDraftChange={setPendingRule}
+          previewLine={previewLine({ ...state, rule: pendingRule }, roster.ratings, nameOf)}
+          onCancel={() => setPendingRule(null)}
+          onConfirm={() => {
+            void dispatch(cmd.changeRule(state, pendingRule.template, pendingRule.winCap, roster.ratings));
+            setPendingRule(null);
+          }}
+        />
+      ) : null}
       {standingsOpen ? (
         <StandingsModal
           rows={rows}

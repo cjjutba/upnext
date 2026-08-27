@@ -28,6 +28,12 @@ export function modeForTemplate(template: RuleTemplate): MatchingMode {
   return template;
 }
 
+/**
+ * Total on purpose. describeEvent labels events from imported logs, which a
+ * newer build may have written with a template this one has never heard of,
+ * and rule 4 says a foreign log must never crash. Coverage of the ids this
+ * build does know is asserted in modes.test.ts.
+ */
 export function modeLabel(template: RuleTemplate): string {
-  return MODES.find((m) => m.id === modeForTemplate(template))!.label;
+  return MODES.find((m) => m.id === modeForTemplate(template))?.label ?? template;
 }

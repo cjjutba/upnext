@@ -21,6 +21,10 @@
   --primary: #171717;
   --primary-press: #383838;
   --primary-fg: #ffffff;
+  /* destructive actions are the one colored button in the system */
+  --danger: #c33236;
+  --danger-press: #a62a2e;
+  --danger-fg: #ffffff;
   /* blue is a state signal only: focus rings and text links */
   --blue: #006bff;
   --focus-ring: 0 0 0 2px #ffffff, 0 0 0 4px #006bff;

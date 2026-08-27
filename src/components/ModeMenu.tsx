@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button } from './Button';
 import { StatusBadge } from './StatusBadge';
-import { Stepper } from './Stepper';
-import { MODES, modeForTemplate, templateForMode, type MatchingMode } from '../domain/modes';
+import { MODES, modeForTemplate, modeLabel, templateForMode, type MatchingMode } from '../domain/modes';
 import type { RuleConfig, RuleTemplate } from '../domain/types';
 
-export function ModeMenu({ rule, onChange }: {
+/**
+ * Picks a mode, and nothing more. It never dispatches: the request goes up to
+ * App, which confirms it in a modal before a single event is appended. The win
+ * cap and the split toggle live in that modal, so the whole winners config is
+ * confirmed in one decision.
+ */
+export function ModeMenu({ rule, onRequestChange }: {
   rule: RuleConfig;
-  onChange: (template: RuleTemplate, winCap: number) => void;
+  onRequestChange: (template: RuleTemplate, winCap: number) => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -24,8 +28,10 @@ export function ModeMenu({ rule, onChange }: {
   }, [open]);
 
   const pick = (mode: MatchingMode) => {
-    onChange(templateForMode(mode, mode === 'winners' ? split : false), rule.winCap);
-    if (mode !== 'winners') setOpen(false);
+    setOpen(false);
+    // re-picking the live mode has nothing to confirm, except in winners where the row is the way to the cap and the split
+    if (mode === current && mode !== 'winners') return;
+    onRequestChange(templateForMode(mode, mode === 'winners' ? split : false), rule.winCap);
   };
 
   return (
@@ -37,7 +43,7 @@ export function ModeMenu({ rule, onChange }: {
           background: 'var(--bg)', color: 'var(--text-secondary)', border: '1px solid var(--border)',
           borderRadius: 'var(--radius-control)', font: '500 14px/1 var(--font-sans)', cursor: 'pointer',
         }}>
-        {'Mode: ' + MODES.find((m) => m.id === current)!.label}
+        {'Mode: ' + modeLabel(rule.template)}
       </button>
       {open ? (
         <div style={{
@@ -60,18 +66,13 @@ export function ModeMenu({ rule, onChange }: {
                 {m.recommended ? <StatusBadge status="live" label="Recommended" /> : null}
               </span>
               <span style={{ font: '400 14px/1.4 var(--font-sans)', color: 'var(--text-secondary)' }}>{m.description}</span>
+              {m.id === 'winners' && current === 'winners' ? (
+                <span className="mono" style={{ font: '400 13px/1.4 var(--font-mono)', color: 'var(--text-tertiary)' }}>
+                  {`Win cap ${rule.winCap}. Split winners ${split ? 'on' : 'off'}. Tap to adjust.`}
+                </span>
+              ) : null}
             </button>
           ))}
-          {current === 'winners' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: '0 var(--space-3) var(--space-2)' }}>
-              <Stepper label="Win cap" value={rule.winCap} min={1} max={5} unit="games"
-                onChange={(v) => onChange(rule.template, v)} />
-              <Button variant={split ? 'primary' : 'secondary'} ariaLabel="Toggle split winners"
-                onClick={() => onChange(split ? 'winners-stay' : 'winners-split', rule.winCap)}>
-                {split ? 'Split winners: on' : 'Split winners: off'}
-              </Button>
-            </div>
-          ) : null}
         </div>
       ) : null}
     </div>

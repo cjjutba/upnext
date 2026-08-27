@@ -21,6 +21,11 @@ export function upNextPhrase(pairs: Pairs, nameOf: NameOf): string {
   return `Up next. ${matchup(pairs, nameOf)}. Please get ready.`;
 }
 
+/** The winners templates cannot name the four before a winner exists, so they call the two who are certain. */
+export function challengersPhrase(pair: Pair, nameOf: NameOf): string {
+  return `Next challengers. ${pairPhrase(pair, nameOf)}. Please get ready.`;
+}
+
 /**
  * Phrases for a run of events this device just appended. Never call this with a
  * replayed log: it has no idea an event is old, and a resume would read back

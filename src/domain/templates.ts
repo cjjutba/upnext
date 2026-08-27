@@ -1,4 +1,5 @@
-import type { Pairs, SessionState } from './types';
+import type { Pair, Pairs, SessionState } from './types';
+import { isWinnersTemplate } from './types';
 
 export interface LastFinished {
   pairs: Pairs;
@@ -126,4 +127,34 @@ export function nextLineup(state: SessionState, lastFinished: LastFinished | nul
     return pickPairing(state, [a, b, c, d], ratings);
   }
   return freshFill(state);
+}
+
+/** What the board can honestly promise about the next game under the current rule. */
+export type UpNextPreview =
+  | { kind: 'lineup'; pairs: Pairs }
+  | { kind: 'challengers'; pair: Pair };
+
+/**
+ * The two waiting players who go on next in a winners template, whoever wins.
+ * Sound either way the finish falls: uncapped, the reducer fronts the winners
+ * and the next four are the winners plus these two; capped, it fronts the
+ * queue and these two lead it.
+ */
+export function nextChallengers(state: SessionState): Pair | null {
+  const e = eligible(state);
+  return e.length >= 2 ? [e[0], e[1]] : null;
+}
+
+/**
+ * The single preview entry point for every mode. Winners templates cannot name
+ * the four before a winner exists, only the challengers, so the shape differs
+ * and callers branch on kind rather than on the template.
+ */
+export function upNextPreview(state: SessionState, ratings: Ratings = {}): UpNextPreview | null {
+  if (isWinnersTemplate(state.rule.template)) {
+    const pair = nextChallengers(state);
+    return pair ? { kind: 'challengers', pair } : null;
+  }
+  const pairs = nextLineup(state, null, ratings);
+  return pairs ? { kind: 'lineup', pairs } : null;
 }
