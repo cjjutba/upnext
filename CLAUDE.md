@@ -20,7 +20,12 @@ branch against the same codebase. As of 2026-08-27 that included
 - Assume another agent may be editing the same file. Rebase before you merge,
   and read `git log origin/main` before assuming your view of the code is
   current.
-- Run `npm install` first. A fresh workspace has no `node_modules`.
+- `.conductor/settings.toml` holds the setup, run, and archive scripts. It is
+  the shared file on purpose: Conductor reads it from `origin/main`, so it
+  works even when the root checkout at `~/Projects/upnext` is behind. A
+  `settings.local.toml` would be read from that checkout instead.
+- Setup runs `npm install`, so a new workspace arrives with `node_modules`.
+  Run it by hand only if the directory is missing.
 
 ## Skills worth reaching for
 
