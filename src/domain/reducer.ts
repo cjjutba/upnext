@@ -2,6 +2,10 @@ import type { Pairs, SessionEvent, SessionState } from './types';
 import { emptyState, isWinnersTemplate } from './types';
 
 const lineupPlayers = (pairs: Pairs): string[] => [pairs[0][0], pairs[0][1], pairs[1][0], pairs[1][1]];
+const sameFour = (pairs: Pairs, players: string[]): boolean => {
+  const a = lineupPlayers(pairs);
+  return players.length === 4 && players.every((p) => a.includes(p));
+};
 const without = (arr: string[], remove: string[]): string[] => arr.filter((x) => !remove.includes(x));
 const resetAll = (rec: Record<string, number>, players: string[]): Record<string, number> => {
   const out = { ...rec };
@@ -72,7 +76,7 @@ export function applyEvent(state: SessionState, e: SessionEvent): SessionState {
     }
     case 'player-checked-in': {
       if (!state.started || state.ended) return state;
-      if (state.queue.includes(e.playerId) || isPlaying(state, e.playerId)) return state;
+      if (state.queue.includes(e.playerId) || isPlaying(state, e.playerId) || isStaged(state, e.playerId)) return state;
       return {
         ...state,
         checkedIn: state.checkedIn.includes(e.playerId) ? state.checkedIn : [...state.checkedIn, e.playerId],
@@ -105,15 +109,54 @@ export function applyEvent(state: SessionState, e: SessionEvent): SessionState {
       if (state.games[e.court] || state.closedCourts.includes(e.court)) return state;
       if (e.court < 1 || e.court > state.courtCount) return state;
       if (new Set(players).size !== 4) return state;
-      if (!players.every((p) => state.queue.includes(p) && !state.sittingOut.includes(p))) return state;
+      // a start promotes exactly the four already staged there; anyone else still has to come off the queue
+      const here = state.staged[e.court];
+      const promoting = here !== undefined && sameFour(here, players);
+      if (!promoting && !players.every((p) => state.queue.includes(p) && !state.sittingOut.includes(p))) return state;
+      const staged = { ...state.staged };
+      delete staged[e.court];
       return {
         ...state,
+        staged,
         queue: without(state.queue, players),
         games: {
           ...state.games,
           [e.court]: { court: e.court, pairs: e.pairs, startedAt: e.ts, startedEventId: e.id },
         },
       };
+    }
+    case 'game-staged': {
+      const after = lineupPlayers(e.pairs);
+      if (!state.started || state.ended) return state;
+      if (state.games[e.court] || state.closedCourts.includes(e.court)) return state;
+      if (e.court < 1 || e.court > state.courtCount) return state;
+      if (new Set(after).size !== 4) return state;
+      // a restage keeps whoever is already on this court, so only the newcomers have to be waiting
+      const before = state.staged[e.court] ? lineupPlayers(state.staged[e.court]) : [];
+      const added = after.filter((p) => !before.includes(p));
+      const removed = before.filter((p) => !after.includes(p));
+      if (!added.every((p) => state.queue.includes(p) && !state.sittingOut.includes(p))) return state;
+      return {
+        ...state,
+        queue: [...removed, ...without(state.queue, added)], // replaced players go to the front
+        staged: { ...state.staged, [e.court]: e.pairs },
+      };
+    }
+    case 'game-unstaged': {
+      const pairs = state.staged[e.court];
+      if (!pairs) return state;
+      const staged = { ...state.staged };
+      delete staged[e.court];
+      return { ...state, staged, queue: [...lineupPlayers(pairs), ...state.queue] };
+    }
+    case 'queue-swapped': {
+      const i = state.queue.indexOf(e.playerA);
+      const j = state.queue.indexOf(e.playerB);
+      if (i < 0 || j < 0 || i === j) return state;
+      const queue = [...state.queue];
+      queue[i] = e.playerB;
+      queue[j] = e.playerA;
+      return { ...state, queue };
     }
     case 'game-lineup-changed': {
       const active = state.games[e.court];
@@ -205,11 +248,15 @@ export function applyEvent(state: SessionState, e: SessionEvent): SessionState {
       const active = state.games[e.court];
       const games = { ...state.games };
       delete games[e.court];
+      const staged = { ...state.staged };
+      delete staged[e.court];
       const players = active ? lineupPlayers(active.pairs) : [];
+      const freed = [...players, ...(state.staged[e.court] ? lineupPlayers(state.staged[e.court]) : [])];
       return {
         ...state,
         games,
-        queue: active ? [...players, ...state.queue] : state.queue, // mid game players go to the front
+        staged,
+        queue: freed.length ? [...freed, ...state.queue] : state.queue, // mid game and staged players go to the front
         consecutiveWins: resetAll(state.consecutiveWins, players),
         closedCourts: [...state.closedCourts, e.court],
       };
@@ -235,4 +282,16 @@ export function applyEvent(state: SessionState, e: SessionEvent): SessionState {
 
 export function isPlaying(state: SessionState, playerId: string): boolean {
   return Object.values(state.games).some((g) => lineupPlayers(g.pairs).includes(playerId));
+}
+
+/** The court this player is staged on, or null. Staged players are out of the queue, exactly like players in a live game. */
+export function stagedCourtOf(state: SessionState, playerId: string): number | null {
+  for (const [court, pairs] of Object.entries(state.staged)) {
+    if (lineupPlayers(pairs).includes(playerId)) return Number(court);
+  }
+  return null;
+}
+
+export function isStaged(state: SessionState, playerId: string): boolean {
+  return stagedCourtOf(state, playerId) !== null;
 }
