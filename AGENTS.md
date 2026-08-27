@@ -69,7 +69,8 @@ open seats section of `docs/event-model.md`.
 number, and returns `[]` when every court is closed. The board hides the whole
 queue section in that case. Do not reintroduce a hardcoded cap: a waiting four
 is a claim on a court, and without a court there is nothing to claim. Closing a
-court is permanent for the session; `addCourt` hands out a fresh number.
+court takes it out of service and gives its number back: `addCourt` reuses the
+lowest closed number and only grows `courtCount` when none is free.
 
 Read `docs/architecture.md` for the full picture and `docs/event-model.md` for
 every event type.

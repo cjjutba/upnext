@@ -39,8 +39,8 @@ another device or a newer build must never crash replay.
 | `game-lineup-changed` | `court`, `pairs` | court has an active game; no player named twice; any added player is queued and not sitting out | Replaces the lineup, which may leave a seat open (`null`). Players who came off go to the queue front. `startedAt` is untouched, so the timer keeps running |
 | `game-finished` | `court`, `winnerPair?`, `score?` | court has an active game; `winnerPair` is `undefined`, `0`, or `1`; every seat is filled | Ends the game, bumps `gamesPlayed` for all four, appends to `finishedGames`, then places the four in the queue by mode. See below |
 | `court-closed` | `court` | not already closed; within `1..courtCount` | Voids any game in progress without counting it, sends whoever is seated plus any staged four to the queue **front**, resets the playing players' streaks, adds to `closedCourts` |
-| `court-reopened` | `court` | currently closed | Clears the closed flag. The command then refills. No UI emits this any more: closing is permanent for the session and `addCourt` is the way back. Kept so old logs replay |
-| `court-added` | none | started, not ended | `courtCount + 1`. Courts are only ever added. Closing covers taking one out of service |
+| `court-reopened` | `court` | currently closed | Clears the closed flag. The command then refills. No reopen button exists any more: this is what Add court emits when a closed number is free, lowest first |
+| `court-added` | none | started, not ended | `courtCount + 1`. Only reached when no closed court is left to reuse, so the count grows only for a court the session has never had |
 | `event-undone` | `targetEventId` | none | No direct effect. `replay()` handles it through `computeSkipped()` |
 | `session-ended` | none | started, not ended | `ended = true`, `endedAt = ts` |
 
@@ -131,7 +131,7 @@ Every field is derived by replay and none is stored. From
 | Field | Notes |
 |---|---|
 | `sessionId`, `started`, `ended`, `startedAt`, `endedAt` | Session lifecycle |
-| `courtCount` | Grows via `court-added`, never shrinks |
+| `courtCount` | Grows via `court-added`, never shrinks. A closed number stays inside the range and comes back through `court-reopened` |
 | `rule` | `{ template, winCap }`. Seeded by `session-started`, replaced by `rule-changed` |
 | `checkedIn` | Check-in order. Grows only. Departures are tracked separately, not removed here |
 | `sittingOut` | Players who keep a queue spot but are skipped when forming games |

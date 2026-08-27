@@ -465,9 +465,10 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     expect(screen.getByText('No courts open. Add a court to keep playing.')).toBeInTheDocument();
     expect(btn('Add court')).toBeEnabled(); // the only way back now that reopening is gone
 
-    // court 1 stays closed for good, so Add court hands over a fresh number
+    // closing gave court 1's number back, so Add court hands that number out again
     await click(btn('Add court'));
-    await screen.findByLabelText('Close court 2');
+    await screen.findByLabelText('Close court 1');
+    expect(screen.queryByLabelText('Close court 2')).not.toBeInTheDocument();
     expect(screen.getByText('Queue')).toBeInTheDocument();
   });
 });

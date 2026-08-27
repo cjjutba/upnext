@@ -148,6 +148,10 @@ export function reopenCourt(state: SessionState, court: number, ratings: Ratings
 
 export function addCourt(state: SessionState, ratings: Ratings = {}): CommandEvent[] | null {
   if (!state.sessionId || !state.started || state.ended) return null;
+  // a closed court gave its number back, so hand the lowest of those out before numbering a new one
+  const reusable = Array.from({ length: state.courtCount }, (_, i) => i + 1)
+    .find((c) => state.closedCourts.includes(c));
+  if (reusable !== undefined) return reopenCourt(state, reusable, ratings);
   const e: CommandEvent = { type: 'court-added', sessionId: state.sessionId };
   return [e, ...stageEvents(simulate(state, e), null, undefined, ratings)];
 }

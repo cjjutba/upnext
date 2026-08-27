@@ -8,7 +8,7 @@ import {
   undoTarget, redoTarget, describeEvent, type CommandEvent,
 } from './commands';
 import { nextLineup } from './templates';
-import { fullLineup } from './types';
+import { fullLineup, openCourts } from './types';
 import type { SessionEvent, EventPayload, Lineup, RuleTemplate } from './types';
 
 let n = 0;
@@ -230,6 +230,37 @@ describe('addCourt', () => {
     expect(s.courtCount).toBe(2);
     expect(s.staged[2]).toEqual([['e', 'g'], ['f', 'h']]);
     expect(addCourt(replay(seal(startSession({ courts: 1, template: 'all-off', winCap: 3 }, []))))).not.toBeNull();
+  });
+
+  it('reuses a closed court number instead of handing out a new one', () => {
+    let log = live(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], 'all-off', 1);
+    log = [...log, ...seal(closeCourt(replay(log), 1)!)];
+    const events = addCourt(replay(log))!;
+    expect(events[0]).toMatchObject({ type: 'court-reopened', court: 1 });
+    log = [...log, ...seal(events)];
+    const s = replay(log);
+    expect(s.courtCount).toBe(1);
+    expect(s.closedCourts).toEqual([]);
+    expect(openCourts(s)).toEqual([1]);
+    expect(s.staged[1]).toBeDefined(); // a court that comes back fills like a new one
+  });
+
+  it('fills the lowest gap before the court count grows', () => {
+    let log = live(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], 'all-off', 3);
+    log = [...log, ...seal(closeCourt(replay(log), 2)!)];
+    log = [...log, ...seal(addCourt(replay(log))!)];
+    const s = replay(log);
+    expect(s.courtCount).toBe(3);
+    expect(openCourts(s)).toEqual([1, 2, 3]);
+  });
+
+  it('starts from court 1 again once every court is closed', () => {
+    let log = live(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], 'all-off', 2);
+    for (const c of [1, 2]) log = [...log, ...seal(closeCourt(replay(log), c)!)];
+    log = [...log, ...seal(addCourt(replay(log))!)];
+    const s = replay(log);
+    expect(s.courtCount).toBe(2);
+    expect(openCourts(s)).toEqual([1]);
   });
 
   it('refuses before start and after end', () => {
