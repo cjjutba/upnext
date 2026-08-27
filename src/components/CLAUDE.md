@@ -10,9 +10,11 @@ Presentational only. Props in, callbacks out.
 - **Inline `style={{}}` reading `var(--token)`.** No CSS modules, no Tailwind,
   no per-component stylesheet. Never hardcode a hex; every value is in
   `src/styles/tokens.css`.
-- **Zero motion.** No `transition`, no `animation`, no transform on press.
-  Press feedback is an instant token swap, driven by `useState` plus the four
-  pointer handlers. Copy `Button.tsx`.
+- **Zero motion in this directory.** No `transition`, no `animation`, no
+  transform on press. Press feedback is an instant token swap, driven by
+  `useState` plus the four pointer handlers. Copy `Button.tsx`. The one
+  animation in the app is the rail collapse, and it lives in
+  `src/screens/SessionBoard.tsx`, not here.
 - **Icons only through `Icon.tsx`.** Add the Lucide import to the `icons` map
   first, which makes the name valid on the `IconName` type. Never import from
   `lucide-react` directly.

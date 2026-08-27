@@ -107,9 +107,12 @@ directly for the history list. Do not add more.
 6. **Never change the meaning of an existing event type or template id.** Old
    logs must replay identically. Widen unions, add cases, add optional fields.
    Do not repurpose.
-7. **No en dashes, no em dashes, no motion.** Not in code, comments, copy,
-   commits, or docs. Zero CSS transitions and zero animations anywhere. Full
-   design rules in `docs/conventions.md`.
+7. **No en dashes, no em dashes, and one animation.** No dashes in code,
+   comments, copy, commits, or docs. Motion has exactly one sanctioned use:
+   the check-in rail sliding open and shut in `src/screens/SessionBoard.tsx`,
+   which moves because the courts resize with it. Everywhere else, zero CSS
+   transitions and zero animations. Do not add a second one without asking.
+   Full design rules in `docs/conventions.md`.
 
 ## Adding things
 
