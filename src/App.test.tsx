@@ -76,7 +76,7 @@ async function startMatch(mode: RegExp) {
 }
 
 /** The card div that owns a court's close button. */
-const courtCard = (n: number) => screen.getByLabelText(`Close court ${n}`).closest('div')!.parentElement!;
+const courtCard = (n: number) => screen.getByLabelText(`Close court ${n}`).closest('[data-court]') as HTMLElement;
 
 /** The queue panel under the courts: the next four, or the challengers a winners template promises. */
 const upNext = () =>
@@ -185,6 +185,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await waitFor(() => expect(said()).toHaveLength(2));
 
     await click(btn('End session'));
+    await click(btn('Tap again to end'));
     await screen.findByText('Session summary');
     await waitFor(() => expect(said().at(-1)).toContain('Session complete. In first place,'));
     expect(said().at(-1)).toContain('with 1 win from 1 game, 100 percent.');
@@ -217,9 +218,78 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await waitFor(() => expect(said()).toHaveLength(2));
 
     await click(btn('End session'));
+    await click(btn('Tap again to end'));
     await screen.findByText('Session summary');
     await waitFor(() => expect(said()).toHaveLength(3));
     expect(said().filter((l) => l.startsWith('Session complete.'))).toHaveLength(1);
+  });
+
+  it('ends the session only on the second tap', async () => {
+    render(<App />);
+    await startMatch(/^Balanced/);
+
+    await click(btn('End session'));
+    expect(screen.queryByText('Session summary')).not.toBeInTheDocument(); // still live, armed
+    await click(btn('Tap again to end'));
+    await screen.findByText('Session summary');
+  });
+
+  it('reopens the last ended session from history onto the live board', async () => {
+    render(<App />);
+    await startMatch(/^Balanced/);
+    await click(btn(/Team 1 wins/, courtCard(1)));
+
+    await click(btn('End session'));
+    await click(btn('Tap again to end'));
+    await screen.findByText('Session summary');
+    await click(btn('New session'));
+    await screen.findByText('Roster');
+
+    await click(await screen.findByRole('button', { name: 'Reopen' }));
+    await screen.findByLabelText('Close court 1'); // live board again, court occupied
+
+    const dialog = await openStandings();
+    await waitFor(() => expect(within(dialog).getAllByText('100%')).toHaveLength(2)); // the win survived
+  });
+
+  it('opens an old session summary from history silently, with export still offered', async () => {
+    render(<App />);
+    await startMatch(/^Balanced/);
+    await click(btn(/Team 1 wins/, courtCard(1)));
+
+    await click(btn('End session'));
+    await click(btn('Tap again to end'));
+    await screen.findByText('Session summary');
+    await click(btn('New session'));
+    await screen.findByText('Roster');
+
+    spoken.length = 0;
+    await click(await screen.findByRole('button', { name: 'View' }));
+    await screen.findByText('Final standings');
+    expect(btn(/Share summary/)).toBeInTheDocument();
+
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    expect(said()).toEqual([]); // browsing history never reads the podium aloud
+  });
+
+  it('hand-composes a lineup: substitute a waiting player onto the court', async () => {
+    render(<App />);
+    await startMatch(/^Balanced/);
+    await waitFor(() => expect(said()).toHaveLength(1));
+
+    await click(btn('Edit lineup on court 1'));
+    const dialog = await screen.findByRole('dialog', { name: 'Edit court 1 lineup' });
+    expect(btn('Apply lineup', dialog)).toBeDisabled(); // nothing changed yet
+
+    await click(btn('Carol', dialog)); // on court in every partition: the front four are Alice..Dave
+    await click(btn('Eve', dialog)); // first waiting player
+    await click(btn('Apply lineup', dialog));
+
+    await waitFor(() => expect(said().at(-1)).toMatch(/^Court 1\. Lineup change\. .*Eve.*\.$/));
+    expect(said().at(-1)).not.toContain('Carol');
+    expect(within(courtCard(1)).getByText('Eve')).toBeInTheDocument();
+    expect(within(courtCard(1)).queryByText('Carol')).not.toBeInTheDocument();
+    expect(screen.getByText('Undo: court 1 lineup')).toBeInTheDocument();
   });
 
   it('keeps the winners on court in Winners mode, staged, and promises only the challengers', async () => {

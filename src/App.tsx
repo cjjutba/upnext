@@ -11,10 +11,12 @@ import { Button } from './components/Button';
 import { IconButton } from './components/IconButton';
 import { StandingsModal } from './components/StandingsModal';
 import { PlayerPicker } from './components/PlayerPicker';
-import { append, lastSessionAttendees, listSessions } from './db/eventStore';
+import { LineupEditor } from './components/LineupEditor';
+import { append, attendanceRecency, lastSessionAttendees, listSessions } from './db/eventStore';
 import { useWakeLock } from './lib/useWakeLock';
 import { useRoute } from './lib/useRoute';
 import { useSpeech } from './lib/useSpeech';
+import { useNarrow } from './lib/useViewport';
 import { shareSessionFile, importSessionFile } from './lib/exportFile';
 import * as cmd from './domain/commands';
 import { previewLineups, upNextPreview } from './domain/templates';
@@ -45,9 +47,22 @@ export default function App() {
   const [standingsOpen, setStandingsOpen] = useState(false);
   /** The tapped chip. `court` is null when the tap came from the queue section, where a swap reorders instead of substituting. */
   const [picking, setPicking] = useState<{ playerId: string; court: number | null } | null>(null);
+  const [editingCourt, setEditingCourt] = useState<number | null>(null);
+  const [endArmed, setEndArmed] = useState(false);
   /** The rule the organizer is proposing. Nothing is appended until the modal confirms it. */
   const [pendingRule, setPendingRule] = useState<RuleConfig | null>(null);
+  const narrow = useNarrow();
   const { state, dispatch } = session;
+
+  // an armed end button disarms itself; an accidental tap must not linger as a one-tap landmine
+  useEffect(() => {
+    if (!endArmed) return;
+    const t = setTimeout(() => setEndArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [endArmed]);
+  useEffect(() => {
+    setEndArmed(false);
+  }, [route]);
 
   useEffect(() => {
     void (async () => {
@@ -64,6 +79,11 @@ export default function App() {
 
   useEffect(() => {
     if (route === 'setup') void lastSessionAttendees().then(setReturningIds);
+  }, [route]);
+
+  const [recency, setRecency] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (route === 'board') void attendanceRecency().then(setRecency);
   }, [route]);
 
   const returning = roster.players.filter((p) => returningIds.includes(p.id) && !selected.includes(p.id));
@@ -152,6 +172,26 @@ export default function App() {
     navigate('summary');
   };
 
+  const endTap = () => {
+    if (!endArmed) {
+      setEndArmed(true);
+      return;
+    }
+    setEndArmed(false);
+    void end();
+  };
+
+  const reopen = async (sessionId: string) => {
+    await session.loadById(sessionId);
+    await session.undo(); // the newest effective event of an ended log is session-ended
+    navigate('board');
+  };
+
+  const view = async (sessionId: string) => {
+    await session.loadById(sessionId);
+    navigate('summary');
+  };
+
   const fresh = () => {
     speech.cancel();
     session.reset();
@@ -168,7 +208,7 @@ export default function App() {
   ) : null;
 
   const header = (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '12px var(--space-4)', borderBottom: '1px solid var(--border)', background: 'var(--bg)', position: 'sticky', top: 0, zIndex: 10 }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--space-3)', padding: '12px var(--space-4)', borderBottom: '1px solid var(--border)', background: 'var(--bg)', position: 'sticky', top: 0, zIndex: 10 }}>
       <span className="display" style={{ fontSize: '22px', fontWeight: 600 }}>upnext</span>
       {route === 'board' ? (
         <>
@@ -179,7 +219,9 @@ export default function App() {
           </span>
           <IconButton icon="trophy" ariaLabel="Live standings" onClick={() => setStandingsOpen(true)} />
           {muteToggle}
-          <Button variant="danger" onClick={() => void end()}>End session</Button>
+          <Button variant="danger" onClick={endTap}>
+            {endArmed ? 'Tap again to end' : 'End session'}
+          </Button>
         </>
       ) : route === 'summary' ? (
         <>
@@ -203,8 +245,8 @@ export default function App() {
   if (resuming || misrouted) return <div style={{ minHeight: '100vh', background: 'var(--bg)' }} />;
 
   return (
-    /* the board pins to the viewport so the courts area and the rail scroll independently; other routes keep page scroll */
-    <div style={route === 'board'
+    /* the wide board pins to the viewport so the courts area and the rail scroll independently; narrow stacks and keeps page scroll */
+    <div style={route === 'board' && !narrow
       ? { height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)' }
       : { minHeight: '100vh', background: 'var(--bg)' }}>
       {header}
@@ -216,12 +258,15 @@ export default function App() {
           onToggle={(id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))}
           onStart={(config) => void start(config)}
           onResume={(sessionId) => void session.loadById(sessionId).then(() => navigate('board'))}
+          onReopen={(sessionId) => void reopen(sessionId)}
+          onView={(sessionId) => void view(sessionId)}
           onImport={(file) => void importSessionFile(file).then(() => window.location.reload()).catch(() => window.alert('Import failed: that is not a valid upnext session file'))}
           onSelectAll={() => setSelected(roster.players.map((p) => p.id))}
           onClearAll={() => setSelected([])}
           returning={returning}
           onCheckInReturning={() => setSelected((s) => [...s, ...returning.map((p) => p.id)])}
           onUpdatePlayer={(id, changes) => void roster.updatePlayer(id, changes)}
+          narrow={narrow}
         />
       ) : route === 'board' ? (
         <SessionBoard
@@ -231,7 +276,7 @@ export default function App() {
           onUndo={() => void session.undo()}
           canRedo={session.canRedo}
           onRedo={() => void session.redo()}
-          onWin={(court, w) => void dispatch(cmd.finishGame(state, court, w, roster.ratings))}
+          onWin={(court, w, score) => void dispatch(cmd.finishGame(state, court, w, roster.ratings, score))}
           onCloseCourt={(court) => void dispatch(cmd.closeCourt(state, court, roster.ratings))}
           onReopenCourt={(court) => void dispatch(cmd.reopenCourt(state, court, roster.ratings))}
           onToggleSit={(id) => void dispatch(state.sittingOut.includes(id) ? cmd.returnPlayer(state, id, roster.ratings) : cmd.sitOutPlayer(state, id))}
@@ -252,7 +297,10 @@ export default function App() {
             const next = previews[0];
             if (next) speech.speak(next.kind === 'lineup' ? getReadyPhrase(next.pairs, nameOf) : challengersPhrase(next.pair, nameOf));
           }}
+          onEditLineup={setEditingCourt}
           previews={previews}
+          narrow={narrow}
+          recency={recency}
         />
       ) : (
         <SessionSummary
@@ -262,6 +310,8 @@ export default function App() {
           onDone={fresh}
           speak={speech.speak}
           canSpeak={speech.supported && speech.enabled}
+          autoRead={session.lastBatch.some((e) => e.type === 'session-ended')}
+          narrow={narrow}
         />
       )}
       {picking ? (
@@ -301,6 +351,16 @@ export default function App() {
           onClose={() => setStandingsOpen(false)}
           onRead={() => speech.speak(leaderPhrase(rows, nameOf))}
           canRead={speech.supported && speech.enabled}
+        />
+      ) : null}
+      {editingCourt !== null && (state.staged[editingCourt] ?? state.games[editingCourt]) ? (
+        <LineupEditor
+          court={editingCourt}
+          pairs={state.staged[editingCourt] ?? state.games[editingCourt].pairs}
+          bench={state.queue.filter((id) => !state.sittingOut.includes(id))}
+          nameOf={nameOf}
+          onApply={(pairs) => void dispatch(cmd.setLineup(state, editingCourt, pairs))}
+          onClose={() => setEditingCourt(null)}
         />
       ) : null}
     </div>

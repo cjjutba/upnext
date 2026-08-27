@@ -49,7 +49,7 @@ export function ModeChangeModal({ from, draft, onDraftChange, previewLine, onCan
     <div
       onClick={onCancel}
       style={{
-        position: 'fixed', inset: 0, zIndex: 45, background: 'rgba(0, 0, 0, 0.32)',
+        position: 'fixed', inset: 0, zIndex: 45, background: 'var(--overlay)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-4)',
       }}>
       <div

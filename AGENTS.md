@@ -14,7 +14,7 @@ log in IndexedDB, so cloud sync later is an upload rather than a rewrite.
 
 Stack: Vite, React 19, TypeScript, Dexie over IndexedDB, ulidx, lucide-react,
 vite-plugin-pwa. Vitest with jsdom, fake-indexeddb, and fast-check. Roughly
-3,350 lines of source across 43 files, 182 test cases in 12 test files.
+3,670 lines of source across 45 files, 188 test cases in 12 test files.
 
 ## Commands
 

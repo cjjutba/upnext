@@ -113,6 +113,15 @@ describe('finishGame', () => {
     expect(s.queue).toEqual(['a', 'c', 'b', 'd']);
   });
 
+  it('carries an optional score onto the finish event and into the finished game', () => {
+    let log = live(['a', 'b', 'c', 'd'], 'all-off', 1);
+    const more = finishGame(replay(log), 1, 0, {}, '11-7');
+    expect(more).not.toBeNull();
+    expect(more![0]).toMatchObject({ type: 'game-finished', score: '11-7' });
+    log = [...log, ...seal(more!)];
+    expect(replay(log).finishedGames[0].score).toBe('11-7');
+  });
+
   it('winners templates require a winner', () => {
     const log = live(['a', 'b', 'c', 'd'], 'winners-stay', 1);
     expect(finishGame(replay(log), 1)).toBeNull();

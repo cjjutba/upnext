@@ -88,12 +88,15 @@ export function startSession(config: SessionConfig, playerIds: string[], ratings
   return [...events, ...stageEvents(s, null, undefined, ratings)];
 }
 
-export function finishGame(state: SessionState, court: number, winnerPair?: 0 | 1, ratings: Ratings = {}): CommandEvent[] | null {
+export function finishGame(state: SessionState, court: number, winnerPair?: 0 | 1, ratings: Ratings = {}, score?: string): CommandEvent[] | null {
   const active = state.games[court];
   if (!active || !state.sessionId || state.ended) return null;
   // Winners templates cannot rotate without a winner; every other mode records one when the organizer taps it and shrugs when they do not.
   if (isWinnersTemplate(state.rule.template) && winnerPair === undefined) return null;
-  const e: CommandEvent = { type: 'game-finished', court, winnerPair, sessionId: state.sessionId };
+  // score is absent rather than undefined so exported JSON never carries empty keys
+  const e: CommandEvent = score
+    ? { type: 'game-finished', court, winnerPair, score, sessionId: state.sessionId }
+    : { type: 'game-finished', court, winnerPair, sessionId: state.sessionId };
   const after = simulate(state, e);
   return [e, ...stageEvents(after, { pairs: active.pairs, winnerPair: e.winnerPair }, court, ratings)];
 }
@@ -178,21 +181,29 @@ export function unstageCourt(state: SessionState, court: number): CommandEvent[]
 }
 
 /**
+ * Apply a hand-composed lineup to a court. One call for both phases: a staged
+ * court restages, a live one takes a lineup change. The reducer owns the
+ * guards on who may join, so this only refuses a court that holds nothing.
+ */
+export function setLineup(state: SessionState, court: number, pairs: Pairs): CommandEvent[] | null {
+  if (!state.sessionId || state.ended) return null;
+  if (state.staged[court]) return [{ type: 'game-staged', court, pairs, sessionId: state.sessionId }];
+  if (state.games[court]) return [{ type: 'game-lineup-changed', court, pairs, sessionId: state.sessionId }];
+  return null;
+}
+
+/**
  * Swap one waiting player onto a court in place of one who is on it, keeping
- * the pairing. One call for both phases: a staged court restages, a live one
- * takes a lineup change.
+ * the pairing.
  */
 export function substitutePlayer(state: SessionState, court: number, outId: string, inId: string): CommandEvent[] | null {
   if (!state.sessionId || state.ended || outId === inId) return null;
   if (!state.queue.includes(inId) || state.sittingOut.includes(inId)) return null;
-  const staged = state.staged[court];
-  const pairs = staged ?? state.games[court]?.pairs;
+  const pairs = state.staged[court] ?? state.games[court]?.pairs;
   if (!pairs) return null;
   const next = replaceInPairs(pairs, outId, inId);
   if (!next) return null;
-  return staged
-    ? [{ type: 'game-staged', court, pairs: next, sessionId: state.sessionId }]
-    : [{ type: 'game-lineup-changed', court, pairs: next, sessionId: state.sessionId }];
+  return setLineup(state, court, next);
 }
 
 /**

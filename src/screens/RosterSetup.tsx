@@ -17,8 +17,8 @@ const MODE_ICON: Record<MatchingMode, IconName> = {
 };
 
 export function RosterSetup({
-  players, onAddPlayer, selected, onToggle, onStart, onResume, onImport,
-  onSelectAll, onClearAll, returning, onCheckInReturning, onUpdatePlayer,
+  players, onAddPlayer, selected, onToggle, onStart, onResume, onReopen, onView, onImport,
+  onSelectAll, onClearAll, returning, onCheckInReturning, onUpdatePlayer, narrow,
 }: {
   players: Player[];
   onAddPlayer: (name: string) => void;
@@ -26,14 +26,19 @@ export function RosterSetup({
   onToggle: (playerId: string) => void;
   onStart: (config: { courts: number; template: RuleTemplate; winCap: number }) => void;
   onResume: (sessionId: string) => void;
+  onReopen: (sessionId: string) => void;
+  onView: (sessionId: string) => void;
   onImport: (file: File) => void;
   onSelectAll: () => void;
   onClearAll: () => void;
   returning: Player[];
   onCheckInReturning: () => void;
   onUpdatePlayer: (id: string, changes: { name?: string; rating?: number }) => void;
+  /** Phone portrait: the Tonight card stacks under the roster. */
+  narrow: boolean;
 }) {
   const [name, setName] = useState('');
+  const [query, setQuery] = useState('');
   const [courts, setCourts] = useState(2);
   const [mode, setMode] = useState<MatchingMode>('balanced');
   const [splitWinners, setSplitWinners] = useState(false);
@@ -46,7 +51,7 @@ export function RosterSetup({
   const fmtDate = (ts: number) => new Date(ts).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: 'var(--space-4)', padding: 'var(--space-4)', alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : '1fr 420px', gap: 'var(--space-4)', padding: 'var(--space-4)', alignItems: 'start' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
           <span className="display" style={{ fontSize: 'var(--text-h1)' }}>Roster</span>
@@ -69,8 +74,16 @@ export function RosterSetup({
             }} />
           <Button variant="secondary" icon="user-plus" onClick={() => { if (name.trim()) { onAddPlayer(name.trim()); setName(''); } }}>Add</Button>
         </form>
+        {players.length > 12 ? (
+          <input
+            value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search players" aria-label="Search players"
+            style={{
+              height: 'var(--tap-min)', padding: '0 var(--space-3)', font: '400 16px var(--font-sans)',
+              border: '1px solid var(--border)', borderRadius: 'var(--radius-control)', background: 'var(--bg)', color: 'var(--text)',
+            }} />
+        ) : null}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
-          {players.map((p) => (
+          {players.filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase())).map((p) => (
             <PlayerChip
               key={p.id}
               name={p.name}
@@ -125,10 +138,18 @@ export function RosterSetup({
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = ''; }} />
             </label>
           </div>
-          {history.map((h) => (
+          {history.map((h, i) => (
             <div key={h.sessionId} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minHeight: 'var(--tap-min)', padding: '0 var(--space-3)', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-control)' }}>
               <span style={{ font: '600 16px var(--font-sans)', flex: 1 }}>{fmtDate(h.startedAt)}</span>
-              {h.endedAt === null ? <Button variant="ghost" onClick={() => onResume(h.sessionId)}>Resume</Button> : <span className="micro-label">Done</span>}
+              {h.endedAt === null ? (
+                <Button variant="ghost" onClick={() => onResume(h.sessionId)}>Resume</Button>
+              ) : (
+                <>
+                  {/* only the newest session can reopen: reviving an older one would race the night's real log */}
+                  {i === 0 ? <Button variant="ghost" onClick={() => onReopen(h.sessionId)}>Reopen</Button> : null}
+                  <Button variant="ghost" onClick={() => onView(h.sessionId)}>View</Button>
+                </>
+              )}
             </div>
           ))}
           {history.length === 0 ? <span style={{ font: '400 14px var(--font-sans)', color: 'var(--text-tertiary)' }}>No sessions yet.</span> : null}

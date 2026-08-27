@@ -7,6 +7,7 @@ import {
   exportSession,
   importSession,
   lastSessionAttendees,
+  attendanceRecency,
   type SessionExport,
 } from './eventStore';
 
@@ -101,5 +102,22 @@ describe('lastSessionAttendees', () => {
 
   it('returns empty with no ended sessions', async () => {
     expect(await lastSessionAttendees(db)).toEqual([]);
+  });
+});
+
+describe('attendanceRecency', () => {
+  it('maps each player to the start of the newest ended session they attended', async () => {
+    await append({ type: 'session-started', sessionId: 'a', courts: 1, template: 'all-off', config: { winCap: 3 } }, db, 1000);
+    await append({ type: 'player-checked-in', sessionId: 'a', playerId: 'p1' }, db, 1100);
+    await append({ type: 'player-checked-in', sessionId: 'a', playerId: 'p2' }, db, 1200);
+    await append({ type: 'session-ended', sessionId: 'a' }, db, 2000);
+    await append({ type: 'session-started', sessionId: 'b', courts: 1, template: 'all-off', config: { winCap: 3 } }, db, 3000);
+    await append({ type: 'player-checked-in', sessionId: 'b', playerId: 'p2' }, db, 3100);
+    await append({ type: 'session-ended', sessionId: 'b' }, db, 4000);
+    // a live night is not history yet
+    await append({ type: 'session-started', sessionId: 'c', courts: 1, template: 'all-off', config: { winCap: 3 } }, db, 5000);
+    await append({ type: 'player-checked-in', sessionId: 'c', playerId: 'p9' }, db, 5100);
+
+    expect(await attendanceRecency(db)).toEqual({ p1: 1000, p2: 3000 });
   });
 });
