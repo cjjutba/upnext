@@ -152,6 +152,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await waitFor(() => expect(said()).toHaveLength(3));
 
     await click(btn('End session'));
+    await click(btn('Tap again to end'));
     await screen.findByText('Session summary');
     await waitFor(() => expect(said().at(-1)).toContain('Session complete. In first place,'));
     expect(said().at(-1)).toContain('with 1 win from 1 game, 100 percent.');
@@ -178,9 +179,38 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await waitFor(() => expect(said()).toHaveLength(3));
 
     await click(btn('End session'));
+    await click(btn('Tap again to end'));
     await screen.findByText('Session summary');
     await waitFor(() => expect(said()).toHaveLength(4));
     expect(said().filter((l) => l.startsWith('Session complete.'))).toHaveLength(1);
+  });
+
+  it('ends the session only on the second tap', async () => {
+    render(<App />);
+    await startSession(/^Balanced/);
+
+    await click(btn('End session'));
+    expect(screen.queryByText('Session summary')).not.toBeInTheDocument(); // still live, armed
+    await click(btn('Tap again to end'));
+    await screen.findByText('Session summary');
+  });
+
+  it('reopens the last ended session from history onto the live board', async () => {
+    render(<App />);
+    await startSession(/^Balanced/);
+    await click(btn(/Team 1 wins/, courtCard(1)));
+
+    await click(btn('End session'));
+    await click(btn('Tap again to end'));
+    await screen.findByText('Session summary');
+    await click(btn('New session'));
+    await screen.findByText('Roster');
+
+    await click(await screen.findByRole('button', { name: 'Reopen' }));
+    await screen.findByLabelText('Close court 1'); // live board again, court occupied
+
+    const dialog = await openStandings();
+    await waitFor(() => expect(within(dialog).getAllByText('100%')).toHaveLength(2)); // the win survived
   });
 
   it('has no up next call in Winners mode, where the next lineup is not known yet', async () => {

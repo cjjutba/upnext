@@ -32,8 +32,19 @@ export default function App() {
   const [resuming, setResuming] = useState(true);
   const [returningIds, setReturningIds] = useState<string[]>([]);
   const [standingsOpen, setStandingsOpen] = useState(false);
+  const [endArmed, setEndArmed] = useState(false);
   const narrow = useNarrow();
   const { state, dispatch } = session;
+
+  // an armed end button disarms itself; an accidental tap must not linger as a one-tap landmine
+  useEffect(() => {
+    if (!endArmed) return;
+    const t = setTimeout(() => setEndArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [endArmed]);
+  useEffect(() => {
+    setEndArmed(false);
+  }, [route]);
 
   useEffect(() => {
     void (async () => {
@@ -116,6 +127,21 @@ export default function App() {
     navigate('summary');
   };
 
+  const endTap = () => {
+    if (!endArmed) {
+      setEndArmed(true);
+      return;
+    }
+    setEndArmed(false);
+    void end();
+  };
+
+  const reopen = async (sessionId: string) => {
+    await session.loadById(sessionId);
+    await session.undo(); // the newest effective event of an ended log is session-ended
+    navigate('board');
+  };
+
   const fresh = () => {
     speech.cancel();
     session.reset();
@@ -143,7 +169,9 @@ export default function App() {
           </span>
           <IconButton icon="trophy" ariaLabel="Live standings" onClick={() => setStandingsOpen(true)} />
           {muteToggle}
-          <Button variant="secondary" onClick={() => void end()}>End session</Button>
+          <Button variant={endArmed ? 'primary' : 'secondary'} onClick={endTap}>
+            {endArmed ? 'Tap again to end' : 'End session'}
+          </Button>
         </>
       ) : route === 'summary' ? (
         <>
@@ -180,6 +208,7 @@ export default function App() {
           onToggle={(id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))}
           onStart={(config) => void start(config)}
           onResume={(sessionId) => void session.loadById(sessionId).then(() => navigate('board'))}
+          onReopen={(sessionId) => void reopen(sessionId)}
           onImport={(file) => void importSessionFile(file).then(() => window.location.reload()).catch(() => window.alert('Import failed: that is not a valid upnext session file'))}
           onSelectAll={() => setSelected(roster.players.map((p) => p.id))}
           onClearAll={() => setSelected([])}

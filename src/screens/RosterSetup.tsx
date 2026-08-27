@@ -17,7 +17,7 @@ const MODE_ICON: Record<MatchingMode, IconName> = {
 };
 
 export function RosterSetup({
-  players, onAddPlayer, selected, onToggle, onStart, onResume, onImport,
+  players, onAddPlayer, selected, onToggle, onStart, onResume, onReopen, onImport,
   onSelectAll, onClearAll, returning, onCheckInReturning, onUpdatePlayer, narrow,
 }: {
   players: Player[];
@@ -26,6 +26,7 @@ export function RosterSetup({
   onToggle: (playerId: string) => void;
   onStart: (config: { courts: number; template: RuleTemplate; winCap: number }) => void;
   onResume: (sessionId: string) => void;
+  onReopen: (sessionId: string) => void;
   onImport: (file: File) => void;
   onSelectAll: () => void;
   onClearAll: () => void;
@@ -127,10 +128,18 @@ export function RosterSetup({
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = ''; }} />
             </label>
           </div>
-          {history.map((h) => (
+          {history.map((h, i) => (
             <div key={h.sessionId} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minHeight: 'var(--tap-min)', padding: '0 var(--space-3)', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-control)' }}>
               <span style={{ font: '600 16px var(--font-sans)', flex: 1 }}>{fmtDate(h.startedAt)}</span>
-              {h.endedAt === null ? <Button variant="ghost" onClick={() => onResume(h.sessionId)}>Resume</Button> : <span className="micro-label">Done</span>}
+              {h.endedAt === null ? (
+                <Button variant="ghost" onClick={() => onResume(h.sessionId)}>Resume</Button>
+              ) : (
+                <>
+                  {/* only the newest session can reopen: reviving an older one would race the night's real log */}
+                  {i === 0 ? <Button variant="ghost" onClick={() => onReopen(h.sessionId)}>Reopen</Button> : null}
+                  <span className="micro-label">Done</span>
+                </>
+              )}
             </div>
           ))}
           {history.length === 0 ? <span style={{ font: '400 14px var(--font-sans)', color: 'var(--text-tertiary)' }}>No sessions yet.</span> : null}
