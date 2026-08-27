@@ -28,7 +28,7 @@ export function StandingsModal({ rows, nameOf, onClose, onRead, canRead }: {
     <div
       onClick={onClose}
       style={{
-        position: 'fixed', inset: 0, zIndex: 40, background: 'rgba(0, 0, 0, 0.32)',
+        position: 'fixed', inset: 0, zIndex: 40, background: 'var(--overlay)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-4)',
       }}>
       <div

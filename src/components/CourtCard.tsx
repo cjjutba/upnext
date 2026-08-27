@@ -4,7 +4,7 @@ import { StatusBadge, type BadgeStatus } from './StatusBadge';
 import { CourtDiagram } from './CourtDiagram';
 import type { Pairs } from '../domain/types';
 
-export function CourtCard({ court, status, pairs, elapsed, onWin, onClose, onReopen }: {
+export function CourtCard({ court, status, pairs, elapsed, onWin, onClose, onReopen, onEdit }: {
   court: number;
   status: BadgeStatus; // live | warn | danger (closed) | neutral (open)
   pairs: Pairs | null;
@@ -12,6 +12,7 @@ export function CourtCard({ court, status, pairs, elapsed, onWin, onClose, onReo
   onWin: (winnerPair: 0 | 1) => void;
   onClose: () => void;
   onReopen: () => void;
+  onEdit: () => void;
 }) {
   const closed = status === 'danger';
   return (
@@ -29,7 +30,10 @@ export function CourtCard({ court, status, pairs, elapsed, onWin, onClose, onReo
         {closed ? (
           <Button variant="ghost" onClick={onReopen} ariaLabel={'Reopen court ' + court}>Reopen</Button>
         ) : (
-          <IconButton icon="x" ariaLabel={'Close court ' + court} onClick={onClose} />
+          <>
+            {pairs ? <IconButton icon="pencil" ariaLabel={'Edit lineup on court ' + court} onClick={onEdit} /> : null}
+            <IconButton icon="x" ariaLabel={'Close court ' + court} onClick={onClose} />
+          </>
         )}
       </div>
       {closed || !pairs ? (

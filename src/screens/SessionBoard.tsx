@@ -22,7 +22,7 @@ export { fmt };
 
 export function SessionBoard({
   state, players, undoLabel, onUndo, canRedo, onRedo, onWin, onCloseCourt, onReopenCourt,
-  onToggleSit, onToggleCheck, onAddCourt, onAddPlayer, nextUp, onCallUpNext, canCallUpNext, narrow,
+  onToggleSit, onToggleCheck, onAddCourt, onAddPlayer, nextUp, onCallUpNext, canCallUpNext, narrow, onEditLineup,
 }: {
   state: SessionState;
   players: Player[];
@@ -43,6 +43,7 @@ export function SessionBoard({
   canCallUpNext: boolean;
   /** Phone portrait: the rail stacks under the courts and the page scrolls as one. */
   narrow: boolean;
+  onEditLineup: (court: number) => void;
 }) {
   const [now, setNow] = useState(() => Date.now());
   const [newName, setNewName] = useState('');
@@ -81,7 +82,8 @@ export function SessionBoard({
             const pairs = game ? ([game.pairs[0].map(nameOf), game.pairs[1].map(nameOf)] as SessionState['games'][number]['pairs']) : null;
             return (
               <CourtCard key={n} court={n} status={status} pairs={pairs} elapsed={fmt(elapsed)}
-                onWin={(w) => onWin(n, w)} onClose={() => onCloseCourt(n)} onReopen={() => onReopenCourt(n)} />
+                onWin={(w) => onWin(n, w)} onClose={() => onCloseCourt(n)} onReopen={() => onReopenCourt(n)}
+                onEdit={() => onEditLineup(n)} />
             );
           })}
         </div>

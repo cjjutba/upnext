@@ -233,6 +233,26 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     expect(said()).toEqual([]); // browsing history never reads the podium aloud
   });
 
+  it('hand-composes a lineup: substitute a waiting player onto the court', async () => {
+    render(<App />);
+    await startSession(/^Balanced/);
+    await waitFor(() => expect(said()).toHaveLength(1));
+
+    await click(btn('Edit lineup on court 1'));
+    const dialog = await screen.findByRole('dialog', { name: 'Edit court 1 lineup' });
+    expect(btn('Apply lineup', dialog)).toBeDisabled(); // nothing changed yet
+
+    await click(btn('Carol', dialog)); // on court in every partition: the front four are Alice..Dave
+    await click(btn('Eve', dialog)); // first waiting player
+    await click(btn('Apply lineup', dialog));
+
+    await waitFor(() => expect(said().at(-1)).toMatch(/^Court 1\. Lineup change\. .*Eve.*\.$/));
+    expect(said().at(-1)).not.toContain('Carol');
+    expect(within(courtCard(1)).getByText('Eve')).toBeInTheDocument();
+    expect(within(courtCard(1)).queryByText('Carol')).not.toBeInTheDocument();
+    expect(screen.getByText('Undo: court 1 lineup')).toBeInTheDocument();
+  });
+
   it('has no up next call in Winners mode, where the next lineup is not known yet', async () => {
     render(<App />);
     await startSession(/^Winners/);

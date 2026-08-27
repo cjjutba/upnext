@@ -9,6 +9,7 @@ import { ModeMenu } from './components/ModeMenu';
 import { Button } from './components/Button';
 import { IconButton } from './components/IconButton';
 import { StandingsModal } from './components/StandingsModal';
+import { LineupEditor } from './components/LineupEditor';
 import { append, lastSessionAttendees, listSessions } from './db/eventStore';
 import { useWakeLock } from './lib/useWakeLock';
 import { useRoute } from './lib/useRoute';
@@ -32,6 +33,7 @@ export default function App() {
   const [resuming, setResuming] = useState(true);
   const [returningIds, setReturningIds] = useState<string[]>([]);
   const [standingsOpen, setStandingsOpen] = useState(false);
+  const [editingCourt, setEditingCourt] = useState<number | null>(null);
   const [endArmed, setEndArmed] = useState(false);
   const narrow = useNarrow();
   const { state, dispatch } = session;
@@ -242,6 +244,7 @@ export default function App() {
           onCallUpNext={() => nextUp && speech.speak(upNextPhrase(nextUp, nameOf))}
           canCallUpNext={speech.supported && speech.enabled}
           narrow={narrow}
+          onEditLineup={setEditingCourt}
         />
       ) : (
         <SessionSummary
@@ -261,6 +264,16 @@ export default function App() {
           onClose={() => setStandingsOpen(false)}
           onRead={() => speech.speak(leaderPhrase(rows, nameOf))}
           canRead={speech.supported && speech.enabled}
+        />
+      ) : null}
+      {editingCourt !== null && state.games[editingCourt] ? (
+        <LineupEditor
+          court={editingCourt}
+          pairs={state.games[editingCourt].pairs}
+          bench={state.queue.filter((id) => !state.sittingOut.includes(id))}
+          nameOf={nameOf}
+          onApply={(pairs) => void dispatch(cmd.changeLineup(state, editingCourt, pairs))}
+          onClose={() => setEditingCourt(null)}
         />
       ) : null}
     </div>
