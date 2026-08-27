@@ -24,7 +24,7 @@ export { fmt };
 
 export function SessionBoard({
   state, players, undoLabel, onUndo, canRedo, onRedo, onWin, onCloseCourt, onReopenCourt,
-  onToggleSit, onToggleCheck, onAddCourt, onAddPlayer, preview, onCallUpNext, canCallUpNext,
+  onToggleSit, onToggleCheck, onAddCourt, onAddPlayer, preview, onCallUpNext, canCallUpNext, narrow, onEditLineup, recency,
 }: {
   state: SessionState;
   players: Player[];
@@ -32,7 +32,7 @@ export function SessionBoard({
   onUndo: () => void;
   canRedo: boolean;
   onRedo: () => void;
-  onWin: (court: number, winnerPair: 0 | 1) => void;
+  onWin: (court: number, winnerPair: 0 | 1, score?: string) => void;
   onCloseCourt: (court: number) => void;
   onReopenCourt: (court: number) => void;
   onToggleSit: (playerId: string) => void;
@@ -44,9 +44,15 @@ export function SessionBoard({
   onCallUpNext: () => void;
   /** False while muted, when the call button would do nothing. */
   canCallUpNext: boolean;
+  /** Phone portrait: the rail stacks under the courts and the page scrolls as one. */
+  narrow: boolean;
+  onEditLineup: (court: number) => void;
+  /** startedAt of the newest ended session each player attended; regulars sort first. */
+  recency: Record<string, number>;
 }) {
   const [now, setNow] = useState(() => Date.now());
   const [newName, setNewName] = useState('');
+  const [query, setQuery] = useState('');
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
@@ -56,37 +62,53 @@ export function SessionBoard({
   const courts = Array.from({ length: state.courtCount }, (_, i) => i + 1);
   const eligibleQueue = state.queue.filter((p) => !state.sittingOut.includes(p));
   const nextFour = new Set(eligibleQueue.slice(0, 4));
-  const grid = [...players].sort((a, b) => Number(state.checkedIn.includes(b.id)) - Number(state.checkedIn.includes(a.id)) || a.name.localeCompare(b.name));
+  const grid = [...players]
+    .sort((a, b) =>
+      Number(state.checkedIn.includes(b.id)) - Number(state.checkedIn.includes(a.id)) ||
+      (recency[b.id] ?? 0) - (recency[a.id] ?? 0) ||
+      a.name.localeCompare(b.name))
+    .filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase()));
 
   const tileState = (p: Player): TileState =>
     isPlaying(state, p.id) ? 'playing' : state.sittingOut.includes(p.id) ? 'sitting' : state.queue.includes(p.id) ? 'in' : 'out';
 
   return (
-    <div style={{ display: 'flex', flex: 1, minHeight: 0, alignItems: 'stretch' }}>
+    <div style={narrow
+      ? { display: 'flex', flexDirection: 'column' }
+      : { display: 'flex', flex: 1, minHeight: 0, alignItems: 'stretch' }}>
       {/* 104px bottom padding keeps the fixed undo pill off the last panel's win buttons */}
-      <main style={{ flex: 1, minWidth: 0, padding: '24px 24px 104px', overflowY: 'auto' }}>
+      <main style={narrow
+        ? { minWidth: 0, padding: '16px' }
+        : { flex: 1, minWidth: 0, padding: '24px 24px 104px', overflowY: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
           <span className="micro-label">Courts</span>
           <span style={{ flex: 1 }} />
           <Button variant="primary" icon="plus" onClick={onAddCourt} disabled={eligibleQueue.length < 4} ariaLabel="Add court">Add court</Button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(480px, 1fr))', gap: 'var(--space-4)', alignContent: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 480px), 1fr))', gap: 'var(--space-4)', alignContent: 'start' }}>
           {courts.map((n) => {
             const game = state.games[n];
             const elapsed = game ? (now - game.startedAt) / 1000 : 0;
             const status = state.closedCourts.includes(n) ? 'danger' : !game ? 'neutral' : elapsed > LONG_GAME_SECONDS ? 'warn' : 'live';
             const pairs = game ? ([game.pairs[0].map(nameOf), game.pairs[1].map(nameOf)] as SessionState['games'][number]['pairs']) : null;
             return (
-              <CourtCard key={n} court={n} status={status} pairs={pairs} elapsed={fmt(elapsed)}
-                onWin={(w) => onWin(n, w)} onClose={() => onCloseCourt(n)} onReopen={() => onReopenCourt(n)} />
+              // keyed by the game so the score field starts blank on every refill
+              <CourtCard key={n + ':' + (game?.startedEventId ?? 'open')} court={n} status={status} pairs={pairs} elapsed={fmt(elapsed)}
+                onWin={(w, score) => onWin(n, w, score)} onClose={() => onCloseCourt(n)} onReopen={() => onReopenCourt(n)}
+                onEdit={() => onEditLineup(n)} />
             );
           })}
         </div>
       </main>
-      <aside style={{
-        width: '360px', flex: 'none', borderLeft: '1px solid var(--border)', padding: '20px', overflowY: 'auto',
-        display: 'flex', flexDirection: 'column', gap: '28px', background: 'var(--bg)',
-      }}>
+      <aside style={narrow
+        ? {
+          borderTop: '1px solid var(--border)', padding: '20px 16px 104px',
+          display: 'flex', flexDirection: 'column', gap: '28px', background: 'var(--bg)',
+        }
+        : {
+          width: '360px', flex: 'none', borderLeft: '1px solid var(--border)', padding: '20px', overflowY: 'auto',
+          display: 'flex', flexDirection: 'column', gap: '28px', background: 'var(--bg)',
+        }}>
         <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
             <span className="micro-label">Queue</span>
@@ -137,6 +159,14 @@ export function SessionBoard({
               }} />
             <Button variant="secondary" icon="user-plus" onClick={() => { if (newName.trim()) { onAddPlayer(newName.trim()); setNewName(''); } }}>Add</Button>
           </form>
+          {players.length > 12 ? (
+            <input
+              value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search players" aria-label="Search players"
+              style={{
+                minWidth: 0, height: 'var(--tap-min)', padding: '0 var(--space-3)', font: '400 16px var(--font-sans)',
+                border: '1px solid var(--border)', borderRadius: 'var(--radius-control)', background: 'var(--bg)', color: 'var(--text)',
+              }} />
+          ) : null}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
             {grid.map((p) => (
               <CheckinTile key={p.id} name={p.name} state={tileState(p)}
