@@ -167,12 +167,12 @@ describe('games', () => {
     expect(s.consecutiveWins['a']).toBe(0);
   });
 
-  it('balanced and social finishes send all four to the back even if a winnerPair sneaks in', () => {
+  it('balanced and social count a winnerPair as a win but still send all four to the back', () => {
     const s = replay([start(1, 'balanced', 3), checkIn('a'), checkIn('b'), checkIn('c'), checkIn('d'), checkIn('e'),
       game(1, four), finish(1, 0)]);
     expect(s.queue).toEqual(['e', 'a', 'c', 'b', 'd']);
-    expect(s.wins).toEqual({});
-    expect(s.consecutiveWins).toEqual({ a: 0, b: 0, c: 0, d: 0 });
+    expect(s.wins).toEqual({ a: 1, c: 1 });
+    expect(s.consecutiveWins).toEqual({ a: 0, b: 0, c: 0, d: 0 }); // the win cap is a winners-template rule
   });
 });
 
