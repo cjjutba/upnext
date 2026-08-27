@@ -13,6 +13,7 @@ import { append, lastSessionAttendees, listSessions } from './db/eventStore';
 import { useWakeLock } from './lib/useWakeLock';
 import { useRoute } from './lib/useRoute';
 import { useSpeech } from './lib/useSpeech';
+import { useNarrow } from './lib/useViewport';
 import { shareSessionFile, importSessionFile } from './lib/exportFile';
 import * as cmd from './domain/commands';
 import { nextLineup } from './domain/templates';
@@ -31,6 +32,7 @@ export default function App() {
   const [resuming, setResuming] = useState(true);
   const [returningIds, setReturningIds] = useState<string[]>([]);
   const [standingsOpen, setStandingsOpen] = useState(false);
+  const narrow = useNarrow();
   const { state, dispatch } = session;
 
   useEffect(() => {
@@ -130,7 +132,7 @@ export default function App() {
   ) : null;
 
   const header = (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '12px var(--space-4)', borderBottom: '1px solid var(--border)', background: 'var(--bg)', position: 'sticky', top: 0, zIndex: 10 }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--space-3)', padding: '12px var(--space-4)', borderBottom: '1px solid var(--border)', background: 'var(--bg)', position: 'sticky', top: 0, zIndex: 10 }}>
       <span className="display" style={{ fontSize: '22px', fontWeight: 600 }}>upnext</span>
       {route === 'board' ? (
         <>
@@ -165,8 +167,8 @@ export default function App() {
   if (resuming || misrouted) return <div style={{ minHeight: '100vh', background: 'var(--bg)' }} />;
 
   return (
-    /* the board pins to the viewport so the courts area and the rail scroll independently; other routes keep page scroll */
-    <div style={route === 'board'
+    /* the wide board pins to the viewport so the courts area and the rail scroll independently; narrow stacks and keeps page scroll */
+    <div style={route === 'board' && !narrow
       ? { height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)' }
       : { minHeight: '100vh', background: 'var(--bg)' }}>
       {header}
@@ -184,6 +186,7 @@ export default function App() {
           returning={returning}
           onCheckInReturning={() => setSelected((s) => [...s, ...returning.map((p) => p.id)])}
           onUpdatePlayer={(id, changes) => void roster.updatePlayer(id, changes)}
+          narrow={narrow}
         />
       ) : route === 'board' ? (
         <SessionBoard
@@ -203,6 +206,7 @@ export default function App() {
           nextUp={nextUp}
           onCallUpNext={() => nextUp && speech.speak(upNextPhrase(nextUp, nameOf))}
           canCallUpNext={speech.supported && speech.enabled}
+          narrow={narrow}
         />
       ) : (
         <SessionSummary

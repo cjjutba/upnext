@@ -22,7 +22,7 @@ export { fmt };
 
 export function SessionBoard({
   state, players, undoLabel, onUndo, canRedo, onRedo, onWin, onCloseCourt, onReopenCourt,
-  onToggleSit, onToggleCheck, onAddCourt, onAddPlayer, nextUp, onCallUpNext, canCallUpNext,
+  onToggleSit, onToggleCheck, onAddCourt, onAddPlayer, nextUp, onCallUpNext, canCallUpNext, narrow,
 }: {
   state: SessionState;
   players: Player[];
@@ -41,6 +41,8 @@ export function SessionBoard({
   onCallUpNext: () => void;
   /** False while muted, when the call button would do nothing. */
   canCallUpNext: boolean;
+  /** Phone portrait: the rail stacks under the courts and the page scrolls as one. */
+  narrow: boolean;
 }) {
   const [now, setNow] = useState(() => Date.now());
   const [newName, setNewName] = useState('');
@@ -59,15 +61,19 @@ export function SessionBoard({
     isPlaying(state, p.id) ? 'playing' : state.sittingOut.includes(p.id) ? 'sitting' : state.queue.includes(p.id) ? 'in' : 'out';
 
   return (
-    <div style={{ display: 'flex', flex: 1, minHeight: 0, alignItems: 'stretch' }}>
+    <div style={narrow
+      ? { display: 'flex', flexDirection: 'column' }
+      : { display: 'flex', flex: 1, minHeight: 0, alignItems: 'stretch' }}>
       {/* 104px bottom padding keeps the fixed undo pill off the last panel's win buttons */}
-      <main style={{ flex: 1, minWidth: 0, padding: '24px 24px 104px', overflowY: 'auto' }}>
+      <main style={narrow
+        ? { minWidth: 0, padding: '16px' }
+        : { flex: 1, minWidth: 0, padding: '24px 24px 104px', overflowY: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
           <span className="micro-label">Courts</span>
           <span style={{ flex: 1 }} />
           <Button variant="ghost" icon="plus" onClick={onAddCourt} disabled={eligibleQueue.length < 4} ariaLabel="Add court">Add court</Button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(480px, 1fr))', gap: 'var(--space-4)', alignContent: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 480px), 1fr))', gap: 'var(--space-4)', alignContent: 'start' }}>
           {courts.map((n) => {
             const game = state.games[n];
             const elapsed = game ? (now - game.startedAt) / 1000 : 0;
@@ -80,10 +86,15 @@ export function SessionBoard({
           })}
         </div>
       </main>
-      <aside style={{
-        width: '360px', flex: 'none', borderLeft: '1px solid var(--border)', padding: '20px', overflowY: 'auto',
-        display: 'flex', flexDirection: 'column', gap: '28px', background: 'var(--bg)',
-      }}>
+      <aside style={narrow
+        ? {
+          borderTop: '1px solid var(--border)', padding: '20px 16px 104px',
+          display: 'flex', flexDirection: 'column', gap: '28px', background: 'var(--bg)',
+        }
+        : {
+          width: '360px', flex: 'none', borderLeft: '1px solid var(--border)', padding: '20px', overflowY: 'auto',
+          display: 'flex', flexDirection: 'column', gap: '28px', background: 'var(--bg)',
+        }}>
         <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
             <span className="micro-label">Queue</span>

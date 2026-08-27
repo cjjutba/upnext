@@ -18,7 +18,7 @@ const MODE_ICON: Record<MatchingMode, IconName> = {
 
 export function RosterSetup({
   players, onAddPlayer, selected, onToggle, onStart, onResume, onImport,
-  onSelectAll, onClearAll, returning, onCheckInReturning, onUpdatePlayer,
+  onSelectAll, onClearAll, returning, onCheckInReturning, onUpdatePlayer, narrow,
 }: {
   players: Player[];
   onAddPlayer: (name: string) => void;
@@ -32,6 +32,8 @@ export function RosterSetup({
   returning: Player[];
   onCheckInReturning: () => void;
   onUpdatePlayer: (id: string, changes: { name?: string; rating?: number }) => void;
+  /** Phone portrait: the Tonight card stacks under the roster. */
+  narrow: boolean;
 }) {
   const [name, setName] = useState('');
   const [courts, setCourts] = useState(2);
@@ -46,7 +48,7 @@ export function RosterSetup({
   const fmtDate = (ts: number) => new Date(ts).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: 'var(--space-4)', padding: 'var(--space-4)', alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : '1fr 420px', gap: 'var(--space-4)', padding: 'var(--space-4)', alignItems: 'start' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
           <span className="display" style={{ fontSize: 'var(--text-h1)' }}>Roster</span>
