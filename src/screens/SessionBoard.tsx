@@ -76,7 +76,8 @@ export function SessionBoard({
   }, []);
 
   const nameOf = (id: string) => players.find((p) => p.id === id)?.name ?? 'Unknown';
-  const courts = Array.from({ length: state.courtCount }, (_, i) => i + 1);
+  const openCourts = Array.from({ length: state.courtCount }, (_, i) => i + 1).filter((n) => !state.closedCourts.includes(n));
+  const closedCourts = [...state.closedCourts].sort((a, b) => a - b);
   const eligibleQueue = state.queue.filter((p) => !state.sittingOut.includes(p));
   // checkedIn only grows, so anyone who left has to be subtracted rather than looked up there
   const present = state.checkedIn.filter((id) => !state.departed.includes(id));
@@ -123,26 +124,44 @@ export function SessionBoard({
             <span style={{ flex: 1 }} />
             <Button variant="primary" icon="plus" onClick={onAddCourt} disabled={eligibleQueue.length < 4} ariaLabel="Add court">Add court</Button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 480px), 1fr))', gap: 'var(--space-4)', alignContent: 'start' }}>
-            {courts.map((n) => {
-              const game = state.games[n];
-              const staged = state.staged[n];
-              const elapsed = game ? (now - game.startedAt) / 1000 : 0;
-              const phase: CourtPhase = state.closedCourts.includes(n) ? 'closed' : game ? 'live' : staged ? 'staged' : 'empty';
-              return (
-                // keyed by the game so the score field starts blank on every refill
-                <CourtCard key={n + ':' + (game?.startedEventId ?? 'open')} court={n} phase={phase} longGame={elapsed > LONG_GAME_SECONDS}
-                  pairs={phase === 'closed' ? null : game?.pairs ?? staged ?? null}
-                  elapsed={fmt(elapsed)} nameOf={nameOf} canStage={eligibleQueue.length >= 4}
-                  canFill={eligibleQueue.length > 0}
-                  onWin={(w, score) => onWin(n, w, score)} onStart={() => onStart(n)} onCall={() => onCallCourt(n)}
-                  onShuffle={() => onShuffle(n)} onStage={() => onStage(n)}
-                  onPlayerTap={(id) => onCourtPlayerTap(n, id)} onEdit={() => onEditLineup(n)}
-                  onSeatTap={(slot) => setSeating({ court: n, slot })} onFill={() => onFillCourt(n)}
-                  onClose={() => onCloseCourt(n)} onReopen={() => onReopenCourt(n)} />
-              );
-            })}
-          </div>
+          {closedCourts.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              <span className="micro-label">Closed courts</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+                {closedCourts.map((n) => (
+                  <Button key={n} variant="secondary" icon="rotate-cw" onClick={() => onReopenCourt(n)} ariaLabel={'Reopen court ' + n}>
+                    Court {n}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {openCourts.length === 0 ? (
+            <div style={{ padding: 'var(--space-3)', font: '400 15px var(--font-sans)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-card)' }}>
+              All courts are closed. Reopen one above to keep playing.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 480px), 1fr))', gap: 'var(--space-4)', alignContent: 'start' }}>
+              {openCourts.map((n) => {
+                const game = state.games[n];
+                const staged = state.staged[n];
+                const elapsed = game ? (now - game.startedAt) / 1000 : 0;
+                const phase: CourtPhase = game ? 'live' : staged ? 'staged' : 'empty';
+                return (
+                  // keyed by the game so the score field starts blank on every refill
+                  <CourtCard key={n + ':' + (game?.startedEventId ?? 'open')} court={n} phase={phase} longGame={elapsed > LONG_GAME_SECONDS}
+                    pairs={game?.pairs ?? staged ?? null}
+                    elapsed={fmt(elapsed)} nameOf={nameOf} canStage={eligibleQueue.length >= 4}
+                    canFill={eligibleQueue.length > 0}
+                    onWin={(w, score) => onWin(n, w, score)} onStart={() => onStart(n)} onCall={() => onCallCourt(n)}
+                    onShuffle={() => onShuffle(n)} onStage={() => onStage(n)}
+                    onPlayerTap={(id) => onCourtPlayerTap(n, id)} onEdit={() => onEditLineup(n)}
+                    onSeatTap={(slot) => setSeating({ court: n, slot })} onFill={() => onFillCourt(n)}
+                    onClose={() => onCloseCourt(n)} />
+                );
+              })}
+            </div>
+          )}
         </section>
 
         <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>

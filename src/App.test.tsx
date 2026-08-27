@@ -420,6 +420,24 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await waitFor(() => expect(within(courtCard(1)).getByText('Live')).toBeInTheDocument());
     expect(within(courtCard(1)).getByText('Alice')).toBeInTheDocument();
   });
+
+  it('removes a closed court card and reopens it from the chip row', async () => {
+    render(<App />);
+    await screen.findByText('Roster');
+    await click(btn('Check in all'));
+    await click(btn(/^Balanced/));
+    await click(btn(/Start session/));
+    await screen.findByLabelText('Close court 1');
+    await screen.findByLabelText('Close court 2');
+
+    await click(screen.getByLabelText('Close court 2'));
+    await waitFor(() => expect(screen.queryByLabelText('Close court 2')).not.toBeInTheDocument());
+    expect(screen.getByLabelText('Close court 1')).toBeInTheDocument();
+
+    await click(await screen.findByRole('button', { name: 'Reopen court 2' }));
+    await screen.findByLabelText('Close court 2');
+    expect(screen.queryByRole('button', { name: 'Reopen court 2' })).not.toBeInTheDocument();
+  });
 });
 
 describe('App: switching matching mode mid-session', () => {

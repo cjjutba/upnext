@@ -5,19 +5,19 @@ import { StatusBadge, type BadgeStatus } from './StatusBadge';
 import { CourtDiagram } from './CourtDiagram';
 import { fullLineup, type Lineup, type SlotIndex } from '../domain/types';
 
-export type CourtPhase = 'live' | 'staged' | 'empty' | 'closed';
+export type CourtPhase = 'live' | 'staged' | 'empty';
 
-const badge: Record<CourtPhase, BadgeStatus> = { live: 'live', staged: 'neutral', empty: 'neutral', closed: 'danger' };
+const badge: Record<CourtPhase, BadgeStatus> = { live: 'live', staged: 'neutral', empty: 'neutral' };
 
 export function CourtCard({
   court, phase, longGame, pairs, elapsed, nameOf,
-  onWin, onStart, onCall, onShuffle, onStage, onPlayerTap, onSeatTap, onFill, onEdit, onClose, onReopen, canStage, canFill,
+  onWin, onStart, onCall, onShuffle, onStage, onPlayerTap, onSeatTap, onFill, onEdit, onClose, canStage, canFill,
 }: {
   court: number;
   phase: CourtPhase;
   /** Live game past the long-game threshold. Only changes the badge. */
   longGame?: boolean;
-  /** The four on the court, live or staged. Null on an empty or closed court. A live court may hold an open seat. */
+  /** The four on the court, live or staged. Null on an empty court. A live court may hold an open seat. */
   pairs: Lineup | null;
   elapsed: string;
   nameOf: (playerId: string) => string;
@@ -31,7 +31,6 @@ export function CourtCard({
   onFill: () => void;
   onEdit: () => void;
   onClose: () => void;
-  onReopen: () => void;
   /** Four or more waiting, so an empty court can be filled by hand. */
   canStage: boolean;
   /** At least one waiting, so an open seat can be filled from the queue. */
@@ -58,14 +57,8 @@ export function CourtCard({
           {phase === 'live' ? (
             <span className="mono" style={{ fontSize: 'clamp(24px, 9vw, 40px)', lineHeight: 1, letterSpacing: '-0.01em' }}>{elapsed}</span>
           ) : null}
-          {phase === 'closed' ? (
-            <Button variant="ghost" onClick={onReopen} ariaLabel={'Reopen court ' + court}>Reopen</Button>
-          ) : (
-            <>
-              {pairs ? <IconButton icon="pencil" ariaLabel={'Edit lineup on court ' + court} onClick={onEdit} /> : null}
-              <IconButton icon="x" ariaLabel={'Close court ' + court} onClick={onClose} />
-            </>
-          )}
+          {pairs ? <IconButton icon="pencil" ariaLabel={'Edit lineup on court ' + court} onClick={onEdit} /> : null}
+          <IconButton icon="x" ariaLabel={'Close court ' + court} onClick={onClose} />
         </div>
       </div>
       {pairs ? (
@@ -110,7 +103,7 @@ export function CourtCard({
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-4) 0' }}>
           <span style={{ font: '400 16px/1.4 var(--font-sans)', color: 'var(--text-tertiary)' }}>
-            {phase === 'closed' ? 'Court closed' : 'Waiting for players'}
+            Waiting for players
           </span>
           {phase === 'empty' && canStage ? (
             <Button variant="secondary" icon="user-plus" onClick={onStage} ariaLabel={'Stage the next four on court ' + court}>Stage next four</Button>
