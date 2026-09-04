@@ -73,7 +73,12 @@ export function SessionSummary({ state, players, onExport, onDone, speak, canSpe
             <span className="mono" style={{ fontSize: row.rank <= 3 ? 'var(--text-h2)' : '14px', color: row.rank <= 3 ? 'var(--text)' : 'var(--text-secondary)' }}>
               {row.rank}
             </span>
-            <span className="display" style={{ fontSize: 'var(--text-h3)' }}>{nameOf(row.playerId)}</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minWidth: 0 }}>
+              <span className="display" style={{ fontSize: 'var(--text-h3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {nameOf(row.playerId)}
+              </span>
+              {row.brokenBy ? <span className="micro-label" style={{ whiteSpace: 'nowrap' }}>{row.brokenBy}</span> : null}
+            </span>
             <span className="mono" style={{ fontSize: '18px', textAlign: 'right' }}>{row.games}</span>
             <span className="mono" style={{ fontSize: '18px', textAlign: 'right' }}>{row.wins}</span>
             <span className="mono" style={{ fontSize: '18px', textAlign: 'right', color: 'var(--text-secondary)' }}>{row.losses}</span>

@@ -181,3 +181,33 @@ conservation invariant stays sharp: a checked-in player is in exactly one of
 three places. The cost is that `player-departed` and `player-sat-out` refuse a
 staged player, so those commands pull them back into the queue first. The
 guards enforcing that is a feature: a stale staged entry can never appear.
+
+## 16. Standings rank on a weighted rate, then a cascade
+
+The table sorted on wins, then win rate, then games played. Three players at six
+and zero came out as three number ones, which is not a standing.
+
+Ranking now runs a cascade. The sort key is the win rate with one notional win
+and one notional loss folded in, so a single game at 100 percent cannot outrank
+six of them. Whoever is still level gets split on head to head, then point
+margin, then the mean win rate of the opponents they faced, then their longest
+run of wins. Each key only reorders inside a group the key above it left tied,
+so a later key can never overturn an earlier one.
+
+A key that splits a group sends every part back to the top of the cascade, the
+way a league table re-applies its tiebreaks. Head to head across four players is
+a sum over the whole group, and it can come out level for two of them who did in
+fact play each other. Once those two are alone, that meeting is the answer.
+
+Three rules hold the shape. A player with no decided game ranks below everyone
+who has one, however badly it went. Point margin sits out unless every player
+still tied recorded a score, and it averages per scored game, because how many
+scores the organizer typed is not a result. An opponent counts at their win rate
+over everyone else, so beating the same player five times does not make that
+player look weak and pull your own tiebreak down with them.
+
+Anyone who survives all of it is genuinely level and still shares a rank. Before
+the first winner, that is everybody.
+
+The cost: the order can move for a reason the columns do not show, so the row
+carries the name of the tiebreak that placed it.

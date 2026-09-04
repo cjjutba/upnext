@@ -79,7 +79,7 @@ Copy these rather than inventing a parallel approach.
 ## Testing
 
 All correctness risk lives in the reducer and the templates, and both are pure
-functions. 182 cases across 12 files.
+functions. 238 cases across 12 files.
 
 | File | Covers |
 |---|---|
@@ -91,7 +91,7 @@ functions. 182 cases across 12 files.
 | `src/state/useSession.test.tsx` | Dispatch, undo, redo, concurrent taps |
 | `src/lib/ids.test.ts` | ULID ordering, stable device id |
 | `src/domain/announce.test.ts` | Phrase builders and what a batch reads aloud |
-| `src/domain/standings.test.ts` | Ranking, ties, win rate |
+| `src/domain/standings.test.ts` | The ranking cascade, every tiebreak, shared ranks, win rate |
 | `src/state/useAnnouncer.test.tsx` | Which batches speak and which stay silent |
 | `src/App.test.tsx` | The board driven end to end: staging, starting, calls, crowd operations, mode switches |
 | `src/domain/modes.test.ts` | Mode metadata, and that every template has a label |
