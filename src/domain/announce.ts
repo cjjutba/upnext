@@ -12,21 +12,28 @@ export function pairPhrase(pair: Pair, nameOf: NameOf): string {
 const matchup = (pairs: Pairs, nameOf: NameOf): string =>
   pairPhrase(pairs[0], nameOf) + ' versus ' + pairPhrase(pairs[1], nameOf);
 
-/** The call that sends four people to a court. */
-export function courtPhrase(court: number, pairs: Pairs, nameOf: NameOf): string {
-  return `Court ${court}. ${matchup(pairs, nameOf)}. Please proceed to court ${court}.`;
+/**
+ * "Alice, Bob, Carol, Dan", in team order. A call has one job, which is to get
+ * four named people walking. Who partners whom is on the court graphic they are
+ * walking towards, and spelling it out doubles the time the call occupies the
+ * only speaker in the gym.
+ */
+export function fourNames(pairs: Pairs, nameOf: NameOf): string {
+  return [...pairs[0], ...pairs[1]].map(nameOf).join(', ');
 }
 
-const teamsPhrase = (pairs: Pairs, nameOf: NameOf): string =>
-  `Team one, ${pairPhrase(pairs[0], nameOf)}. Versus team two, ${pairPhrase(pairs[1], nameOf)}.`;
+/** The call that sends four people to a court. */
+export function courtPhrase(court: number, pairs: Pairs, nameOf: NameOf): string {
+  return `Court ${court}. ${fourNames(pairs, nameOf)}.`;
+}
 
 /**
  * The Call players button. Staging is silent, so this is the only way four
  * people hear their names before a match starts.
  */
 export function getReadyPhrase(pairs: Pairs, nameOf: NameOf, court?: number): string {
-  const teams = teamsPhrase(pairs, nameOf);
-  return court === undefined ? `Get ready. Up next. ${teams}` : `Get ready. Court ${court}. ${teams}`;
+  const who = fourNames(pairs, nameOf);
+  return court === undefined ? `Get ready. Up next. ${who}.` : `Get ready. Court ${court}. ${who}.`;
 }
 
 /**
@@ -37,7 +44,7 @@ export function getReadyPhrase(pairs: Pairs, nameOf: NameOf, court?: number): st
 export function matchReadyPhrase(pairs: Pairs, nameOf: NameOf, index: number): string {
   return index === 0
     ? getReadyPhrase(pairs, nameOf)
-    : `Get ready. Match ${index + 1}. ${teamsPhrase(pairs, nameOf)}`;
+    : `Get ready. Match ${index + 1}. ${fourNames(pairs, nameOf)}.`;
 }
 
 /**
@@ -49,40 +56,54 @@ export function challengersPhrase(pair: Pair, nameOf: NameOf): string {
 }
 
 /**
+ * One line to say, and what it is about. The key is how a stale call gets
+ * thrown away: everything a court can announce shares that court's key, so the
+ * newest thing about court 3 replaces whatever court 3 had waiting.
+ */
+export interface Announcement {
+  text: string;
+  key: string;
+}
+
+/** Every announcement about a court queues under one key. */
+export const courtKey = (court: number): string => `court-${court}`;
+
+/**
  * Phrases for a run of events this device just appended. Never call this with a
  * replayed log: it has no idea an event is old, and a resume would read back
  * every court call of the session.
  */
-export function announceBatch(batch: SessionEvent[], stateAfter: SessionState, nameOf: NameOf): string[] {
+export function announceBatch(batch: SessionEvent[], stateAfter: SessionState, nameOf: NameOf): Announcement[] {
   const restaged = new Set(batch.filter((e) => e.type === 'game-staged').map((e) => e.court));
-  const out: string[] = [];
+  const out: Announcement[] = [];
+  const say = (court: number, text: string) => out.push({ text, key: courtKey(court) });
   for (const e of batch) {
     switch (e.type) {
       case 'game-started':
-        out.push(courtPhrase(e.court, e.pairs, nameOf));
+        say(e.court, courtPhrase(e.court, e.pairs, nameOf));
         break;
       case 'game-lineup-changed': {
         // stay quiet while a court is mid-edit. A remove and the add that follows
         // would otherwise read out as two half sentences
         const lineup = fullLineup(e.pairs);
-        if (lineup) out.push(`Court ${e.court}. Lineup change. ${matchup(lineup, nameOf)}.`);
+        if (lineup) say(e.court, `Court ${e.court}. Lineup change. ${matchup(lineup, nameOf)}.`);
         break;
       }
       case 'game-finished': {
         if (e.winnerPair === undefined) {
           // finishGame stages the next four in the same batch, and the board shows them, so saying it too is noise
-          if (!restaged.has(e.court)) out.push(`Court ${e.court}. Game over.`);
+          if (!restaged.has(e.court)) say(e.court, `Court ${e.court}. Game over.`);
           break;
         }
         // the payload carries no pairs, so read them back off the game the reducer just filed
         const game = stateAfter.finishedGames.findLast((g) => g.court === e.court && g.endedAt === e.ts);
         if (game && game.winnerPair !== undefined) {
-          out.push(`Court ${e.court}. ${pairPhrase(game.pairs[game.winnerPair], nameOf)} win.`);
+          say(e.court, `Court ${e.court}. ${pairPhrase(game.pairs[game.winnerPair], nameOf)} win.`);
         }
         break;
       }
       case 'court-closed':
-        out.push(`Court ${e.court} is closed.`);
+        say(e.court, `Court ${e.court} is closed.`);
         break;
       default:
         break; // check-ins, sit-outs, rule changes, undo, and every staging event stay silent

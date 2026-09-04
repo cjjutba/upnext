@@ -12,9 +12,12 @@ class FakeUtterance {
   voice: unknown = null;
   lang = '';
   volume = 1;
+  private listeners: Record<string, Array<() => void>> = {};
   constructor(text: string) {
     this.text = text;
   }
+  addEventListener(type: string, fn: () => void) { (this.listeners[type] ??= []).push(fn); }
+  fire(type: string) { for (const fn of this.listeners[type] ?? []) fn(); }
 }
 
 function installSpeechStub() {
@@ -22,8 +25,11 @@ function installSpeechStub() {
   const synth = {
     paused: false,
     speaking: false,
+    // speaks instantly: speech.ts holds the queue itself and waits for end before the next one
     speak: (u: FakeUtterance) => {
       if (u.volume !== 0) spoken.push(u.text); // volume 0 is the silent iOS unlock utterance
+      u.fire('start');
+      u.fire('end');
     },
     cancel: () => spoken.push('[cancel]'),
     resume: () => {},
@@ -137,7 +143,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
 
     await click(btn('Start match on court 1'));
     await waitFor(() => expect(said()).toHaveLength(1));
-    expect(said()[0]).toBe('Court 1. Alice and Carol versus Bob and Dave. Please proceed to court 1.');
+    expect(said()[0]).toBe('Court 1. Alice, Carol, Bob, Dave.');
     expect(within(courtCard(1)).getByText('Live')).toBeInTheDocument();
 
     await recordWin(1, 1);
@@ -234,10 +240,10 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     expect(said()).toEqual([]); // no timer call fires on its own any more
 
     await click(btn('Call players up next'));
-    expect(said()).toEqual(['Get ready. Up next. Team one, Eve and Grace. Versus team two, Frank and Henry.']);
+    expect(said()).toEqual(['Get ready. Up next. Eve, Grace, Frank, Henry.']);
 
     await click(btn('Call players to court 1'));
-    expect(said().at(-1)).toBe('Get ready. Court 1. Team one, Alice and Carol. Versus team two, Bob and Dave.');
+    expect(said().at(-1)).toBe('Get ready. Court 1. Alice, Carol, Bob, Dave.');
   });
 
   it('says everything exactly once under StrictMode, which is how main.tsx mounts it', async () => {
@@ -441,7 +447,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await waitFor(() => expect(chipOrder(upNext())).toEqual(['Henry', 'Grace', 'Frank', 'Eve']));
 
     await click(btn('Call players up next'));
-    expect(said().at(-1)).toBe('Get ready. Up next. Team one, Henry and Grace. Versus team two, Frank and Eve.');
+    expect(said().at(-1)).toBe('Get ready. Up next. Henry, Grace, Frank, Eve.');
   });
 
   it('undoes a win together with the stage it triggered', async () => {
@@ -521,10 +527,10 @@ describe('App: the queue panels track the courts', () => {
     await screen.findByText('Then, match 2');
 
     await click(btn('Call players up next'));
-    expect(said().at(-1)).toMatch(/^Get ready\. Up next\. Team one, /);
+    expect(said().at(-1)).toMatch(/^Get ready\. Up next\. \w+, \w+, \w+, \w+\.$/);
 
     await click(btn('Call players for match 2'));
-    expect(said().at(-1)).toMatch(/^Get ready\. Match 2\. Team one, /);
+    expect(said().at(-1)).toMatch(/^Get ready\. Match 2\. \w+, \w+, \w+, \w+\.$/);
   });
 });
 

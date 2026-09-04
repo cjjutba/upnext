@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as speech from './speech';
+import type { SpeakOptions } from './speech';
 
 const KEY = 'upnext.speech.enabled';
 
@@ -18,7 +19,7 @@ export interface SpeechApi {
   setEnabled: (on: boolean) => void;
   toggle: () => void;
   /** No-op while muted. Referentially stable, so effects can depend on it. */
-  speak: (text: string) => void;
+  speak: (text: string, opts?: SpeakOptions) => void;
   cancel: () => void;
 }
 
@@ -48,8 +49,8 @@ export function useSpeech(): SpeechApi {
   }, []);
 
   const toggle = useCallback(() => setEnabled(!enabledRef.current), [setEnabled]);
-  const speak = useCallback((text: string) => {
-    if (enabledRef.current) speech.speak(text);
+  const speak = useCallback((text: string, opts?: SpeakOptions) => {
+    if (enabledRef.current) speech.speak(text, opts);
   }, []);
 
   return { enabled, supported: speech.isSupported(), setEnabled, toggle, speak, cancel: speech.cancel };

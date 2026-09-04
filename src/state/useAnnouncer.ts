@@ -7,7 +7,8 @@ export interface AnnouncerInput {
   lastBatch: SessionEvent[];
   state: SessionState;
   nameOf: NameOf;
-  speak: (text: string) => void;
+  /** Structural on purpose: src/state does not reach into src/lib for a type. */
+  speak: (text: string, opts?: { key?: string }) => void;
   active: boolean;
 }
 
@@ -25,7 +26,7 @@ export function useAnnouncer({ lastBatch, state, nameOf, speak, active }: Announ
     if (!active || lastBatch.length === 0) return;
     if (spokenRef.current === lastBatch) return; // strict mode runs effects twice; the same batch is not two batches
     spokenRef.current = lastBatch;
-    for (const line of announceBatch(lastBatch, state, nameOf)) speak(line);
+    for (const line of announceBatch(lastBatch, state, nameOf)) speak(line.text, { key: line.key });
     // state and nameOf are read at the moment the batch lands, never re-read for an old one
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastBatch, active]);

@@ -9,7 +9,8 @@ import { useMisrouteGuard, type Navigate } from '../lib/useRoute';
 import * as cmd from '../domain/commands';
 import type { CommandEvent } from '../domain/commands';
 import { previewLineups, type Ratings } from '../domain/templates';
-import { challengersPhrase, getReadyPhrase, matchReadyPhrase } from '../domain/announce';
+import { challengersPhrase, courtKey, getReadyPhrase, matchReadyPhrase } from '../domain/announce';
+import type { SpeakOptions } from '../lib/speech';
 import { isStaged, stagedCourtOf } from '../domain/reducer';
 import { fullLineup, slotAt } from '../domain/types';
 import type { Player, SessionEvent, SessionState, SlotIndex } from '../domain/types';
@@ -25,7 +26,7 @@ interface BoardRouteProps {
   canRedo: boolean;
   onRedo: () => void;
   lastBatch: SessionEvent[];
-  speak: (text: string) => void;
+  speak: (text: string, opts?: SpeakOptions) => void;
   resuming: boolean;
   navigate: Navigate;
   narrow: boolean;
@@ -133,7 +134,7 @@ export function BoardRoute({
         onCallCourt={(court) => {
           const lineup = state.staged[court] ?? state.games[court]?.pairs;
           const pairs = lineup && fullLineup(lineup);
-          if (pairs) speak(getReadyPhrase(pairs, nameOf, court));
+          if (pairs) speak(getReadyPhrase(pairs, nameOf, court), { key: courtKey(court) });
         }}
         onCallPreview={(i) => {
           const next = previews[i];
