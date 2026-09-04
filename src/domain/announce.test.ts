@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { announceBatch, challengersPhrase, courtPhrase, getReadyPhrase, leaderPhrase, matchReadyPhrase, pairPhrase, podiumPhrase } from './announce';
+import {
+  announceBatch, challengersPhrase, courtKey, courtPhrase, fourNames, getReadyPhrase,
+  leaderPhrase, matchReadyPhrase, pairPhrase, podiumPhrase,
+} from './announce';
 import { standings } from './standings';
 import { replay } from './reducer';
 import {
@@ -39,24 +42,27 @@ function startAll(log: SessionEvent[]): { log: SessionEvent[]; batch: SessionEve
 }
 
 describe('phrase builders', () => {
-  it('names a pair and a matchup', () => {
+  it('names a pair, and the four a court call sends over', () => {
     expect(pairPhrase(['a', 'b'], nameOf)).toBe('Alice and Bob');
-    expect(courtPhrase(2, [['a', 'b'], ['c', 'd']], nameOf))
-      .toBe('Court 2. Alice and Bob versus Carol and Dave. Please proceed to court 2.');
+    expect(fourNames([['a', 'b'], ['c', 'd']], nameOf)).toBe('Alice, Bob, Carol, Dave');
+  });
+
+  it('calls a court without naming it twice or asking anyone to proceed', () => {
+    expect(courtPhrase(2, [['a', 'b'], ['c', 'd']], nameOf)).toBe('Court 2. Alice, Bob, Carol, Dave.');
   });
 
   it('calls four people to get ready, with and without a court', () => {
     expect(getReadyPhrase([['e', 'f'], ['g', 'h']], nameOf))
-      .toBe('Get ready. Up next. Team one, Eve and Frank. Versus team two, Grace and Henry.');
+      .toBe('Get ready. Up next. Eve, Frank, Grace, Henry.');
     expect(getReadyPhrase([['e', 'f'], ['g', 'h']], nameOf, 2))
-      .toBe('Get ready. Court 2. Team one, Eve and Frank. Versus team two, Grace and Henry.');
+      .toBe('Get ready. Court 2. Eve, Frank, Grace, Henry.');
   });
 
   it('names which waiting match it is calling, so three panels do not all say up next', () => {
     expect(matchReadyPhrase([['e', 'f'], ['g', 'h']], nameOf, 0))
       .toBe(getReadyPhrase([['e', 'f'], ['g', 'h']], nameOf));
     expect(matchReadyPhrase([['e', 'f'], ['g', 'h']], nameOf, 1))
-      .toBe('Get ready. Match 2. Team one, Eve and Frank. Versus team two, Grace and Henry.');
+      .toBe('Get ready. Match 2. Eve, Frank, Grace, Henry.');
   });
 
   it('calls the two challengers a winners template can promise, and says why there are only two', () => {
@@ -74,7 +80,7 @@ describe('announceBatch', () => {
   it('reads the court assignment on the Start tap', () => {
     const { log, batch } = startAll(boot(['a', 'b', 'c', 'd']));
     expect(announceBatch(batch, replay(log), nameOf))
-      .toEqual(['Court 1. Alice and Carol versus Bob and Dave. Please proceed to court 1.']);
+      .toEqual([{ text: 'Court 1. Alice, Carol, Bob, Dave.', key: 'court-1' }]);
   });
 
   it('reads the winning pair and stays quiet about the stage it triggered', () => {
@@ -82,7 +88,7 @@ describe('announceBatch', () => {
     const batch = seal(finishGame(replay(log), 1, 0)!);
     log = [...log, ...batch];
     const lines = announceBatch(batch, replay(log), nameOf);
-    expect(lines).toEqual(['Court 1. Alice and Carol win.']);
+    expect(lines).toEqual([{ text: 'Court 1. Alice and Carol win.', key: 'court-1' }]);
   });
 
   it('swallows "Game over" when the same batch stages the court again', () => {
@@ -99,7 +105,7 @@ describe('announceBatch', () => {
     const state = replay(log);
     const batch = seal([{ type: 'game-finished', court: 1, sessionId: state.sessionId! }]);
     log = [...log, ...batch];
-    expect(announceBatch(batch, replay(log), nameOf)).toEqual(['Court 1. Game over.']);
+    expect(announceBatch(batch, replay(log), nameOf)).toEqual([{ text: 'Court 1. Game over.', key: 'court-1' }]);
   });
 
   it('reads a closed court and a lineup change', () => {
@@ -107,10 +113,11 @@ describe('announceBatch', () => {
     const swap = seal(changeLineup(replay(log), 1, [['a', 'd'], ['c', 'b']] as Pairs)!);
     log = [...log, ...swap];
     expect(announceBatch(swap, replay(log), nameOf))
-      .toEqual(['Court 1. Lineup change. Alice and Dave versus Carol and Bob.']);
+      .toEqual([{ text: 'Court 1. Lineup change. Alice and Dave versus Carol and Bob.', key: 'court-1' }]);
     const close = seal(closeCourt(replay(log), 2)!);
     log = [...log, ...close];
-    expect(announceBatch(close, replay(log), nameOf)[0]).toBe('Court 2 is closed.');
+    expect(announceBatch(close, replay(log), nameOf)[0])
+      .toEqual({ text: 'Court 2 is closed.', key: 'court-2' });
   });
 
   it('stays silent while a court is mid-edit, then reads the lineup once it is whole again', () => {
@@ -122,7 +129,19 @@ describe('announceBatch', () => {
     const seat = seal(seatPlayer(replay(log), 1, 0, 'a')!);
     log = [...log, ...seat];
     expect(announceBatch(seat, replay(log), nameOf)).toHaveLength(1);
-    expect(announceBatch(seat, replay(log), nameOf)[0]).toMatch(/^Court 1\. Lineup change\. /);
+    expect(announceBatch(seat, replay(log), nameOf)[0].text).toMatch(/^Court 1\. Lineup change\. /);
+  });
+
+  it('keys every line by its court, so a newer one can replace it while it waits', () => {
+    let { log } = startAll(boot(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], 'balanced', 2));
+    const finish = seal(finishGame(replay(log), 2, 0)!);
+    log = [...log, ...finish];
+    const lines = announceBatch(finish, replay(log), nameOf);
+    expect(lines.map((l) => l.key)).toEqual([courtKey(2)]);
+    const start = seal(startStagedGame(replay(log), 2)!);
+    log = [...log, ...start];
+    // the call that replaces it queues under the same key
+    expect(announceBatch(start, replay(log), nameOf).map((l) => l.key)).toEqual([courtKey(2)]);
   });
 
   it('stays silent for check-ins and for undo', () => {

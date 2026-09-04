@@ -30,10 +30,11 @@ const setup = (over: Partial<AnnouncerInput> = {}) => {
 };
 
 describe('useAnnouncer', () => {
-  it('reads a batch this device just appended', () => {
+  it('reads a batch this device just appended, keyed to the court it is about', () => {
     const { speak } = setup({ lastBatch: START });
     expect(speak).toHaveBeenCalledTimes(1);
-    expect(speak.mock.calls[0][0]).toContain('Please proceed to court 1');
+    expect(speak.mock.calls[0][0]).toBe('Court 1. A, C, B, D.');
+    expect(speak.mock.calls[0][1]).toEqual({ key: 'court-1' });
   });
 
   it('stays silent for a loaded log, which is what a resume hands it', () => {
@@ -59,6 +60,8 @@ describe('useAnnouncer', () => {
     rerender({ lastBatch: batch, state: after, nameOf, speak, active: true });
     expect(speak).toHaveBeenCalledTimes(2); // the court call, then the win; the stage behind it is silent
     expect(speak.mock.calls[1][0]).toBe('Court 1. A and C win.');
+    // both queue under one key, so the win replaces a court call still waiting to be said
+    expect(speak.mock.calls[1][1]).toEqual({ key: 'court-1' });
   });
 
   it('says nothing for a batch that only stages a court', () => {
