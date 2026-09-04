@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Button } from './Button';
 import { IconButton } from './IconButton';
 import { StatusBadge, type BadgeStatus } from './StatusBadge';
@@ -19,7 +18,7 @@ export function CourtCard({
   pairs: Lineup | null;
   elapsed: string;
   nameOf: (playerId: string) => string;
-  onWin: (winnerPair: 0 | 1, score?: string) => void;
+  onWin: (winnerPair: 0 | 1) => void;
   onStart: () => void;
   /** Pages the four on this court over TTS. */
   onCall: () => void;
@@ -34,31 +33,24 @@ export function CourtCard({
   /** At least one waiting, so an open seat can be filled from the queue. */
   canFill: boolean;
 }) {
-  // per game: the parent keys this card by the game, so a refill starts blank
-  const [score1, setScore1] = useState('');
-  const [score2, setScore2] = useState('');
-  const digitsOnly = (v: string) => v.replace(/\D/g, '');
-  const entered = score1 !== '' && score2 !== '';
-  // The higher score is the winner. A game has no other outcome, so pointing at a
-  // team after typing the numbers is stating the same result twice.
-  const winner: 0 | 1 | null =
-    !entered || score1 === score2 ? null : Number(score1) > Number(score2) ? 0 : 1;
-  const verdict = !entered ? 'Enter the score' : winner === null ? 'Scores are tied' : `Team ${winner + 1} wins`;
   // an open seat means this was never a game of four, so there is no winner to record
   const short = phase === 'live' && pairs !== null && fullLineup(pairs) === null;
+  const full = phase === 'live' && pairs !== null ? fullLineup(pairs) : null;
 
-  const scoreField = (team: 1 | 2, value: string, set: (v: string) => void) => (
-    <input
-      value={value} onChange={(e) => set(digitsOnly(e.target.value))}
-      inputMode="numeric" maxLength={2} placeholder="0" aria-label={`Team ${team} score on court ${court}`}
-      className="mono"
-      style={{
-        width: '52px', minHeight: 'var(--tap-primary)', boxSizing: 'border-box',
-        textAlign: 'center', fontSize: '18px',
-        border: '1px solid var(--border)', borderRadius: 'var(--radius-control)',
-        background: 'var(--bg)', color: 'var(--text)',
-      }} />
+  /**
+   * One team's button, sitting on that team's side of the card. The diagram
+   * directly above names the two players and captions the halves Team 1 and
+   * Team 2, so the button says which side won and lets the graphic say who
+   * that is.
+   */
+  const resultButton = (side: 0 | 1) => (
+    <Button
+      size="lg" onClick={() => onWin(side)}
+      ariaLabel={`Team ${side + 1} wins on court ${court}`}>
+      {`Team ${side + 1} wins`}
+    </Button>
   );
+
   return (
     <div data-court={court} style={{
       display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', padding: '20px',
@@ -96,21 +88,12 @@ export function CourtCard({
                 {canFill ? 'Fill every seat to record a winner.' : 'Nobody is waiting. Check a player in to fill this court.'}
               </span>
             </div>
-          ) : phase === 'live' ? (
-            /* One row: each score sits under its own team's half of the court, so the
-               sides need no caption, and the button between them reads out the
-               winner the numbers already picked. */
-            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: '12px', alignItems: 'stretch' }}>
-              {scoreField(1, score1, setScore1)}
-              <Button
-                size="lg" block icon={winner === null ? undefined : 'trophy'} disabled={winner === null}
-                onClick={() => winner !== null && onWin(winner, `${score1}-${score2}`)}
-                ariaLabel={winner === null ? 'Record the result on court ' + court : `Team ${winner + 1} wins on court ${court}`}
-                /* tighter than a standalone button: the label has to clear two score fields on a phone */
-                style={{ padding: '0 var(--space-3)', height: 'auto' }}>
-                {verdict}
-              </Button>
-              {scoreField(2, score2, setScore2)}
+          ) : full ? (
+            /* Left button under team 1, right button under team 2, each the same
+               width, so the row reads as the two halves of the court above it. */
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px' }}>
+              {resultButton(0)}
+              {resultButton(1)}
             </div>
           ) : (
             // Start match stays the primary action; Choose players matches its height and width for a balanced row

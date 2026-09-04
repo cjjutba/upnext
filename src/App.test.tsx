@@ -74,20 +74,22 @@ async function openBoard(mode: RegExp) {
 async function startMatch(mode: RegExp) {
   await openBoard(mode);
   await click(btn('Start match on court 1'));
-  await screen.findByLabelText('Record the result on court 1'); // the dispatch is async; wait for the clock
+  await waitFor(() => expect(resultButtons(1)).toHaveLength(2)); // the dispatch is async; wait for the clock
 }
 
 /** The card div that owns a court's close button. */
 const courtCard = (n: number) => screen.getByLabelText(`Close court ${n}`).closest('[data-court]') as HTMLElement;
 
-/** Types a score the given team wins, then taps the button that reads out that winner. */
+/**
+ * The two winner buttons on a live court, left then right, which is team 1 then
+ * team 2. Empty on a staged court and on a live one holding an open seat.
+ */
+const resultButtons = (court: number) =>
+  within(courtCard(court)).queryAllByRole('button', { name: new RegExp(`^Team [12] wins on court ${court}$`) });
+
+/** Taps the team that won, which is the whole gesture: one tap ends the match. */
 async function recordWin(court: number, team: 1 | 2) {
-  const card = courtCard(court);
-  await act(() => {
-    fireEvent.change(within(card).getByLabelText(`Team 1 score on court ${court}`), { target: { value: team === 1 ? '11' : '7' } });
-    fireEvent.change(within(card).getByLabelText(`Team 2 score on court ${court}`), { target: { value: team === 1 ? '7' : '11' } });
-  });
-  await click(btn(`Team ${team} wins on court ${court}`, card));
+  await click(btn(`Team ${team} wins on court ${court}`, courtCard(court)));
 }
 
 /** The queue panel under the courts: the next four, or the challengers a winners template promises. */
@@ -255,7 +257,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
   it('lifts a player off a live court, offers the open seat, and seats whoever is picked', async () => {
     render(<App />);
     await startMatch(/^Balanced/);
-    expect(btn('Record the result on court 1', courtCard(1))).toBeInTheDocument();
+    expect(resultButtons(1)).toHaveLength(2);
 
     await click(chip('Alice', courtCard(1)));
     await click(btn('Off the court', dialog(/Change Alice/)));
@@ -263,8 +265,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
 
     const opened = courtCard(1);
     expect(within(opened).getByText('Tap to add player')).toBeInTheDocument();
-    expect(within(opened).queryByRole('button', { name: /Record the result/ })).not.toBeInTheDocument();
-    expect(within(opened).queryByLabelText('Team 1 score on court 1')).not.toBeInTheDocument();
+    expect(resultButtons(1)).toHaveLength(0); // no winner to record while a seat is open
     expect(btn('Fill court 1', opened)).toBeInTheDocument();
     expect(chipOrder(opened)).toEqual(['Carol', 'Bob', 'Dave']); // three left on court
 
@@ -273,7 +274,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await click(within(picker).getByText('Eve').closest('button')!);
 
     await waitFor(() => expect(chipOrder(courtCard(1))).toEqual(['Eve', 'Carol', 'Bob', 'Dave']));
-    expect(btn('Record the result on court 1', courtCard(1))).toBeInTheDocument();
+    expect(resultButtons(1)).toHaveLength(2);
     expect(screen.queryByRole('dialog', { name: /Add a player/ })).not.toBeInTheDocument();
   });
 
@@ -288,7 +289,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
 
     // Bob went to the queue front when he came off, so filling puts him straight back
     await waitFor(() => expect(chipOrder(courtCard(1))).toEqual(['Alice', 'Carol', 'Bob', 'Dave']));
-    expect(btn('Record the result on court 1', courtCard(1))).toBeInTheDocument();
+    expect(resultButtons(1)).toHaveLength(2);
   });
 
   it('offers Off the court only on a live court, never on a staged one', async () => {
@@ -302,7 +303,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await click(btn('Close player options', staged));
 
     await click(btn('Start match on court 1'));
-    await screen.findByLabelText('Record the result on court 1');
+    await waitFor(() => expect(resultButtons(1)).toHaveLength(2));
     await click(chip('Alice', courtCard(1)));
     expect(btn('Off the court', dialog(/Change Alice/))).toBeInTheDocument();
   });
@@ -319,7 +320,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
 
     await click(btn('Keep playing', asking));
     expect(screen.queryByRole('dialog', { name: /end the session/ })).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Record the result on court 1')).toBeInTheDocument(); // still live
+    expect(resultButtons(1)).toHaveLength(2); // still live
 
     await endSession();
     await screen.findByText('Session summary');
@@ -449,9 +450,9 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await recordWin(1, 1);
     await waitFor(() => expect(within(courtCard(1)).getByText('Staged')).toBeInTheDocument());
 
-    await click(btn(/Undo: court 1, team 1 won/));
+    await click(btn(/Undo: court 1 result/));
     await waitFor(() => expect(within(courtCard(1)).getByText('Live')).toBeInTheDocument());
-    expect(within(courtCard(1)).getByText('Alice')).toBeInTheDocument();
+    expect(chipOrder(courtCard(1))).toContain('Alice');
   });
 
   it('removes a closed court card and leaves no chip to reopen it', async () => {
@@ -534,8 +535,8 @@ describe('App: switching matching mode mid-session', () => {
   });
   afterEach(cleanup);
 
-  /** The four names showing on a court right now. */
-  const lineup = (n: number) => NAMES.filter((name) => within(courtCard(n)).queryByText(name) !== null);
+  /** The four names showing on a court right now. A live card prints each of them twice: on the diagram and on that team's result button. */
+  const lineup = (n: number) => NAMES.filter((name) => within(courtCard(n)).queryAllByText(name).length > 0);
 
   const openMenu = async () => {
     await click(btn('Change matching mode'));

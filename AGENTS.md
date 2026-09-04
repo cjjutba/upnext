@@ -63,6 +63,21 @@ that is wrong gets unstaged rather than emptied. `game-started` still carries
 four real players, and a court with an open seat cannot record a winner. See the
 open seats section of `docs/event-model.md`.
 
+### One tap ends a match
+
+A live court draws two buttons under the diagram, Team 1 wins on the left and
+Team 2 wins on the right, each under the half of the diagram that names those
+two players. Tapping one emits `game-finished` with that `winnerPair` and
+rotates the court. There is no
+confirmation and nothing to fill in; the undo pill is the way back, and it now
+times out after ten seconds so it stops reading as the state of the court.
+
+No screen records a score. `game-finished` still carries an optional `score` and
+`finishGame()` still accepts one, because an imported log may have it and the
+point margin tiebreak in `standings()` still reads it, but nothing in the UI
+writes one. Do not add a score field back to a court card without asking.
+Decision 17 in `docs/decisions.md` has the reasoning.
+
 ### The queue mirrors the courts
 
 `previewLineups()` draws one waiting match per open court, never a fixed

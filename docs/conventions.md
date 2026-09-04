@@ -23,6 +23,8 @@ preference.
 | Touch targets | 48px minimum, 56px or more for primary actions. Someone is holding a paddle in the other hand |
 | Icons | Lucide only, 1.5px stroke, labeled except close, back, and overflow |
 | Flat fills | No gradients, no glassmorphism, no glow, no purple, no emoji |
+| Buttons say what they do | A label names the action or the outcome it records, never an instruction to the organizer. "Enter the score" on a disabled button tells someone what to do instead of what the button does; helper text under the control is where that belongs |
+| Controls hold their width | A field or chip is the same width empty, focused and filled. Fix the width, and use `minmax(0, 1fr)` where a long name shares a grid row |
 | No dashes | No en dashes and no em dashes in copy, code, comments, commits, or docs. Use a comma, a period, or "to" for ranges |
 
 Roughly all of any screen should survive being converted to grayscale. If a

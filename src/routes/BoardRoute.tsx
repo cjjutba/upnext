@@ -115,10 +115,11 @@ export function BoardRoute({
         state={state}
         players={players}
         undoLabel={undoLabel}
+        actionId={lastBatch.at(-1)?.id ?? null}
         onUndo={onUndo}
         canRedo={canRedo}
         onRedo={onRedo}
-        onWin={(court, w, score) => void dispatch(cmd.finishGame(state, court, w, ratings, score))}
+        onWin={(court, w) => void dispatch(cmd.finishGame(state, court, w, ratings))}
         onCloseCourt={(court) => void dispatch(cmd.closeCourt(state, court, ratings))}
         onToggleSit={(id) => void dispatch(state.sittingOut.includes(id) ? cmd.returnPlayer(state, id, ratings) : cmd.sitOutPlayer(state, id))}
         onToggleCheck={toggleBoardCheck}

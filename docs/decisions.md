@@ -211,3 +211,30 @@ the first winner, that is everybody.
 
 The cost: the order can move for a reason the columns do not show, so the row
 carries the name of the tiebreak that placed it.
+
+## 17. The winner is a tap, and no screen records a score
+
+Ending a match used to mean typing two numbers. The button under the court read
+"Enter the score" until both were filled, then flipped to "Team 1 wins". Two
+problems came out of that. The organizer is courtside with a paddle in one hand
+and four people waiting to rotate on, and two numeric fields is not a gesture
+that fits. Worse, a match nobody kept score of could not be ended at all, which
+is most of them.
+
+A live court now shows two buttons, Team 1 wins and Team 2 wins, one under each
+half of the diagram. The left button is under team 1 because team 1 is drawn on
+the left, and the diagram right above it is already carrying the four names, so
+repeating them on the buttons only makes the label longer and breakable by a
+long name. One tap finishes the game and stages the next four. Nothing confirms
+it: the undo pill is the safety net, and it names the court.
+
+Score entry is gone, not moved. It was built back as an optional row of chips
+for the losing team behind a Track scores switch, and cut on sight: an open play
+night does not want a second thing to tap, and a control that is off by default
+and useless when on is not worth the header space. Rec play is win and loss.
+
+`game-finished` keeps its optional `score` and `finishGame()` still accepts one.
+Dropping the field would change the meaning of an event type, and rule 6 does
+not allow that. An imported log with scores still feeds the point margin key in
+decision 16. A session played on this build never will, so that key sits out,
+which it was already written to do whenever a tied player had no scored game.
