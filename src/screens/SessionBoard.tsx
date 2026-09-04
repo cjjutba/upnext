@@ -20,6 +20,13 @@ import { isPlaying, isStaged } from '../domain/reducer';
  */
 const RAIL_MOTION = '180ms ease';
 
+/**
+ * How long the undo pill stays up after an action. Long enough to catch a
+ * mis-tapped result, short enough that it stops reporting what happened before
+ * the current match while that match is still being played.
+ */
+const UNDO_WINDOW_MS = 10000;
+
 const fmt = (totalSeconds: number): string => {
   const s = Math.max(0, Math.floor(totalSeconds));
   const h = Math.floor(s / 3600);
@@ -30,7 +37,7 @@ const fmt = (totalSeconds: number): string => {
 export { fmt };
 
 export function SessionBoard({
-  state, players, undoLabel, onUndo, canRedo, onRedo, onWin, onCloseCourt,
+  state, players, undoLabel, actionId, onUndo, canRedo, onRedo, onWin, onCloseCourt,
   onToggleSit, onToggleCheck, onAddCourt, onAddPlayer, onRemovePlayer, onCourtPlayerTap, onQueuePlayerTap,
   onStart, onStage, onCallCourt, onCallPreview, onEditLineup, previews, narrow, railCollapsed, motion, recency,
   onSeatPlayer, onCreateAndSeat, onFillCourt,
@@ -38,10 +45,16 @@ export function SessionBoard({
   state: SessionState;
   players: Player[];
   undoLabel: string | null;
+  /**
+   * The newest event this device just appended, or null after a replay. It is
+   * what tells a fresh action apart from a resumed log, and a repeat of the same
+   * action apart from the one before it.
+   */
+  actionId: string | null;
   onUndo: () => void;
   canRedo: boolean;
   onRedo: () => void;
-  onWin: (court: number, winnerPair: 0 | 1, score?: string) => void;
+  onWin: (court: number, winnerPair: 0 | 1) => void;
   onCloseCourt: (court: number) => void;
   onToggleSit: (playerId: string) => void;
   onToggleCheck: (playerId: string) => void;
@@ -82,6 +95,24 @@ export function SessionBoard({
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  /**
+   * The undo pill is a receipt for something the organizer just did, so it goes
+   * away on its own. Left up, it names an action from ten minutes ago while a
+   * match is running, which reads as the state of the court rather than a
+   * receipt. It keys off the last dispatched batch rather than the newest event,
+   * because a resumed session replays a log nobody in this room just typed.
+   */
+  const [fresh, setFresh] = useState(false);
+  useEffect(() => {
+    if (!actionId) {
+      setFresh(false);
+      return;
+    }
+    setFresh(true);
+    const t = setTimeout(() => setFresh(false), UNDO_WINDOW_MS);
+    return () => clearTimeout(t);
+  }, [actionId]);
 
   const nameOf = (id: string) => players.find((p) => p.id === id)?.name ?? 'Unknown';
   const courts = openCourts(state);
@@ -149,7 +180,7 @@ export function SessionBoard({
                     pairs={game?.pairs ?? staged ?? null}
                     elapsed={fmt(elapsed)} nameOf={nameOf} canStage={eligibleQueue.length >= 4}
                     canFill={eligibleQueue.length > 0}
-                    onWin={(w, score) => onWin(n, w, score)} onStart={() => onStart(n)} onCall={() => onCallCourt(n)}
+                    onWin={(w) => onWin(n, w)} onStart={() => onStart(n)} onCall={() => onCallCourt(n)}
                     onStage={() => onStage(n)}
                     onPlayerTap={(id) => onCourtPlayerTap(n, id)} onEdit={() => onEditLineup(n)}
                     onSeatTap={(slot) => setSeating({ court: n, slot })} onFill={() => onFillCourt(n)}
@@ -291,7 +322,7 @@ export function SessionBoard({
           onCreate={(name) => { onCreateAndSeat(seating.court, seating.slot, name); setSeating(null); }}
           onClose={() => setSeating(null)} />
       ) : null}
-      {undoLabel || canRedo ? (
+      {fresh && (undoLabel || canRedo) ? (
         <div style={{ position: 'fixed', left: 'var(--space-4)', bottom: 'var(--space-4)', zIndex: 50, display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           {undoLabel ? <UndoPill label={undoLabel} onUndo={onUndo} /> : null}
           {canRedo ? <Button variant="ghost" onClick={onRedo}>Redo</Button> : null}

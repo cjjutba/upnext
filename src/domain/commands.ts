@@ -335,7 +335,8 @@ export function redoTarget(events: SessionEvent[]): string | null {
 export function describeEvent(e: SessionEvent): string {
   switch (e.type) {
     case 'game-finished':
-      return e.winnerPair === undefined ? `Undo: court ${e.court} finished` : `Undo: court ${e.court}, team ${e.winnerPair + 1} won`;
+      // one word for both: the organizer tapped a team, and what they want back is the match
+      return e.winnerPair === undefined ? `Undo: court ${e.court} finished` : `Undo: court ${e.court} result`;
     case 'game-started': return `Undo: court ${e.court} started`;
     case 'game-staged': return `Undo: court ${e.court} lineup`;
     case 'game-unstaged': return `Undo: court ${e.court} cleared`;

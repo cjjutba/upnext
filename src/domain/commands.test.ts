@@ -555,7 +555,7 @@ describe('describeEvent', () => {
   it('produces the undo pill label', () => {
     const [started] = boot(['a', 'b', 'c', 'd'], 'all-off', 1);
     expect(describeEvent({ ...started, type: 'game-finished', court: 2 } as SessionEvent)).toBe('Undo: court 2 finished');
-    expect(describeEvent({ ...started, type: 'game-finished', court: 1, winnerPair: 1 } as SessionEvent)).toBe('Undo: court 1, team 2 won');
+    expect(describeEvent({ ...started, type: 'game-finished', court: 1, winnerPair: 1 } as SessionEvent)).toBe('Undo: court 1 result');
     expect(describeEvent({ ...started, type: 'player-checked-in', playerId: 'x' } as SessionEvent)).toBe('Undo: check-in');
     expect(describeEvent({ ...started, type: 'game-started', court: 3 } as SessionEvent)).toBe('Undo: court 3 started');
     expect(describeEvent({ ...started, type: 'game-staged', court: 3 } as SessionEvent)).toBe('Undo: court 3 lineup');
