@@ -44,7 +44,11 @@ another device or a newer build must never crash replay.
 | `event-undone` | `targetEventId` | none | No direct effect. `replay()` handles it through `computeSkipped()` |
 | `session-ended` | none | started, not ended | `ended = true`, `endedAt = ts` |
 
-`score` is on the `game-finished` payload and no UI writes it yet.
+`score` is on the `game-finished` payload. `CourtCard` requires a Team 1 and a
+Team 2 number before either win button enables, and sends them joined as
+`"11-7"`. `standings()` only reads the two numbers back out with a regex, so
+the join character was never a contract; the requirement is what changed,
+turning the point margin tiebreak from occasional into the common case.
 
 ## Open seats
 

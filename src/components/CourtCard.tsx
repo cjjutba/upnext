@@ -10,21 +10,19 @@ export type CourtPhase = 'live' | 'staged' | 'empty';
 const badge: Record<CourtPhase, BadgeStatus> = { live: 'live', staged: 'neutral', empty: 'neutral' };
 
 export function CourtCard({
-  court, phase, longGame, pairs, elapsed, nameOf,
-  onWin, onStart, onCall, onShuffle, onStage, onPlayerTap, onSeatTap, onFill, onEdit, onClose, canStage, canFill,
+  court, phase, pairs, elapsed, nameOf,
+  onWin, onStart, onCall, onStage, onPlayerTap, onSeatTap, onFill, onEdit, onClose, canStage, canFill,
 }: {
   court: number;
   phase: CourtPhase;
-  /** Live game past the long-game threshold. Only changes the badge. */
-  longGame?: boolean;
   /** The four on the court, live or staged. Null on an empty court. A live court may hold an open seat. */
   pairs: Lineup | null;
   elapsed: string;
   nameOf: (playerId: string) => string;
   onWin: (winnerPair: 0 | 1, score?: string) => void;
   onStart: () => void;
+  /** Pages the four on this court over TTS. */
   onCall: () => void;
-  onShuffle: () => void;
   onStage: () => void;
   onPlayerTap: (playerId: string) => void;
   onSeatTap: (slot: SlotIndex) => void;
@@ -37,8 +35,11 @@ export function CourtCard({
   canFill: boolean;
 }) {
   // per game: the parent keys this card by the game, so a refill starts blank
-  const [score, setScore] = useState('');
-  const win = (pair: 0 | 1) => onWin(pair, score.trim() || undefined);
+  const [score1, setScore1] = useState('');
+  const [score2, setScore2] = useState('');
+  const scoreEntered = score1.trim() !== '' && score2.trim() !== '';
+  const win = (pair: 0 | 1) => onWin(pair, `${score1.trim()}-${score2.trim()}`);
+  const digitsOnly = (v: string) => v.replace(/\D/g, '');
   // an open seat means this was never a game of four, so there is no winner to record
   const short = phase === 'live' && pairs !== null && fullLineup(pairs) === null;
   return (
@@ -50,15 +51,18 @@ export function CourtCard({
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px 14px', flexWrap: 'wrap' }}>
         <span className="display" style={{ fontSize: 'var(--text-h2)', lineHeight: 1, whiteSpace: 'nowrap' }}>Court {court}</span>
         <StatusBadge
-          status={phase === 'live' && longGame ? 'warn' : badge[phase]}
+          status={badge[phase]}
           label={phase === 'staged' ? 'Staged' : phase === 'empty' ? 'Open' : undefined} />
         {/* one cluster so the timer and controls wrap together, right-aligned on either line */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginLeft: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginLeft: 'auto' }}>
           {phase === 'live' ? (
-            <span className="mono" style={{ fontSize: 'clamp(24px, 9vw, 40px)', lineHeight: 1, letterSpacing: '-0.01em' }}>{elapsed}</span>
+            <span className="mono" style={{ fontSize: '15px', color: 'var(--text-secondary)', lineHeight: 1 }}>{elapsed}</span>
           ) : null}
-          {pairs ? <IconButton icon="pencil" ariaLabel={'Edit lineup on court ' + court} onClick={onEdit} /> : null}
-          <IconButton icon="x" ariaLabel={'Close court ' + court} onClick={onClose} />
+          {/* the icon row itself stays tight: these two or three are one toolbar, not separate controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+            {pairs ? <IconButton icon="megaphone" ariaLabel={'Call players to court ' + court} onClick={onCall} /> : null}
+            <IconButton icon="x" ariaLabel={'Close court ' + court} onClick={onClose} />
+          </div>
         </div>
       </div>
       {pairs ? (
@@ -77,26 +81,37 @@ export function CourtCard({
             </div>
           ) : phase === 'live' ? (
             <>
-              {/* every mode records the winner so standings mean something */}
+              {/* a small score chip sits right above its own team's button, so the pairing needs no caption */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <Button size="lg" block icon="trophy" onClick={() => win(0)} ariaLabel={'Team 1 wins on court ' + court}>Team 1 wins</Button>
-                <Button size="lg" block icon="trophy" onClick={() => win(1)} ariaLabel={'Team 2 wins on court ' + court}>Team 2 wins</Button>
+                <input
+                  value={score1} onChange={(e) => setScore1(digitsOnly(e.target.value))}
+                  inputMode="numeric" maxLength={2} placeholder="0" aria-label={'Team 1 score on court ' + court}
+                  className="mono"
+                  style={{
+                    width: '52px', height: '36px', margin: '0 auto', display: 'block',
+                    textAlign: 'center', fontSize: '16px',
+                    border: '1px solid var(--border)', borderRadius: 'var(--radius-control)', background: 'var(--bg)', color: 'var(--text)',
+                  }} />
+                <input
+                  value={score2} onChange={(e) => setScore2(digitsOnly(e.target.value))}
+                  inputMode="numeric" maxLength={2} placeholder="0" aria-label={'Team 2 score on court ' + court}
+                  className="mono"
+                  style={{
+                    width: '52px', height: '36px', margin: '0 auto', display: 'block',
+                    textAlign: 'center', fontSize: '16px',
+                    border: '1px solid var(--border)', borderRadius: 'var(--radius-control)', background: 'var(--bg)', color: 'var(--text)',
+                  }} />
               </div>
-              <input
-                value={score} onChange={(e) => setScore(e.target.value)}
-                placeholder="Score, optional" aria-label={'Score on court ' + court}
-                className="mono"
-                style={{
-                  height: 'var(--tap-min)', padding: '0 var(--space-3)', textAlign: 'center', fontSize: '15px',
-                  border: '1px solid var(--border)', borderRadius: 'var(--radius-control)', background: 'var(--bg)', color: 'var(--text)',
-                }} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <Button size="lg" block icon="trophy" disabled={!scoreEntered} onClick={() => win(0)} ariaLabel={'Team 1 wins on court ' + court}>Team 1 wins</Button>
+                <Button size="lg" block icon="trophy" disabled={!scoreEntered} onClick={() => win(1)} ariaLabel={'Team 2 wins on court ' + court}>Team 2 wins</Button>
+              </div>
             </>
           ) : (
-            /* wraps rather than squeezing: on a phone-width card these three take two rows */
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-              <Button size="lg" icon="play" onClick={onStart} style={{ flex: '1 1 160px' }} ariaLabel={'Start match on court ' + court}>Start match</Button>
-              <Button variant="secondary" size="lg" icon="megaphone" onClick={onCall} ariaLabel={'Call players to court ' + court}>Call players</Button>
-              <Button variant="secondary" size="lg" icon="shuffle" onClick={onShuffle} ariaLabel={'Shuffle pairing on court ' + court}>Shuffle</Button>
+            // Start match stays the primary action; Choose players matches its height and width for a balanced row
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <Button size="lg" icon="play" onClick={onStart} ariaLabel={'Start match on court ' + court}>Start match</Button>
+              <Button variant="secondary" size="lg" icon="arrow-left-right" onClick={onEdit} ariaLabel={'Choose players on court ' + court}>Choose players</Button>
             </div>
           )}
         </>
