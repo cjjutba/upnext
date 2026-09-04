@@ -45,7 +45,7 @@ async function reset() {
   await db.players.clear();
   await db.sessionEvents.clear();
   await db.meta.clear();
-  window.location.hash = '';
+  window.history.replaceState(null, '', '/app');
   window.localStorage.clear();
   const now = Date.now();
   await db.players.bulkPut(NAMES.map((name, i) => ({ id: `p-${i}`, name, createdAt: now + i, updatedAt: now + i })));
@@ -197,6 +197,15 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await recordWin(1, 2);
     await waitFor(() => expect(said().length).toBeGreaterThan(0));
     expect(said()[0]).toMatch(/win\.$/);
+  });
+
+  it('replaces rather than pushes when a session starts, so Back cannot land back in setup', async () => {
+    render(<App />);
+    await screen.findByText('Roster');
+    const before = window.history.length;
+    await openBoard(/^Balanced/);
+    expect(window.location.pathname).toBe('/app/board');
+    expect(window.history.length).toBe(before); // no new entry: replace, not push
   });
 
   it('reads the podium when the session ends, and ranks the summary', async () => {
