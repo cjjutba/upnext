@@ -885,26 +885,36 @@ iPhone and a real iPad, and CJ is doing that himself.
 
 ### 12.11 Branch state
 
-`origin/main` moved from `a343627` to `ada0070` while this was being measured.
-This branch sits on `a343627` plus the changes in 12.1, and production serves
-that, not `main`.
+`origin/main` moved from `a343627` to `ada0070` while this was being measured,
+so every number in section 12 was taken on `a343627` plus the changes in 12.1.
+This branch has since been rebased onto `ada0070` for the pull request.
 
-I did not rebase. `ada0070` removes score entry and replaces the single verdict
-button with a Team 1 wins and Team 2 wins pair, which is the exact control every
-latency number here was taken on. Rebasing would have invalidated the
-measurements and the deployment they describe, and the harness would need
-rewriting before anything could be re-measured. That is a decision for whoever
-merges, not something to fold in silently.
+The rebase hit one conflict, in `src/screens/SessionBoard.tsx`, where both sides
+add a module constant right after `RAIL_MOTION`: my `BOARD_GRID` and their
+`UNDO_WINDOW_MS`. Resolved by keeping both. `src/App.test.tsx` and
+`src/routes/BoardRoute.tsx` merged on their own. On the rebased tree
+`npm run typecheck` is clean and all 465 tests pass.
 
-Test-merged the working tree against `ada0070`. One conflict:
+What that means for the numbers above:
 
-| File | Result |
-|---|---|
-| `src/App.test.tsx` | auto-merges |
-| `src/routes/BoardRoute.tsx` | auto-merges |
-| `src/screens/SessionBoard.tsx` | **conflict**, both sides add a module constant right after `RAIL_MOTION`: my `BOARD_GRID` and their `UNDO_WINDOW_MS`. Keep both blocks. Nothing else in the file collides |
-| everything else | no overlap |
+- **The voice measurements still hold.** `ada0070` touches the win control, the
+  undo pill and `finishGame`'s score argument. It does not touch
+  `announce.ts`, `speech.ts` or the announcer, and it does not change what gets
+  announced or when.
+- **The grid column counts still hold.** They follow from content width, which
+  `ada0070` does not change.
+- **The screens-of-scroll numbers are now conservative.** `ada0070` removes the
+  score row from a live court card, so cards are shorter than the ones measured
+  here and every scroll figure should come out lower. I have not re-measured.
+- **The interaction latency numbers were taken on the old control.** A win was
+  two score fields and a verdict button; on `main` it is one tap on Team 1 wins
+  or Team 2 wins. Fewer interactions for the same event, so nothing here gets
+  worse, but the tap-to-paint figure has not been re-taken on the new button.
+- **12.5 needs re-checking after merge.** `ada0070` hides the undo pill ten
+  seconds after an action and its cards are shorter, so where the pill lands
+  relative to court 3 has moved. The overlap may be smaller, or gone. The hit
+  test in 12.5 is a two minute re-run.
 
-After merging, two things need re-checking rather than assuming: the harness
-selectors, which key off `Team N wins on court N` and the score fields, and
-whether `ada0070`'s pill window changes the overlap in 12.5.
+Re-running the harness against the rebased build needs the driver updated
+first: it types into score fields that no longer exist and finds a live court by
+looking for them.
