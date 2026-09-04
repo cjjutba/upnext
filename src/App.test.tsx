@@ -74,20 +74,20 @@ async function openBoard(mode: RegExp) {
 async function startMatch(mode: RegExp) {
   await openBoard(mode);
   await click(btn('Start match on court 1'));
-  await screen.findByLabelText('Team 1 wins on court 1'); // the dispatch is async; wait for the clock
+  await screen.findByLabelText('Record the result on court 1'); // the dispatch is async; wait for the clock
 }
 
 /** The card div that owns a court's close button. */
 const courtCard = (n: number) => screen.getByLabelText(`Close court ${n}`).closest('[data-court]') as HTMLElement;
 
-/** Fills both score fields and taps the winner, since a win now requires a recorded score. */
+/** Types a score the given team wins, then taps the button that reads out that winner. */
 async function recordWin(court: number, team: 1 | 2) {
   const card = courtCard(court);
   await act(() => {
-    fireEvent.change(within(card).getByLabelText(`Team 1 score on court ${court}`), { target: { value: '11' } });
-    fireEvent.change(within(card).getByLabelText(`Team 2 score on court ${court}`), { target: { value: '7' } });
+    fireEvent.change(within(card).getByLabelText(`Team 1 score on court ${court}`), { target: { value: team === 1 ? '11' : '7' } });
+    fireEvent.change(within(card).getByLabelText(`Team 2 score on court ${court}`), { target: { value: team === 1 ? '7' : '11' } });
   });
-  await click(btn(team === 1 ? /Team 1 wins/ : /Team 2 wins/, card));
+  await click(btn(`Team ${team} wins on court ${court}`, card));
 }
 
 /** The queue panel under the courts: the next four, or the challengers a winners template promises. */
@@ -246,7 +246,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
   it('lifts a player off a live court, offers the open seat, and seats whoever is picked', async () => {
     render(<App />);
     await startMatch(/^Balanced/);
-    expect(btn(/Team 1 wins/, courtCard(1))).toBeInTheDocument();
+    expect(btn('Record the result on court 1', courtCard(1))).toBeInTheDocument();
 
     await click(chip('Alice', courtCard(1)));
     await click(btn('Off the court', dialog(/Change Alice/)));
@@ -254,8 +254,8 @@ describe('App: courtside calls, standings, and the mute switch', () => {
 
     const opened = courtCard(1);
     expect(within(opened).getByText('Tap to add player')).toBeInTheDocument();
-    expect(within(opened).queryByRole('button', { name: /Team 1 wins/ })).not.toBeInTheDocument();
-    expect(within(opened).queryByRole('button', { name: /Team 2 wins/ })).not.toBeInTheDocument();
+    expect(within(opened).queryByRole('button', { name: /Record the result/ })).not.toBeInTheDocument();
+    expect(within(opened).queryByLabelText('Team 1 score on court 1')).not.toBeInTheDocument();
     expect(btn('Fill court 1', opened)).toBeInTheDocument();
     expect(chipOrder(opened)).toEqual(['Carol', 'Bob', 'Dave']); // three left on court
 
@@ -264,7 +264,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await click(within(picker).getByText('Eve').closest('button')!);
 
     await waitFor(() => expect(chipOrder(courtCard(1))).toEqual(['Eve', 'Carol', 'Bob', 'Dave']));
-    expect(btn(/Team 1 wins/, courtCard(1))).toBeInTheDocument();
+    expect(btn('Record the result on court 1', courtCard(1))).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: /Add a player/ })).not.toBeInTheDocument();
   });
 
@@ -279,7 +279,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
 
     // Bob went to the queue front when he came off, so filling puts him straight back
     await waitFor(() => expect(chipOrder(courtCard(1))).toEqual(['Alice', 'Carol', 'Bob', 'Dave']));
-    expect(btn(/Team 2 wins/, courtCard(1))).toBeInTheDocument();
+    expect(btn('Record the result on court 1', courtCard(1))).toBeInTheDocument();
   });
 
   it('offers Off the court only on a live court, never on a staged one', async () => {
@@ -293,7 +293,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await click(btn('Close player options', staged));
 
     await click(btn('Start match on court 1'));
-    await screen.findByLabelText('Team 1 wins on court 1');
+    await screen.findByLabelText('Record the result on court 1');
     await click(chip('Alice', courtCard(1)));
     expect(btn('Off the court', dialog(/Change Alice/))).toBeInTheDocument();
   });
@@ -310,7 +310,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
 
     await click(btn('Keep playing', asking));
     expect(screen.queryByRole('dialog', { name: /end the session/ })).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Team 1 wins on court 1')).toBeInTheDocument(); // still live
+    expect(screen.getByLabelText('Record the result on court 1')).toBeInTheDocument(); // still live
 
     await endSession();
     await screen.findByText('Session summary');
