@@ -76,6 +76,7 @@ export function StandingsModal({ rows, nameOf, onClose, onRead, canRead }: {
                 </span>
                 {row.departed ? <StatusBadge status="neutral" label="Left" /> : null}
                 {!row.departed && row.streak >= 2 ? <StatusBadge status="live" label={`${row.streak} in a row`} /> : null}
+                {row.brokenBy ? <span className="micro-label" style={{ whiteSpace: 'nowrap' }}>{row.brokenBy}</span> : null}
               </span>
               <span className="mono" style={{ fontSize: '16px', textAlign: 'right' }}>{row.games}</span>
               <span className="mono" style={{ fontSize: '16px', textAlign: 'right' }}>{row.wins}</span>
@@ -87,7 +88,9 @@ export function StandingsModal({ rows, nameOf, onClose, onRead, canRead }: {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '12px var(--space-4)', borderTop: '1px solid var(--border)' }}>
           <span style={{ font: '400 14px/1.4 var(--font-sans)', color: 'var(--text-tertiary)' }}>
-            {decided ? 'Ranked by wins, then win rate, then games played.' : 'Pick a winner on a court to start the table.'}
+            {decided
+              ? 'Ranked by win rate, weighted by games played. The note beside a name is what broke the tie.'
+              : 'Pick a winner on a court to start the table.'}
           </span>
           <span style={{ flex: 1 }} />
           <Button variant="secondary" icon="volume-2" disabled={!canRead || !decided} onClick={onRead}>

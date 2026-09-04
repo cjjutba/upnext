@@ -129,7 +129,6 @@ export function BoardRoute({
         onQueuePlayerTap={(id) => setPicking({ playerId: id, court: null })}
         onStart={(court) => void dispatch(cmd.startStagedGame(state, court))}
         onStage={(court) => void dispatch(cmd.stageCourt(state, court, ratings))}
-        onShuffle={(court) => void dispatch(cmd.shufflePairing(state, court))}
         onCallCourt={(court) => {
           const lineup = state.staged[court] ?? state.games[court]?.pairs;
           const pairs = lineup && fullLineup(lineup);
