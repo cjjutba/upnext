@@ -27,6 +27,23 @@ const RAIL_MOTION = '180ms ease';
  */
 const UNDO_WINDOW_MS = 10000;
 
+/**
+ * Court cards, and the waiting panels that mirror them so a panel is a court
+ * card's width. Two columns cost twice the minimum plus one gap, so 420 asks
+ * for 864px of content where 480 asked for 984: at 480 a 1280 board with the
+ * rail open fell to one column and four courts took six screens of scrolling.
+ *
+ * auto-fill, not auto-fit. auto-fit collapses the tracks nothing landed in and
+ * lets one card stretch the whole column, which is how hiding the rail at 1024
+ * made the board taller rather than shorter. The max stays 1fr on purpose: a
+ * definite max is what auto-fill counts repetitions by, so capping it here puts
+ * 1280 straight back to one column.
+ */
+const BOARD_GRID = {
+  display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 420px), 1fr))',
+  gap: 'var(--space-4)', alignContent: 'start',
+} as const;
+
 const fmt = (totalSeconds: number): string => {
   const s = Math.max(0, Math.floor(totalSeconds));
   const h = Math.floor(s / 3600);
@@ -138,16 +155,6 @@ export function SessionBoard({
   const positions = (preview: UpNextPreview, i: number) =>
     preview.kind === 'challengers' ? '1 and 2' : `${i * 4 + 1} to ${i * 4 + 4}`;
 
-  /**
-   * The queue section tracks the courts grid, so a panel is a court card's
-   * width and the waiting rows sit under the first one. auto-fill, not
-   * auto-fit: a lone panel would otherwise stretch across the whole column.
-   */
-  const queueGrid = {
-    display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 480px), 1fr))',
-    gap: 'var(--space-4)', alignContent: 'start',
-  } as const;
-
   return (
     <div style={narrow
       ? { display: 'flex', flexDirection: 'column' }
@@ -168,7 +175,7 @@ export function SessionBoard({
               No courts open. Add a court to keep playing.
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 480px), 1fr))', gap: 'var(--space-4)', alignContent: 'start' }}>
+            <div style={BOARD_GRID}>
               {courts.map((n) => {
                 const game = state.games[n];
                 const staged = state.staged[n];
@@ -201,7 +208,7 @@ export function SessionBoard({
               <span style={{ flex: 1 }} />
               <span className="mono" style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>{eligibleQueue.length} waiting</span>
             </div>
-            <div style={queueGrid}>
+            <div style={BOARD_GRID}>
               {previews.length === 0 ? (
                 <div style={{ padding: 'var(--space-3)', font: '400 15px var(--font-sans)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-card)' }}>
                   {state.queue.length === 0
@@ -217,7 +224,7 @@ export function SessionBoard({
               ))}
             </div>
             {leftovers.length > 0 ? (
-              <div style={queueGrid}>
+              <div style={BOARD_GRID}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                   <span className="micro-label">Also waiting</span>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
