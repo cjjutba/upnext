@@ -137,7 +137,7 @@ export function SessionBoard({
               No courts open. Add a court to keep playing.
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 480px), 1fr))', gap: 'var(--space-4)', alignContent: 'start' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 480px), 1fr))', gap: 'var(--space-4)', alignContent: 'start' }}>
               {courts.map((n) => {
                 const game = state.games[n];
                 const staged = state.staged[n];
