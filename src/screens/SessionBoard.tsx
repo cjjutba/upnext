@@ -12,9 +12,6 @@ import type { UpNextPreview } from '../domain/templates';
 import { modeLabel } from '../domain/modes';
 import { isPlaying, isStaged } from '../domain/reducer';
 
-// wall clock on purpose: timers derive from event ts so resume replays exactly; a mid-session OS clock change can jump timers, accepted trade-off
-const LONG_GAME_SECONDS = 900;
-
 /**
  * The one animation in the app. The rail slides rather than snapping, because
  * the courts resize with it and an instant jump reads as a repaint bug. Short
@@ -35,7 +32,7 @@ export { fmt };
 export function SessionBoard({
   state, players, undoLabel, onUndo, canRedo, onRedo, onWin, onCloseCourt,
   onToggleSit, onToggleCheck, onAddCourt, onAddPlayer, onRemovePlayer, onCourtPlayerTap, onQueuePlayerTap,
-  onStart, onStage, onShuffle, onCallCourt, onCallPreview, onEditLineup, previews, narrow, railCollapsed, motion, recency,
+  onStart, onStage, onCallCourt, onCallPreview, onEditLineup, previews, narrow, railCollapsed, motion, recency,
   onSeatPlayer, onCreateAndSeat, onFillCourt,
 }: {
   state: SessionState;
@@ -57,7 +54,6 @@ export function SessionBoard({
   onQueuePlayerTap: (playerId: string) => void;
   onStart: (court: number) => void;
   onStage: (court: number) => void;
-  onShuffle: (court: number) => void;
   onCallCourt: (court: number) => void;
   /** Call the four on waiting panel i. Every panel has its own button. */
   onCallPreview: (index: number) => void;
@@ -76,6 +72,7 @@ export function SessionBoard({
   onCreateAndSeat: (court: number, slot: SlotIndex, name: string) => void;
   onFillCourt: (court: number) => void;
 }) {
+  // wall clock on purpose: timers derive from event ts so resume replays exactly; a mid-session OS clock change can jump timers, accepted trade-off
   const [now, setNow] = useState(() => Date.now());
   const [newName, setNewName] = useState('');
   const [query, setQuery] = useState('');
@@ -148,12 +145,12 @@ export function SessionBoard({
                 const phase: CourtPhase = game ? 'live' : staged ? 'staged' : 'empty';
                 return (
                   // keyed by the game so the score field starts blank on every refill
-                  <CourtCard key={n + ':' + (game?.startedEventId ?? 'open')} court={n} phase={phase} longGame={elapsed > LONG_GAME_SECONDS}
+                  <CourtCard key={n + ':' + (game?.startedEventId ?? 'open')} court={n} phase={phase}
                     pairs={game?.pairs ?? staged ?? null}
                     elapsed={fmt(elapsed)} nameOf={nameOf} canStage={eligibleQueue.length >= 4}
                     canFill={eligibleQueue.length > 0}
                     onWin={(w, score) => onWin(n, w, score)} onStart={() => onStart(n)} onCall={() => onCallCourt(n)}
-                    onShuffle={() => onShuffle(n)} onStage={() => onStage(n)}
+                    onStage={() => onStage(n)}
                     onPlayerTap={(id) => onCourtPlayerTap(n, id)} onEdit={() => onEditLineup(n)}
                     onSeatTap={(slot) => setSeating({ court: n, slot })} onFill={() => onFillCourt(n)}
                     onClose={() => onCloseCourt(n)} />
