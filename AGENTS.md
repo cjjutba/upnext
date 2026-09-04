@@ -14,7 +14,7 @@ log in IndexedDB, so cloud sync later is an upload rather than a rewrite.
 
 Stack: Vite, React 19, TypeScript, Dexie over IndexedDB, ulidx, lucide-react,
 vite-plugin-pwa. Vitest with jsdom, fake-indexeddb, and fast-check. Roughly
-3,670 lines of source across 45 files, 188 test cases in 12 test files.
+3,760 lines of source across 45 files, 238 test cases in 12 test files.
 
 ## Commands
 
@@ -71,6 +71,18 @@ queue section in that case. Do not reintroduce a hardcoded cap: a waiting four
 is a claim on a court, and without a court there is nothing to claim. Closing a
 court takes it out of service and gives its number back: `addCourt` reuses the
 lowest closed number and only grows `courtCount` when none is free.
+
+### Standings rank on a cascade
+
+`standings()` in `src/domain/standings.ts` sorts on the win rate with one
+notional win and one notional loss added, so six and zero outranks one and zero
+though both read 100 percent. Whatever is still level gets split on head to
+head, then point margin, then the mean win rate of the opponents faced, then the
+longest run of wins. Each key only reorders inside a group the key above it left
+tied, and a key that splits a group sends every part back to the top, so head to
+head is read again once two players are alone. Anyone still level shares a rank,
+and the row carries the name of the tiebreak that placed it. Decision 16 in
+`docs/decisions.md` has the reasoning.
 
 Read `docs/architecture.md` for the full picture and `docs/event-model.md` for
 every event type.
