@@ -44,11 +44,19 @@ another device or a newer build must never crash replay.
 | `event-undone` | `targetEventId` | none | No direct effect. `replay()` handles it through `computeSkipped()` |
 | `session-ended` | none | started, not ended | `ended = true`, `endedAt = ts` |
 
-`score` is on the `game-finished` payload. `CourtCard` requires a Team 1 and a
-Team 2 number before either win button enables, and sends them joined as
-`"11-7"`. `standings()` only reads the two numbers back out with a regex, so
-the join character was never a contract; the requirement is what changed,
-turning the point margin tiebreak from occasional into the common case.
+`score` is on the `game-finished` payload. `CourtCard` takes a Team 1 and a Team
+2 number and sends them joined as `"11-7"`, always in that order. `standings()`
+only reads the two numbers back out with a regex, so the join character was
+never a contract; the requirement is what changed, turning the point margin
+tiebreak from occasional into the common case.
+
+The score also picks `winnerPair`. The higher number wins, so a card shows one
+button rather than two, and its label reads back the result the numbers already
+decided: "Enter the score" until both are typed, "Scores are tied" on equal
+numbers, then "Team 1 wins" or "Team 2 wins". Only the last of those is
+enabled. This is a UI decision, not a domain one: `finishGame()` still takes
+`winnerPair` and a score independently, and a log where they disagree replays
+exactly as written.
 
 ## Open seats
 
@@ -60,8 +68,8 @@ organizer's own edits produce one. `game-started` still carries four real
 players, because a matching mode never picks fewer.
 
 A court with an open seat is live but unfinishable. `game-finished` no-ops on
-it and `finishGame()` refuses, which is why the board swaps the two win buttons
-for a single Fill court button. Everything else works normally: the timer keeps
+it and `finishGame()` refuses, which is why the board swaps the score row for a
+single Fill court button. Everything else works normally: the timer keeps
 running from the original `game-started`, closing the court sends whoever is
 seated to the queue front, and `isPlaying()` reads only real players.
 

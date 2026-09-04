@@ -37,11 +37,28 @@ export function CourtCard({
   // per game: the parent keys this card by the game, so a refill starts blank
   const [score1, setScore1] = useState('');
   const [score2, setScore2] = useState('');
-  const scoreEntered = score1.trim() !== '' && score2.trim() !== '';
-  const win = (pair: 0 | 1) => onWin(pair, `${score1.trim()}-${score2.trim()}`);
   const digitsOnly = (v: string) => v.replace(/\D/g, '');
+  const entered = score1 !== '' && score2 !== '';
+  // The higher score is the winner. A game has no other outcome, so pointing at a
+  // team after typing the numbers is stating the same result twice.
+  const winner: 0 | 1 | null =
+    !entered || score1 === score2 ? null : Number(score1) > Number(score2) ? 0 : 1;
+  const verdict = !entered ? 'Enter the score' : winner === null ? 'Scores are tied' : `Team ${winner + 1} wins`;
   // an open seat means this was never a game of four, so there is no winner to record
   const short = phase === 'live' && pairs !== null && fullLineup(pairs) === null;
+
+  const scoreField = (team: 1 | 2, value: string, set: (v: string) => void) => (
+    <input
+      value={value} onChange={(e) => set(digitsOnly(e.target.value))}
+      inputMode="numeric" maxLength={2} placeholder="0" aria-label={`Team ${team} score on court ${court}`}
+      className="mono"
+      style={{
+        width: '52px', minHeight: 'var(--tap-primary)', boxSizing: 'border-box',
+        textAlign: 'center', fontSize: '18px',
+        border: '1px solid var(--border)', borderRadius: 'var(--radius-control)',
+        background: 'var(--bg)', color: 'var(--text)',
+      }} />
+  );
   return (
     <div data-court={court} style={{
       display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', padding: '20px',
@@ -80,33 +97,21 @@ export function CourtCard({
               </span>
             </div>
           ) : phase === 'live' ? (
-            <>
-              {/* a small score chip sits right above its own team's button, so the pairing needs no caption */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <input
-                  value={score1} onChange={(e) => setScore1(digitsOnly(e.target.value))}
-                  inputMode="numeric" maxLength={2} placeholder="0" aria-label={'Team 1 score on court ' + court}
-                  className="mono"
-                  style={{
-                    width: '52px', height: '36px', margin: '0 auto', display: 'block',
-                    textAlign: 'center', fontSize: '16px',
-                    border: '1px solid var(--border)', borderRadius: 'var(--radius-control)', background: 'var(--bg)', color: 'var(--text)',
-                  }} />
-                <input
-                  value={score2} onChange={(e) => setScore2(digitsOnly(e.target.value))}
-                  inputMode="numeric" maxLength={2} placeholder="0" aria-label={'Team 2 score on court ' + court}
-                  className="mono"
-                  style={{
-                    width: '52px', height: '36px', margin: '0 auto', display: 'block',
-                    textAlign: 'center', fontSize: '16px',
-                    border: '1px solid var(--border)', borderRadius: 'var(--radius-control)', background: 'var(--bg)', color: 'var(--text)',
-                  }} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <Button size="lg" block icon="trophy" disabled={!scoreEntered} onClick={() => win(0)} ariaLabel={'Team 1 wins on court ' + court}>Team 1 wins</Button>
-                <Button size="lg" block icon="trophy" disabled={!scoreEntered} onClick={() => win(1)} ariaLabel={'Team 2 wins on court ' + court}>Team 2 wins</Button>
-              </div>
-            </>
+            /* One row: each score sits under its own team's half of the court, so the
+               sides need no caption, and the button between them reads out the
+               winner the numbers already picked. */
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: '12px', alignItems: 'stretch' }}>
+              {scoreField(1, score1, setScore1)}
+              <Button
+                size="lg" block icon={winner === null ? undefined : 'trophy'} disabled={winner === null}
+                onClick={() => winner !== null && onWin(winner, `${score1}-${score2}`)}
+                ariaLabel={winner === null ? 'Record the result on court ' + court : `Team ${winner + 1} wins on court ${court}`}
+                /* tighter than a standalone button: the label has to clear two score fields on a phone */
+                style={{ padding: '0 var(--space-3)', height: 'auto' }}>
+                {verdict}
+              </Button>
+              {scoreField(2, score2, setScore2)}
+            </div>
           ) : (
             // Start match stays the primary action; Choose players matches its height and width for a balanced row
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
