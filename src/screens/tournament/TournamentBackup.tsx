@@ -58,15 +58,15 @@ export function TournamentBackup({ hasTournament, busy, error, onSave, onRestore
       }} />
     </div>
     {reading ? <p role="status" style={muted}>Reading backup.</p> : null}
-    {notice ? <p role="status" style={muted}>{notice}</p> : null}
-    {localError ? <p role="alert" style={muted}>{localError}</p> : null}
+    {notice ? <p role="status" className="app-notice">{notice}</p> : null}
+    {localError ? <p role="alert" className="app-notice" data-kind="error">{localError}</p> : null}
     {preview ? <TournamentDialog title="Restore tournament backup" busy={busy} onClose={() => setPreview(null)}>
       <div style={{ ...stack, overflowWrap: 'anywhere' }}>
         <strong>{preview.name}</strong>
         <p style={muted}>{preview.time}</p>
         <p style={muted}>Upnext checks the file before restoring it. Existing tournament results are kept when a backup conflicts.</p>
       </div>
-      {error ? <p role="alert" style={muted}>{error}</p> : null}
+      {error ? <p role="alert" className="app-notice" data-kind="error">{error}</p> : null}
       <Button size="lg" disabled={busy} onClick={async () => {
         if (await onRestore(preview.data)) {
           setNotice('Tournament restored.');

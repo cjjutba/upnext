@@ -39,16 +39,18 @@ function CourtTile({ court, fixture, busy, nameOf, matchRef, onAction, onEdit }:
 }) {
   const start = fixture?.match.startedAt;
   const live = start !== null && start !== undefined;
-  const status = fixture ? (live ? 'Live' : 'Staged') : 'Open';
-  return <Panel title={court.name} aside={<StatusBadge status={live ? 'live' : 'neutral'} label={status} />}>
+  const status = fixture ? (live ? 'live' : 'ready') : 'neutral';
+  return <Panel kind="court" heading="h3" title={court.name} aside={<StatusBadge status={status} />}>
     {(court.availableFrom || court.availableUntil) ? <p style={muted}>
       Available {court.availableFrom ? new Date(court.availableFrom).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : 'at opening'}
       {' to '}{court.availableUntil ? new Date(court.availableUntil).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : 'close'}.
     </p> : null}
     {fixture ? <>
-      <p style={muted}>{fixture.title}</p>
+      <p className="fixture-context">{fixture.title}</p>
       {fixture.match.playerIds ? <CourtDiagram pairs={fixture.match.playerIds} nameOf={nameOf} /> : null}
-      <MatchRecord fixture={fixture} matchRef={matchRef} />
+      {fixture.match.playerIds ? (
+        <div className="fixture-sides"><strong>{fixture.sides[0]}</strong><span>vs</span><strong>{fixture.sides[1]}</strong></div>
+      ) : <MatchRecord fixture={fixture} matchRef={matchRef} />}
       {live ? (
         <Button size="lg" disabled={busy} ariaLabel={`Record score on ${court.name}`} onClick={() => onEdit(fixture)}>Record score</Button>
       ) : (
@@ -61,7 +63,7 @@ function CourtTile({ court, fixture, busy, nameOf, matchRef, onAction, onEdit }:
           })}>Unassign</Button>
         </div>
       )}
-    </> : <p style={muted}>Assign a waiting match below.</p>}
+    </> : <p className="tournament-court-empty">Assign a waiting match below.</p>}
   </Panel>;
 }
 
@@ -75,9 +77,9 @@ function FixtureCard({ fixture, courts, availableCourtIds, busy, matchRef, onAct
   const courtName = courts.find((court) => court.id === match.courtId)?.name;
   const status = match.result
     ? match.result.type === 'played' ? 'Finished' : match.result.type === 'forfeit' ? 'Forfeit' : 'Cancelled'
-    : !match.playerIds ? 'Qualification pending' : match.courtId ? (match.startedAt !== null ? 'Live' : 'Staged') : 'Unassigned';
+    : !match.playerIds ? 'Qualification pending' : match.courtId ? (match.startedAt !== null ? 'Live' : 'Ready to start') : 'Unassigned';
   const label = fixture.title;
-  return <Panel title={label} aside={<StatusBadge label={status} />}>
+  return <Panel kind="fixture" heading="h3" title={label} aside={<StatusBadge status={status === 'Live' ? 'live' : status === 'Ready to start' ? 'ready' : 'neutral'} label={status} />}>
     {courtName ? <p style={muted}>{courtName}</p> : null}
     <MatchRecord fixture={fixture} matchRef={matchRef} />
     {match.result ? (
@@ -114,10 +116,18 @@ export function TournamentPlay({ courts, fixtures, busy, nameOf, matchRef, onAct
   const waiting = matches.filter(({ match }) => !match.result && !match.courtId);
   const finished = matches.filter(({ match }) => match.result);
   const visible = filter === 'waiting' ? waiting : filter === 'finished' ? finished : matches;
+  const remaining = matches.length - finished.length;
+  const emptyMessage = fixtures.length === 0
+    ? 'Lock a division or confirm an Unidos draw to add matches.'
+    : filter === 'waiting' ? 'No unassigned matches in this view.'
+      : filter === 'finished' ? 'No finished matches in this view.' : 'No matches in this division.';
 
   return <div style={stack}>
-    <h2 className="display" style={{ margin: 0, fontSize: 'var(--text-h2)' }}>Court board</h2>
-    <div style={grid}>{courts.map((court) => <CourtTile key={court.id} court={court} fixture={occupied.get(court.id)} busy={busy}
+    <div className="panel-heading">
+      <h2 className="display division-section-title">Court board</h2>
+      <span className="count-label mono">{available.length} open</span>
+    </div>
+    <div className="tournament-court-grid">{courts.map((court) => <CourtTile key={court.id} court={court} fixture={occupied.get(court.id)} busy={busy}
       nameOf={nameOf} matchRef={matchRef} onAction={onAction} onEdit={onEdit} />)}</div>
     {draw ? <Disclosure title="Draw the next Unidos match">{draw}</Disclosure> : null}
     <Panel title="Fixtures" aside={<span className="mono">{waiting.length} unassigned</span>}>
@@ -130,9 +140,9 @@ export function TournamentPlay({ courts, fixtures, busy, nameOf, matchRef, onAct
           <option value="waiting">Unassigned</option><option value="all">All fixtures</option><option value="finished">Finished</option>
         </select></Field>
       </div>
-      <p style={muted}><span className="mono">{matches.length - finished.length}</span> fixtures remaining, including matches waiting for qualification.</p>
-      {visible.length === 0 ? <p style={muted}>No fixtures in this view. Lock a division or confirm an Unidos draw to add fixtures.</p> : (
-        <div style={grid}>{visible.map((fixture) => <FixtureCard key={fixture.match.id} fixture={fixture} courts={courts} availableCourtIds={available}
+      <p style={muted}><span className="mono">{remaining}</span> {remaining === 1 ? 'match' : 'matches'} remaining, including any waiting for qualification.</p>
+      {visible.length === 0 ? <p style={muted}>{emptyMessage}</p> : (
+        <div className="tournament-fixture-grid">{visible.map((fixture) => <FixtureCard key={fixture.match.id} fixture={fixture} courts={courts} availableCourtIds={available}
           busy={busy} matchRef={matchRef} onAction={onAction} onEdit={onEdit} />)}</div>
       )}
     </Panel>

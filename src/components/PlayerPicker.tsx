@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
 import { Button } from './Button';
+import { AppDialog } from './AppDialog';
 import { IconButton } from './IconButton';
 import { PlayerChip } from './PlayerChip';
 import type { Player } from '../domain/types';
@@ -24,30 +24,9 @@ export function PlayerPicker({ name, context, candidates, sitting, onSwap, onSit
   onLift?: () => void;
   onClose: () => void;
 }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 40, background: 'rgba(0, 0, 0, 0.32)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-4)',
-      }}>
-      <div
-        role="dialog" aria-modal="true" aria-label={'Change ' + name}
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '520px', maxWidth: '100%', maxHeight: '82vh', display: 'flex', flexDirection: 'column',
-          background: 'var(--bg)', border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-modal)', boxShadow: 'var(--shadow-modal)',
-        }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '12px var(--space-4)', borderBottom: '1px solid var(--border)' }}>
+    <AppDialog label={'Change ' + name} onClose={onClose} width="520px">
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)', padding: '12px var(--space-4)', borderBottom: '1px solid var(--border)' }}>
           <span className="display" style={{ fontSize: 'var(--text-h2)' }}>{name}</span>
           <span className="micro-label">{context}</span>
           <span style={{ flex: 1 }} />
@@ -78,7 +57,6 @@ export function PlayerPicker({ name, context, candidates, sitting, onSwap, onSit
           {onLift ? <Button variant="secondary" icon="user-minus" onClick={onLift}>Off the court</Button> : null}
           <Button variant="secondary" icon="user-minus" onClick={onRemove}>Remove from session</Button>
         </div>
-      </div>
-    </div>
+    </AppDialog>
   );
 }

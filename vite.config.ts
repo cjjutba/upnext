@@ -56,10 +56,10 @@ export default defineConfig({
       manifest: {
         name: 'upnext',
         short_name: 'upnext',
-        description: 'Courtside pickleball open play manager',
+        description: 'Courtside pickleball open play and tournaments',
         display: 'standalone',
-        background_color: '#ffffff',
-        theme_color: '#ffffff',
+        background_color: '#f6f8f2',
+        theme_color: '#f6f8f2',
         start_url: '/app',
         scope: '/app',
         icons: [
@@ -71,22 +71,10 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         // Only /app/* is the SPA: the landing page must never be swallowed by this fallback.
         navigateFallback: '/app.html',
         navigateFallbackAllowlist: [/^\/app(\/.*)?$/],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: { cacheName: 'google-fonts-css', expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 365 } },
-          },
-          {
-            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: { cacheName: 'google-fonts-files', expiration: { maxEntries: 16, maxAgeSeconds: 60 * 60 * 24 * 365 } },
-          },
-        ],
       },
       devOptions: { enabled: false },
     }),

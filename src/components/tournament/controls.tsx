@@ -1,4 +1,4 @@
-import { useLayoutEffect, useId, useRef } from 'react';
+import { AppDialog } from '../AppDialog';
 import type { CSSProperties, ReactNode } from 'react';
 import { IconButton } from '../IconButton';
 
@@ -14,11 +14,14 @@ export const grid: CSSProperties = {
   display: 'grid', gap: 'var(--space-3)', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))',
 };
 
-export function Panel({ title, aside, children }: { title: string; aside?: ReactNode; children: ReactNode }) {
+export function Panel({ title, aside, children, kind, heading = 'h2' }: {
+  title: string; aside?: ReactNode; children: ReactNode; kind?: 'court' | 'fixture'; heading?: 'h2' | 'h3';
+}) {
+  const Heading = heading;
   return (
-    <section style={{ ...stack, border: '1px solid var(--border)', borderRadius: 'var(--radius-card)', padding: 'var(--space-3)' }}>
-      <div style={{ ...row, justifyContent: 'space-between' }}>
-        <h2 className="display" style={{ margin: 0, fontSize: 'var(--text-h3)' }}>{title}</h2>
+    <section className="tournament-panel" data-kind={kind}>
+      <div className="panel-heading">
+        <Heading className="display">{title}</Heading>
         {aside}
       </div>
       {children}
@@ -40,17 +43,15 @@ export function Disclosure({ title, children }: { title: string; children: React
   </details>;
 }
 
-export function Choices<T extends string>({ label, value, options, onChange }: {
+export function Choices<T extends string>({ label, value, options, onChange, navigation }: {
   label: string; value: T; options: readonly { value: T; label: string }[]; onChange: (value: T) => void;
+  navigation?: boolean;
 }) {
-  return <div role="group" aria-label={label} style={row}>
+  return <div role="group" aria-label={label} className="tournament-choices" data-navigation={navigation || undefined}>
     {options.map((option) => (
-      <button key={option.value} type="button" aria-pressed={value === option.value} onClick={() => onChange(option.value)}
-        style={{
-          ...control, width: 'auto', cursor: 'pointer', paddingInline: 'var(--space-3)',
-          fontWeight: 500, background: value === option.value ? 'var(--primary)' : 'var(--bg)',
-          color: value === option.value ? 'var(--primary-fg)' : 'var(--text)',
-        }}>{option.label}</button>
+      <button key={option.value} type="button" aria-pressed={value === option.value} onClick={() => onChange(option.value)}>
+        {option.label}
+      </button>
     ))}
   </div>;
 }
@@ -58,35 +59,15 @@ export function Choices<T extends string>({ label, value, options, onChange }: {
 export function TournamentDialog({ title, onClose, busy, children }: {
   title: string; onClose: () => void; busy?: boolean; children: ReactNode;
 }) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
-
-  useLayoutEffect(() => {
-    const element = dialog.current;
-    element?.showModal();
-    return () => element?.close();
-  }, []);
-
-  const close = () => {
-    if (busy) return;
-    dialog.current?.close();
-    onClose();
-  };
-
   return (
-    <dialog ref={dialog} aria-labelledby={titleId} onCancel={(event) => { event.preventDefault(); close(); }}
-      style={{
-        width: '520px', maxWidth: 'calc(100% - 2 * var(--space-3))', maxHeight: 'calc(100dvh - 2 * var(--space-3))',
-        background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border)',
-        borderRadius: 'var(--radius-modal)', boxShadow: 'var(--shadow-modal)', padding: 'var(--space-3)',
-      }}>
-      <div style={stack}>
-        <div style={{ ...row, justifyContent: 'space-between' }}>
-          <h2 id={titleId} className="display" style={{ margin: 0, fontSize: 'var(--text-h3)', flex: 1 }}>{title}</h2>
-          <IconButton icon="x" ariaLabel="Close dialog" onClick={close} />
+    <AppDialog label={title} onClose={onClose} busy={busy} dismissOnBackdrop={false}>
+      <div className="tournament-dialog" style={stack}>
+        <div className="panel-heading">
+          <h2 className="display" style={{ margin: 0, fontSize: 'var(--text-h2)', flex: 1 }}>{title}</h2>
+          <IconButton icon="x" ariaLabel="Close dialog" onClick={() => { if (!busy) onClose(); }} />
         </div>
         {children}
       </div>
-    </dialog>
+    </AppDialog>
   );
 }

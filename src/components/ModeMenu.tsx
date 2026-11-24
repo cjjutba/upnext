@@ -15,6 +15,7 @@ export function ModeMenu({ rule, onRequestChange }: {
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   const current = modeForTemplate(rule.template);
   const split = rule.template === 'winners-split';
 
@@ -35,11 +36,16 @@ export function ModeMenu({ rule, onRequestChange }: {
   };
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div ref={ref} style={{ position: 'relative' }} onKeyDown={(event) => {
+      if (event.key === 'Escape' && open) {
+        setOpen(false);
+        trigger.current?.focus();
+      }
+    }}>
       <button
-        type="button" onClick={() => setOpen(!open)} aria-label="Change matching mode"
+        ref={trigger} type="button" onClick={() => setOpen(!open)} aria-label="Change matching mode" aria-expanded={open}
         style={{
-          display: 'inline-flex', alignItems: 'center', height: '40px', padding: '0 var(--space-3)',
+          display: 'inline-flex', alignItems: 'center', minHeight: 'var(--tap-min)', padding: '0 var(--space-3)',
           background: 'var(--bg)', color: 'var(--text-secondary)', border: '1px solid var(--border)',
           borderRadius: 'var(--radius-control)', font: '500 14px/1 var(--font-sans)', cursor: 'pointer',
         }}>
@@ -57,7 +63,7 @@ export function ModeMenu({ rule, onRequestChange }: {
             <button key={m.id} type="button" onClick={() => pick(m.id)} aria-pressed={current === m.id}
               style={{
                 display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'left', width: '100%',
-                padding: 'var(--space-3)', cursor: 'pointer', background: 'var(--bg)', color: 'var(--text)',
+                padding: 'var(--space-3)', cursor: 'pointer', background: current === m.id ? 'var(--status-green-bg)' : 'var(--bg)', color: 'var(--text)',
                 border: current === m.id ? '1px solid var(--gray-1000)' : '1px solid var(--border)',
                 borderRadius: 'var(--radius-card)',
               }}>

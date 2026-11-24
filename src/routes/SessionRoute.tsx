@@ -15,12 +15,11 @@ interface SessionRouteProps {
   canSpeak: boolean;
   resuming: boolean;
   navigate: Navigate;
-  narrow: boolean;
 }
 
 /** Views a past session by id, the existing History "View" action. Always read only: autoRead stays false because loadById clears lastBatch. */
 export function SessionRoute({
-  id, state, lastBatch, loadById, players, onDone, speak, canSpeak, resuming, navigate, narrow,
+  id, state, lastBatch, loadById, players, onDone, speak, canSpeak, resuming, navigate,
 }: SessionRouteProps) {
   const [loaded, setLoaded] = useState(false);
 
@@ -47,7 +46,6 @@ export function SessionRoute({
       speak={speak}
       canSpeak={canSpeak}
       autoRead={lastBatch.some((e) => e.type === 'session-ended')}
-      narrow={narrow}
     />
   );
 }

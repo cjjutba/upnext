@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Button } from '../components/Button';
-import { Choices, control, Field, muted, Panel, row, stack, TournamentDialog } from '../components/tournament/controls';
+import { AppHeader } from '../components/AppHeader';
+import { Choices, control, Field, muted, Panel, row, TournamentDialog } from '../components/tournament/controls';
 import { MatchEditor, ResolveAffectedMatch } from '../components/tournament/MatchEditor';
 import type { CorrectionConflict } from '../components/tournament/MatchEditor';
 import { divisionQualifyingComplete, getDivisionStandings, getMatchWinner, getRotationProgress } from '../domain/tournament';
@@ -194,29 +195,41 @@ function TournamentWorkspace({ state, tournament, roster }: {
     !match.result && (match.teamIds?.includes(withdrawal.entryId) || match.playerIds?.flat().includes(withdrawal.entryId)),
   ).length : 0;
 
-  return <div style={stack}>
-    <div style={row}>
-      <h1 className="display" style={{ margin: 0, fontSize: 'var(--text-h1)', overflowWrap: 'anywhere', minWidth: 0, flex: 1 }}>{state.settings.name}</h1>
-      {state.settings.date ? <time className="mono" dateTime={state.settings.date}>{state.settings.date}</time> : null}
-    </div>
-    <Choices label="Tournament views" value={tab} options={views} onChange={selectView} />
-    {error ? <p role="alert" style={{
-      ...muted, padding: 'var(--space-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-control)',
-      background: 'var(--bg-secondary)', position: 'sticky', top: 0, zIndex: 1,
-    }}>{error}</p> : null}
+  const lockedCount = Object.values(state.divisions).filter((item) => item.locked).length;
+  const liveCount = fixtures.filter(({ match }) => match.startedAt !== null && !match.result).length;
+
+  return <div className="tournament-workspace">
+    <header className="tournament-masthead">
+      <div>
+        <h1 className="display">{state.settings.name}</h1>
+        <p>{state.settings.date ? <time dateTime={state.settings.date}>{new Date(state.settings.date + 'T12:00:00').toLocaleDateString(undefined, {
+          weekday: 'short', month: 'long', day: 'numeric', year: 'numeric',
+        })}</time> : 'Set the event date in Setup.'}</p>
+      </div>
+      <dl className="tournament-tally">
+        <div><dt>Courts</dt><dd className="mono">{state.settings.courts.length}</dd></div>
+        <div><dt>Divisions locked</dt><dd className="mono">{lockedCount} of 4</dd></div>
+        <div><dt>Live matches</dt><dd className="mono">{liveCount}</dd></div>
+      </dl>
+    </header>
+    <Choices label="Tournament views" value={tab} options={views} onChange={selectView} navigation />
+    {error ? <p role="alert" className="app-notice" data-kind="error">{error}</p> : null}
     {tab === 'setup' ? <>
-      <EventSettings key={JSON.stringify(state.settings)} settings={state.settings} locked={tournamentHasPlayed(state)} busy={busy}
-        onSave={(settings) => void save({ type: 'update-settings', settings })} />
-      <AddRosterPlayer roster={roster.players} busy={busy} onAdd={async (name) => {
-        clearFailure();
-        try {
-          if (await roster.addPlayer(name)) return true;
-          throw new Error('A player with that name is already on the roster.');
-        } catch (error) {
-          tournament.report(error);
-          return false;
-        }
-      }} />
+      <div className="tournament-setup-grid">
+        <EventSettings key={JSON.stringify(state.settings)} settings={state.settings} locked={tournamentHasPlayed(state)} busy={busy}
+          onSave={(settings) => void save({ type: 'update-settings', settings })} />
+        <AddRosterPlayer roster={roster.players} busy={busy} onAdd={async (name) => {
+          clearFailure();
+          try {
+            if (await roster.addPlayer(name)) return true;
+            throw new Error('A player with that name is already on the roster.');
+          } catch (error) {
+            tournament.report(error);
+            return false;
+          }
+        }} />
+      </div>
+      <h2 className="display division-section-title">Divisions</h2>
       <Choices label="Setup division" value={setupDivision} options={divisionOptions} onChange={(id) => {
         clearFailure();
         setSetupDivision(id);
@@ -257,20 +270,22 @@ function TournamentWorkspace({ state, tournament, roster }: {
   </div>;
 }
 
-export function TournamentRoute({ onOpenPlay }: { onOpenPlay: () => void }) {
+export function TournamentRoute() {
   const tournament = useTournament();
   const roster = useRoster();
   return <>
-    <header style={{ ...row, justifyContent: 'space-between', padding: 'var(--space-2) var(--space-3)', borderBottom: '1px solid var(--border)' }}>
-      <span className="display" style={{ fontSize: 'var(--text-h3)' }}>upnext</span>
-      <Button variant="ghost" onClick={onOpenPlay}>Open play</Button>
-    </header>
-    <main style={{ ...stack, width: '100%', maxWidth: '1080px', marginInline: 'auto', padding: 'var(--space-3)' }}>
+    <AppHeader mode="tournament" />
+    <main id="app-main" className="tournament-page" tabIndex={-1}>
       {tournament.loading ? <p role="status" style={muted}>Loading tournaments.</p> : tournament.state ? (
         <TournamentWorkspace key={tournament.state.id} state={tournament.state} tournament={tournament} roster={roster} />
       ) : <>
-        <h1 className="display" style={{ margin: 0, fontSize: 'var(--text-h1)' }}>Tournaments</h1>
-        {tournament.failure ? <p role="alert" style={muted}>{tournament.failure.message}</p> : null}
+        <header className="tournament-masthead tournament-masthead--empty">
+          <div>
+            <h1 className="display">Tournaments</h1>
+            <p>Set up entries and draws, then run courts, scores, and standings.</p>
+          </div>
+        </header>
+        {tournament.failure ? <p role="alert" className="app-notice" data-kind="error">{tournament.failure.message}</p> : null}
         <Panel title="On this device">
           {tournament.list.length ? tournament.list.map((entry) => (
             <div key={entry.id} style={{ ...row, justifyContent: 'space-between', borderTop: '1px solid var(--border)' }}>

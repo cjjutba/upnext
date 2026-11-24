@@ -76,7 +76,7 @@ export function MatchEditor({ match, teams, format, scoringRule, busy, error, co
     if (onReview && !currentReview) {
       const output = onReview(result, reason.trim(), choice);
       setReview({ signature, output });
-      if (output.error || output.changes.length || output.affectedMatches.length) return;
+      return;
     }
     if (await onSave(result, reason.trim(), choice)) {
       onClose();
@@ -90,13 +90,14 @@ export function MatchEditor({ match, teams, format, scoringRule, busy, error, co
     ]} onChange={setKind} /> : null}
     <fieldset disabled={busy} style={{ ...stack, minWidth: 0, padding: 0, margin: 0, border: 0 }}>
       {kind === 'played' ? <>
-        {scores.map((score, game) => <fieldset key={game} style={{
+        {scores.map((score, game) => <fieldset className="score-game" key={game} style={{
           display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-2)',
           padding: 'var(--space-2)', border: '1px solid var(--border)', margin: 0, minWidth: 0, overflowWrap: 'anywhere',
         }}>
           <legend className="mono">Game {game + 1}</legend>
           {teams.map((team, side) => <Field key={side} label={team}>
-            <input type="number" min={0} inputMode="numeric" aria-label={`Game ${game + 1}, ${team} points`} className="mono" style={control}
+            <input type="number" min={0} inputMode="numeric" aria-label={`Game ${game + 1}, ${team} points`} className="mono"
+              style={{ ...control, minHeight: 'var(--tap-primary)', font: '650 24px var(--font-sans)' }}
               value={score[side]} onChange={(e) => {
                 const values: [string, string] = [...score];
                 values[side] = e.target.value;
@@ -119,17 +120,23 @@ export function MatchEditor({ match, teams, format, scoringRule, busy, error, co
         <p style={muted}>A forfeit records a match winner without game scores.</p>
       </>}
       {editing ? <Field label="Correction reason"><input value={reason} style={control} onChange={(e) => setReason(e.target.value)} /></Field> : null}
-      {(error && !pendingConflict) || currentReview?.error ? <p role="alert" style={muted}>{currentReview?.error ?? error}</p> : null}
-      {currentReview?.changes.length ? <section aria-label="Updated playoff pairings" style={stack}>
+      {(error && !pendingConflict) || currentReview?.error ? <p role="alert" className="app-notice" data-kind="error">{currentReview?.error ?? error}</p> : null}
+      {currentReview?.changes.length ? <section aria-label="Updated playoff pairings" className="correction-impact">
         <strong>Playoff pairing changes</strong>
         {currentReview.changes.map((change) => <div key={change.label} style={{ ...stack, gap: 'var(--space-1)' }}>
           <strong>{change.label}</strong>
-          <p style={muted}>Before. {change.before}</p><p style={muted}>With the correction. {change.after}</p>
+          <dl className="correction-diff">
+            <div><dt>Before</dt><dd>{change.before}</dd></div>
+            <div><dt>With the correction</dt><dd>{change.after}</dd></div>
+          </dl>
         </div>)}
       </section> : null}
+      {currentReview && !currentReview.error && !currentReview.changes.length && !currentReview.affectedMatches.length ? (
+        <p role="status" className="app-notice">This correction leaves the playoff pairings as they are.</p>
+      ) : null}
       {pendingConflict ? <ResolveAffectedMatch conflict={pendingConflict} resolution={resolution} onChange={setResolution} /> : null}
       <Button size="lg" disabled={busy || !canSubmit || (editing && !reason.trim()) || (!!pendingConflict && !resolution?.reason.trim()) || !!currentReview?.error}
-        onClick={() => void save()}>{editing ? 'Save correction' : 'Save result'}</Button>
+        onClick={() => void save()}>{onReview && !currentReview ? 'Review correction' : editing ? 'Save correction' : 'Save result'}</Button>
     </fieldset>
   </TournamentDialog>;
 }

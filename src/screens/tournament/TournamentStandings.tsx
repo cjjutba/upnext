@@ -27,10 +27,11 @@ function metricValue(evidence: RankingEvidence): string {
 function RankingRow({ standing, label, fixtures, matchRef }: {
   standing: Standing; label: string; fixtures: Map<string, FixtureView>; matchRef: (id: string) => string;
 }) {
-  return <li style={{ ...stack, gap: 'var(--space-2)', borderTop: '1px solid var(--border)', paddingTop: 'var(--space-2)' }}>
+  const finalMetric = standing.evidence.findLast((item) => item.value !== null && item.metric !== 'wins');
+  return <li className="tournament-ranking">
     <div style={{ ...row, justifyContent: 'space-between' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-2)', overflowWrap: 'anywhere', minWidth: 0 }}>
-        <span className="mono">{standing.withdrawn ? '' : standing.place}</span>
+        {standing.withdrawn ? null : <span className="rank-place mono" aria-label={`Place ${standing.place}`}>{standing.place}</span>}
         <strong>{label}</strong>
       </div>
       <div style={row}>
@@ -38,7 +39,10 @@ function RankingRow({ standing, label, fixtures, matchRef }: {
         {standing.withdrawn ? <StatusBadge label="Withdrawn" /> : null}
       </div>
     </div>
-    <p style={muted}><span className="mono">{standing.wins}</span> wins, <span className="mono">{standing.played}</span> played, <span className="mono">{standing.scored}</span> with scores.</p>
+    <p style={muted}><span className="mono">{standing.wins}</span> {standing.wins === 1 ? 'win' : 'wins'} from <span className="mono">{standing.played}</span> played. {standing.scored ? <>Point differential <span className="mono">{standing.pointDifferential > 0 ? '+' : ''}{standing.pointDifferential}</span>.</> : 'No game scores yet.'}</p>
+    {finalMetric && finalMetric.metric !== 'point-differential' ? <p style={muted}>
+      {metricNames[finalMetric.metric]} <span className="mono">{metricValue(finalMetric)}</span>.
+    </p> : null}
     <Disclosure title="Why this rank?">
       {standing.evidence.map((evidence) => (
         <div key={evidence.metric} style={stack}>

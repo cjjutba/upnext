@@ -6,6 +6,7 @@ import { ModeMenu } from './components/ModeMenu';
 import { ModeChangeModal } from './components/ModeChangeModal';
 import { EndSessionModal } from './components/EndSessionModal';
 import { Button } from './components/Button';
+import { AppHeader } from './components/AppHeader';
 import { IconButton } from './components/IconButton';
 import { AnnouncementVoiceModal } from './components/AnnouncementVoiceModal';
 import { StandingsModal } from './components/StandingsModal';
@@ -39,7 +40,7 @@ function previewLine(state: SessionState, ratings: Ratings, nameOf: (id: string)
 export default function App() {
   const [route, navigate] = useRoute();
   return route.name === 'tournament'
-    ? <TournamentRoute onOpenPlay={() => navigate({ name: 'resolve' })} />
+    ? <TournamentRoute />
     : <OpenPlay route={route} navigate={navigate} />;
 }
 
@@ -143,61 +144,35 @@ function OpenPlay({ route, navigate }: { route: Exclude<Route, { name: 'tourname
     </>
   );
 
-  const tournamentLink = (
-    <a href="/app/tournament" style={{
-      display: 'inline-flex', alignItems: 'center', minHeight: 'var(--tap-min)',
-      fontSize: 'var(--text-ui)', fontWeight: 500,
-    }}>Tournament</a>
-  );
   const header = (
-    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--space-3)', padding: '12px var(--space-4)', borderBottom: '1px solid var(--border)', background: 'var(--bg)', position: 'sticky', top: 0, zIndex: 10 }}>
-      <span className="display" style={{ fontSize: '22px', fontWeight: 600 }}>upnext</span>
+    <AppHeader mode="open-play" openPlayHref={route.name === 'board' ? '/app/board' : '/app/setup'}>
       {route.name === 'board' ? (
         <>
-          <ModeMenu rule={state.rule} onRequestChange={(template, winCap) => setPendingRule({ template, winCap })} />
-          <span style={{ flex: 1 }} />
-          <span className="mono" style={{ fontSize: '20px' }}>
-            {fmt((clock - state.startedAt) / 1000)}
-          </span>
-          {/* mid session the organizer is looking at courts, so the rail is the 360px worth giving up */}
-          <IconButton
-            icon={rail.collapsed ? 'panel-right-open' : 'panel-right-close'}
-            ariaLabel={rail.collapsed ? 'Show check-in' : 'Hide check-in'}
-            pressed={rail.collapsed}
-            onClick={rail.toggle} />
-          <IconButton icon="trophy" ariaLabel="Live standings" onClick={() => setStandingsOpen(true)} />
-          {tournamentLink}
-          {announcementControls}
-          <Button variant="danger" onClick={() => setEndOpen(true)}>End session</Button>
+          <div className="session-mode">
+            <ModeMenu rule={state.rule} onRequestChange={(template, winCap) => setPendingRule({ template, winCap })} />
+            <span className="mono session-elapsed" aria-label="Session elapsed time">{fmt((clock - state.startedAt) / 1000)}</span>
+          </div>
+          <div className="session-actions">
+            <IconButton
+              icon={rail.collapsed ? 'panel-right-open' : 'panel-right-close'}
+              ariaLabel={rail.collapsed ? 'Show check-in' : 'Hide check-in'}
+              pressed={rail.collapsed} onClick={rail.toggle} />
+            <IconButton icon="trophy" ariaLabel="Live standings" onClick={() => setStandingsOpen(true)} />
+            {announcementControls}
+            <Button variant="danger" onClick={() => setEndOpen(true)}>End session</Button>
+          </div>
         </>
-      ) : route.name === 'summary' || route.name === 'session' ? (
-        <>
-          <span className="micro-label">Session summary</span>
-          <span style={{ flex: 1 }} />
-          {tournamentLink}
-          {announcementControls}
-        </>
-      ) : (
-        <>
-          <span className="micro-label">Open play</span>
-          <span className="mono" style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-            {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-          </span>
-          <span style={{ flex: 1 }} />
-          {tournamentLink}
-          {announcementControls}
-        </>
-      )}
-    </div>
+      ) : announcementControls}
+    </AppHeader>
   );
 
-  if (resuming || resolveTarget) return <div style={{ minHeight: '100vh', background: 'var(--bg)' }} />;
+  if (resuming || resolveTarget) return <div style={{ minHeight: '100vh', background: 'var(--canvas)' }} />;
 
   return (
     /* the wide board pins to the viewport so the courts area and the rail scroll independently; narrow stacks and keeps page scroll */
     <div style={route.name === 'board' && !narrow
-      ? { height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)' }
-      : { minHeight: '100vh', background: 'var(--bg)' }}>
+      ? { height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--canvas)' }
+      : { minHeight: '100vh', background: 'var(--canvas)' }}>
       {header}
       {route.name === 'setup' ? (
         <SetupRoute
@@ -239,7 +214,6 @@ function OpenPlay({ route, navigate }: { route: Exclude<Route, { name: 'tourname
           canSpeak={speech.supported && speech.enabled}
           resuming={resuming}
           navigate={navigate}
-          narrow={narrow}
         />
       ) : route.name === 'session' ? (
         <SessionRoute
@@ -253,7 +227,6 @@ function OpenPlay({ route, navigate }: { route: Exclude<Route, { name: 'tourname
           canSpeak={speech.supported && speech.enabled}
           resuming={resuming}
           navigate={navigate}
-          narrow={narrow}
         />
       ) : null}
       {pendingRule && !state.ended ? (

@@ -49,7 +49,7 @@ describe('tournament routes', () => {
     render(<App />);
     await screen.findByRole('heading', { name });
     expect(location.pathname).toBe('/app/tournament');
-    await click(screen.getByRole('button', { name: 'Open play' }));
+    await click(screen.getByRole('link', { name: 'Open play' }));
     await screen.findByRole('button', { name: 'Start match on court 1' });
     expect(location.pathname).toBe('/app/board');
     await click(screen.getByRole('link', { name: 'Tournament' }));

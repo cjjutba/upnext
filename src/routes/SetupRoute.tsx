@@ -19,6 +19,8 @@ export function SetupRoute({
   players, onAddPlayer, onUpdatePlayer, onStart, onResume, onReopen, onView, narrow,
 }: SetupRouteProps) {
   const [selected, setSelected] = useState<string[]>([]);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
   const [returningIds, setReturningIds] = useState<string[]>([]);
 
   useEffect(() => {
@@ -26,6 +28,18 @@ export function SetupRoute({
   }, []);
 
   const returning = players.filter((p) => returningIds.includes(p.id) && !selected.includes(p.id));
+
+  const importSession = async (file: File) => {
+    setImportError(null);
+    setImporting(true);
+    try {
+      await importSessionFile(file);
+      window.location.reload();
+    } catch {
+      setImportError('This file could not be imported. Choose an Upnext open play session export.');
+      setImporting(false);
+    }
+  };
 
   return (
     <RosterSetup
@@ -37,7 +51,9 @@ export function SetupRoute({
       onResume={onResume}
       onReopen={onReopen}
       onView={onView}
-      onImport={(file) => void importSessionFile(file).then(() => window.location.reload()).catch(() => window.alert('Import failed: that is not a valid upnext session file'))}
+      onImport={(file) => void importSession(file)}
+      importError={importError}
+      importing={importing}
       onSelectAll={() => setSelected(players.map((p) => p.id))}
       onClearAll={() => setSelected([])}
       returning={returning}

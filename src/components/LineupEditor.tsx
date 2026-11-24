@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Button } from './Button';
+import { AppDialog } from './AppDialog';
 import { IconButton } from './IconButton';
 import type { Pairs } from '../domain/types';
 
@@ -40,14 +41,6 @@ export function LineupEditor({ court, pairs, bench, nameOf, onApply, onClose }: 
   const [draft, setDraft] = useState<Pairs>(pairs);
   const [picked, setPicked] = useState<string | null>(null);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
   const onCourt = (id: string) => draft[0].includes(id) || draft[1].includes(id);
   // benched court players lead the list: on apply the reducer returns them to the queue front
   const waiting = [
@@ -72,7 +65,7 @@ export function LineupEditor({ court, pairs, bench, nameOf, onApply, onClose }: 
   };
 
   const team = (label: string, idx: 0 | 1) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
       <span className="micro-label" style={{ width: '64px' }}>{label}</span>
       {draft[idx].map((id) => (
         <Chip key={id} name={nameOf(id)} selected={picked === id} onTap={() => tap(id)} />
@@ -81,21 +74,8 @@ export function LineupEditor({ court, pairs, bench, nameOf, onApply, onClose }: 
   );
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 40, background: 'var(--overlay)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-4)',
-      }}>
-      <div
-        role="dialog" aria-modal="true" aria-label={'Edit court ' + court + ' lineup'}
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '560px', maxWidth: '100%', maxHeight: '82vh', display: 'flex', flexDirection: 'column',
-          background: 'var(--bg)', border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-modal)', boxShadow: 'var(--shadow-modal)',
-        }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '12px var(--space-4)', borderBottom: '1px solid var(--border)' }}>
+    <AppDialog label={'Edit court ' + court + ' lineup'} onClose={onClose} width="560px">
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)', padding: '12px var(--space-4)', borderBottom: '1px solid var(--border)' }}>
           <span className="display" style={{ fontSize: 'var(--text-h2)' }}>Court {court} lineup</span>
           <span style={{ flex: 1 }} />
           <IconButton icon="x" ariaLabel="Close lineup editor" onClick={onClose} size="sm" />
@@ -120,14 +100,13 @@ export function LineupEditor({ court, pairs, bench, nameOf, onApply, onClose }: 
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '12px var(--space-4)', borderTop: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)', padding: '12px var(--space-4)', borderTop: '1px solid var(--border)' }}>
           <span style={{ font: '400 14px/1.4 var(--font-sans)', color: 'var(--text-tertiary)' }}>
             Tap two players to swap them.
           </span>
           <span style={{ flex: 1 }} />
           <Button disabled={!changed} onClick={() => { onApply(draft); onClose(); }}>Apply lineup</Button>
         </div>
-      </div>
-    </div>
+    </AppDialog>
   );
 }

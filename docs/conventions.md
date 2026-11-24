@@ -1,7 +1,7 @@
 # Conventions
 
 Design rules, code patterns, and what running the tests is supposed to prove.
-The visual reasoning behind the rules is in `design/claude-design-brief.md`.
+The current visual system is in `../DESIGN.md`.
 
 ## Design rules
 
@@ -11,14 +11,14 @@ preference.
 | Rule | Detail |
 |---|---|
 | Light mode only | One `:root` block. No dark tokens, no theme switcher. Dark mode would be a designed theme, never an inversion |
-| Monochrome interactive layer | Primary buttons are solid `#171717` with white text. One exception: a destructive action is solid `--danger` red, and End session is the only one. Never a colored icon tile |
-| Structure from borders | 1px black-alpha borders, not shadows. Shadows exist only on menus and modals |
-| Blue is a state signal | `#006bff` for focus rings and text links. Nothing else. Court state is carried by a text badge, never by a hue |
+| Actions | Use court teal for the primary action, ghost or neutral borders for secondary actions, and red for End session |
+| Structure | Use warm off-white for the workspace, ink for text and the tournament masthead, and simple borders for working panels. Elevated menus, dialogs, and the landing preview can use a shadow |
+| State signals | Court teal marks focus and links. Pickleball lime calls out the first waiting match. Pair every status tint with a readable word |
 | Text-only badges | A pill with the word alone. No dots, no circles, no icons, ever. Tinted background, dark same-hue text |
 | Near-zero motion | One exception: the check-in rail slides on collapse, 180ms, skipped under `prefers-reduced-motion`. Otherwise no transitions, no easing, no press scale, no shimmer. Press feedback is an instant one-step background or border change |
 | The court is the graphic | A four on a court is drawn on `CourtDiagram`, live or staged or merely next up. The queue section under the courts uses the same graphic on purpose |
-| Type | Geist Sans 400/500/600 and Geist Mono. Mono with tabular numerals for every timer, count, position, and stat column, so digits never shift layout |
-| Radii | 6px controls, 8px cards, 12px modals, 9999px pills |
+| Type | Locally bundled variable Geist Sans with tabular numerals for every timer, count, position, and stat column, so digits never shift layout |
+| Radii | 9px controls, 15px cards, 19px modals, 9999px pills |
 | Spacing | 8pt grid via the `--space-*` tokens |
 | Touch targets | 48px minimum, 56px or more for primary actions. Someone is holding a paddle in the other hand |
 | Icons | Lucide only, 1.5px stroke, labeled except close, back, and overflow |
@@ -36,13 +36,13 @@ change fails that, the color is carrying meaning it should not.
 
 | Group | Tokens |
 |---|---|
-| Surfaces | `--bg`, `--bg-secondary` |
+| Surfaces | `--canvas`, `--bg`, `--bg-secondary` |
 | Grays | `--gray-100` through `--gray-1000` |
-| Borders | `--border`, `--border-hover`, `--border-active`, all black alpha |
+| Borders | `--border`, `--border-hover`, `--border-active` |
 | Text | `--text`, `--text-secondary`, `--text-tertiary` |
 | Interactive | `--primary`, `--primary-press`, `--primary-fg` |
 | Destructive | `--danger`, `--danger-press`, `--danger-fg` |
-| Signals | `--blue`, `--focus-ring` |
+| Signals | `--link`, `--focus-ring`, `--accent`, `--accent-ink` |
 | Elevation | `--shadow-menu`, `--shadow-modal` |
 | Status | `--status-{green,amber,red,neutral}-{bg,text}` |
 | Type | `--font-sans`, `--font-mono`, ten size tokens, `--tracking-tight` |
@@ -50,26 +50,25 @@ change fails that, the color is carrying meaning it should not.
 
 ## Styling
 
-Inline `style={{}}` reading `var(--token)`. No CSS modules, no Tailwind, no
-styled-components, no `.css` file per component.
-
-`src/styles/base.css` holds the reset and four utility classes, used through
-`className`:
+Shared classes live in `src/styles/base.css` and `src/styles/app.css`. The
+script-free landing styles live in `src/styles/landing.css`. Use inline styles
+for values derived from state and read colors and spacing from tokens.
 
 | Class | For |
 |---|---|
-| `.mono` | Geist Mono, tabular numerals. Every number that could shift layout |
-| `.display` | Geist Sans 600, tight tracking. Names, court numbers, headings |
-| `.micro-label` | 13px medium, tertiary color. Section labels |
-| `.timer` | Same as `.mono`. Kept for timer markup |
+| `.mono` | Geist with tabular digits for numbers that could shift layout |
+| `.display` | Geist with tight tracking for headings and names |
+| `.micro-label` | Short supporting labels |
+| `.timer` | Same typography as `.mono` |
 
 ## Component patterns
 
 Copy these rather than inventing a parallel approach.
 
-- **Pressed state** is `useState` plus `onPointerDown`, `onPointerUp`,
-  `onPointerLeave`, and `onPointerCancel`, swapping a background or border
-  token with no transition. See `src/components/Button.tsx`.
+- **Pressed state** uses an instant background or border change. Use the
+  shared Button or IconButton and keep keyboard focus visible.
+- **Dialogs** use AppDialog for native focus handling, Escape, and an accessible
+  name. Keep explicit confirmation for ending sessions and changing results.
 - **Icons** come only from `src/components/Icon.tsx`. Add the Lucide import
   to the `icons` map first, which makes the name available through the
   `IconName` type. Never import from `lucide-react` in a component.

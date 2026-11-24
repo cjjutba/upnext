@@ -204,9 +204,8 @@ so a winners config is one confirmation rather than one per stepper tap.
 - Comments explain why, not what. Look at `src/domain/reducer.ts:169` for the
   register: short, load-bearing, and about a decision.
 - Tests sit next to the code as `*.test.ts` or `*.test.tsx`.
-- Styling is inline `style={{}}` reading CSS custom properties. No CSS
-  modules, no Tailwind, no styled-components. Tokens live in
-  `src/styles/tokens.css`.
+- Styling uses shared CSS classes and inline values derived from state. Read
+  tokens from `src/styles/tokens.css`. The visual contract is in `DESIGN.md`.
 - Commit messages use conventional prefixes, lowercase, no scope:
   `feat:`, `fix:`, `docs:`, `test:`. One commit per finished task.
 

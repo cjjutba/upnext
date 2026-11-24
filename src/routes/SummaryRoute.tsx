@@ -12,10 +12,9 @@ interface SummaryRouteProps {
   canSpeak: boolean;
   resuming: boolean;
   navigate: Navigate;
-  narrow: boolean;
 }
 
-export function SummaryRoute({ state, players, autoRead, onDone, speak, canSpeak, resuming, navigate, narrow }: SummaryRouteProps) {
+export function SummaryRoute({ state, players, autoRead, onDone, speak, canSpeak, resuming, navigate }: SummaryRouteProps) {
   // Nothing started yet: back to setup. Started but not ended: a live session exists, nothing to summarize yet.
   const target = !state.started ? 'setup' : !state.ended ? 'board' : null;
   useMisrouteGuard(resuming, target, navigate);
@@ -31,7 +30,6 @@ export function SummaryRoute({ state, players, autoRead, onDone, speak, canSpeak
       speak={speak}
       canSpeak={canSpeak}
       autoRead={autoRead}
-      narrow={narrow}
     />
   );
 }

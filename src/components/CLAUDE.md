@@ -7,12 +7,11 @@ Presentational only. Props in, callbacks out.
 - **No Dexie, no commands, no session state.** A component takes what it needs
   as props and reports back through callbacks. The only domain imports allowed
   are types and `modes.ts`.
-- **Inline `style={{}}` reading `var(--token)`.** No CSS modules, no Tailwind,
-  no per-component stylesheet. Never hardcode a hex; every value is in
-  `src/styles/tokens.css`.
+- **Use shared classes and tokens.** Styles live in `src/styles`. Read colors
+  and spacings from tokens and keep state-dependent values inline.
 - **Zero motion in this directory.** No `transition`, no `animation`, no
-  transform on press. Press feedback is an instant token swap, driven by
-  `useState` plus the four pointer handlers. Copy `Button.tsx`. The one
+  transform on press. Press feedback is an instant token swap. Reuse
+  `Button.tsx` and `IconButton.tsx`. The one
   animation in the app is the rail collapse, and it lives in
   `src/screens/SessionBoard.tsx`, not here.
 - **Icons only through `Icon.tsx`.** Add the Lucide import to the `icons` map

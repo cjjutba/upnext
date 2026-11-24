@@ -100,8 +100,7 @@ async function recordWin(court: number, team: 1 | 2) {
 }
 
 /** The queue panel under the courts: the next four, or the challengers a winners template promises. */
-const upNext = () =>
-  (screen.queryByText('Up next') ?? screen.getByText('Next challengers')).closest('div')!.parentElement!;
+const upNext = () => screen.getByRole('article', { name: /^(Up next|Next challengers)$/ });
 
 const chip = (name: string, scope: HTMLElement) => within(scope).getByRole('button', { name: `${name}, change or remove` });
 
@@ -150,7 +149,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await openBoard(/^Balanced/);
 
     // the four are on the court and the clock has not started, so nothing was said
-    expect(within(courtCard(1)).getByText('Staged')).toBeInTheDocument();
+    expect(within(courtCard(1)).getByText('Ready to start')).toBeInTheDocument();
     expect(within(courtCard(1)).getByText('Alice')).toBeInTheDocument();
     expect(said()).toEqual([]);
 
@@ -163,7 +162,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await waitFor(() => expect(said()).toHaveLength(2));
     expect(said()[1]).toBe('Court 1. Alice and Carol win.');
     // the next four walk on and wait: staged again, nothing spoken about it
-    await waitFor(() => expect(within(courtCard(1)).getByText('Staged')).toBeInTheDocument());
+    await waitFor(() => expect(within(courtCard(1)).getByText('Ready to start')).toBeInTheDocument());
     expect(said()).toHaveLength(2);
   });
 
@@ -408,7 +407,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     const winners = ['Alice', 'Carol'];
 
     await recordWin(1, 1);
-    await waitFor(() => expect(within(courtCard(1)).getByText('Staged')).toBeInTheDocument());
+    await waitFor(() => expect(within(courtCard(1)).getByText('Ready to start')).toBeInTheDocument());
     for (const name of winners) expect(within(courtCard(1)).getByText(name)).toBeInTheDocument();
     expect(within(courtCard(1)).queryByText('0:00')).not.toBeInTheDocument(); // no clock until Start
 
@@ -469,7 +468,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     render(<App />);
     await startMatch(/^Balanced/);
     await recordWin(1, 1);
-    await waitFor(() => expect(within(courtCard(1)).getByText('Staged')).toBeInTheDocument());
+    await waitFor(() => expect(within(courtCard(1)).getByText('Ready to start')).toBeInTheDocument());
 
     await click(btn(/Undo: court 1 result/));
     await waitFor(() => expect(within(courtCard(1)).getByText('Live')).toBeInTheDocument());
@@ -663,7 +662,7 @@ describe('App: hiding the check-in rail', () => {
     render(<App />);
     await openBoard(/^Balanced/);
     const rail = document.querySelector('aside')!;
-    expect(rail).toHaveStyle({ width: '360px' });
+    expect(rail).toHaveStyle({ width: 'var(--rail-width)' });
     expect(rail).not.toHaveAttribute('inert');
 
     await click(btn('Hide check-in'));
@@ -671,10 +670,10 @@ describe('App: hiding the check-in rail', () => {
     // a rail nobody can see must not still be tabbable
     expect(rail).toHaveAttribute('inert');
     // the courts keep the whole width, so nothing about the session changed
-    expect(within(courtCard(1)).getByText('Staged')).toBeInTheDocument();
+    expect(within(courtCard(1)).getByText('Ready to start')).toBeInTheDocument();
 
     await click(btn('Show check-in'));
-    expect(rail).toHaveStyle({ width: '360px' });
+    expect(rail).toHaveStyle({ width: 'var(--rail-width)' });
     expect(rail).not.toHaveAttribute('inert');
     expect(screen.getByLabelText('Add player')).toBeInTheDocument();
   });

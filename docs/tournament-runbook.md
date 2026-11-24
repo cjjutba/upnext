@@ -15,7 +15,7 @@ Use a synthetic tournament to rehearse on the phone or tablet that will run the 
 - Choose **Courts**. In **Fixtures**, pick a court for a waiting match and choose **Assign match**. Confirm the players are present, then choose **Start match** on its court card. A booked court or player blocks a conflicting assignment.
 - Choose **Record score** and enter the points beside each side. For best-of matches, add rows for the games actually played. Choose **Save result**. Use **Record forfeit** and give a reason when a side forfeits. To withdraw a team or rotating player, return to the division's **Teams** or **Entries** on **Setup**.
 - Choose **Standings** and the division to check provisional, tied or final places. Open **Why this rank?** to see the rules, values and games behind a place. When the division calls for a tie playoff, play it and record the order and result.
-- To correct a score, set the fixture filter to **Finished** and choose **Edit result**. Enter a reason. Review any playoff pairing changes. If an affected match has started, explicitly choose whether to keep its pairing or reset the affected matches. Reset removes their current court assignment, start and result, so replay them under the corrected pairing.
+- To correct a score, set the fixture filter to **Finished** and choose **Edit result**. Enter a reason. For pool or playoff results, choose **Review correction** to see any pairing changes before saving. If an affected match has started, explicitly choose whether to keep its pairing or reset the affected matches. Reset removes their current court assignment, start and result, so replay them under the corrected pairing.
 
 ## Back up and recover
 
