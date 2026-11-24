@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { replay } from './reducer';
 import {
-  startSession, finishGame, checkInPlayer, sitOutPlayer, returnPlayer,
+  startSession, finishGame, finishScoredGame, checkInPlayer, sitOutPlayer, returnPlayer,
   departPlayer, closeCourt, reopenCourt, changeRule, changeLineup, endSession, addCourt,
   startStagedGame, stageCourt, unstageCourt, substitutePlayer, shufflePairing, swapQueue,
   removeFromLineup, seatPlayer, fillCourt,
@@ -191,6 +191,64 @@ describe('finishGame', () => {
     expect(after.consecutiveWins).toEqual({ a: 0, b: 0, c: 0, d: 0 }); // no streaks outside the winners templates
     // all four went to the back, so the four who were waiting take the court
     expect(after.staged[1]!.flat().sort()).toEqual(['e', 'f', 'g', 'h']);
+  });
+});
+
+describe('finishScoredGame', () => {
+  it.each([
+    [11, 3, 0, '11-3'],
+    [11, 0, 0, '11-0'],
+    [9, 11, 1, '9-11'],
+    [16, 15, 0, '16-15'],
+    [0, Number.MAX_SAFE_INTEGER, 1, '0-9007199254740991'],
+  ])('records team scores %i and %i in team order', (team1, team2, winnerPair, score) => {
+    const log = live(['a', 'b', 'c', 'd']);
+    const batch = finishScoredGame(replay(log), 1, team1, team2)!;
+    expect(batch[0]).toMatchObject({ type: 'game-finished', winnerPair, score });
+    const state = replay([...log, ...seal(batch)]);
+    expect(state.finishedGames[0]).toMatchObject({ winnerPair, score });
+    expect(state.wins).toEqual(winnerPair === 0 ? { a: 1, c: 1 } : { b: 1, d: 1 });
+  });
+
+  it.each([
+    [11, 11],
+    [0, 0],
+    [-1, 11],
+    [11, -1],
+    [1.5, 11],
+    [11, NaN],
+    [Infinity, 11],
+    [11, Number.MAX_SAFE_INTEGER + 1],
+  ])('refuses invalid scores %s and %s', (team1, team2) => {
+    const state = replay(live(['a', 'b', 'c', 'd']));
+    expect(finishScoredGame(state, 1, team1, team2)).toBeNull();
+  });
+
+  it('requires a live court with all seats filled', () => {
+    const staged = boot(['a', 'b', 'c', 'd']);
+    expect(finishScoredGame(replay(staged), 1, 11, 3)).toBeNull();
+    const log = startAll(staged);
+    const short = seal(removeFromLineup(replay(log), 1, 0)!);
+    expect(finishScoredGame(replay([...log, ...short]), 1, 11, 3)).toBeNull();
+  });
+
+  it('rotates the scored winner and undoes or restores the result and stage together', () => {
+    const log = live(['a', 'b', 'c', 'd', 'e', 'f'], 'winners-stay');
+    const before = replay(log);
+    const batch = seal(finishScoredGame(before, 1, 9, 11)!);
+    const finishedLog = [...log, ...batch];
+    const after = replay(finishedLog);
+    expect(after.staged[1]).toEqual([['b', 'd'], ['e', 'f']]);
+    expect(after.games[1]).toBeUndefined();
+    expect(after.queue).toEqual(['a', 'c']);
+    expect(undoTarget(finishedLog)).toBe(batch[0].id);
+
+    const [undo] = seal([{ type: 'event-undone', targetEventId: batch[0].id, sessionId: log[0].sessionId }]);
+    const undone = [...finishedLog, undo];
+    expect(replay(undone)).toEqual(before);
+    expect(redoTarget(undone)).toBe(undo.id);
+    const redo = seal([{ type: 'event-undone', targetEventId: undo.id, sessionId: log[0].sessionId }]);
+    expect(replay([...undone, ...redo])).toEqual(after);
   });
 });
 
