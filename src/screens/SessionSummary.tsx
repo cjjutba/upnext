@@ -2,12 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../components/Button';
 import { TimerDisplay } from '../components/TimerDisplay';
 import { SessionStandingsTable } from '../components/SessionStandingsTable';
+import { formatOpenPlayScore } from '../lib/formatOpenPlayScore';
 import { podiumPhrase } from '../domain/announce';
 import { standings } from '../domain/standings';
 import type { Player, SessionState } from '../domain/types';
 import { fmt } from './SessionBoard';
 
 const TOP = 10;
+const RECENT_RESULTS = 5;
 
 export function SessionSummary({ state, players, onExport, onDone, speak, canSpeak, autoRead }: {
   state: SessionState;
@@ -24,6 +26,9 @@ export function SessionSummary({ state, players, onExport, onDone, speak, canSpe
   const rows = useMemo(() => standings(state, nameOf), [state, players]); // eslint-disable-line react-hooks/exhaustive-deps
   const [showAll, setShowAll] = useState(false);
   const visible = showAll ? rows : rows.slice(0, TOP);
+  const [showAllResults, setShowAllResults] = useState(false);
+  const results = state.finishedGames;
+  const visibleResults = (showAllResults ? results : results.slice(-RECENT_RESULTS)).toReversed();
 
   const sessionSeconds = ((state.endedAt ?? Date.now()) - state.startedAt) / 1000;
   const longest = state.finishedGames.reduce((m, g) => Math.max(m, (g.endedAt - g.startedAt) / 1000), 0);
@@ -64,6 +69,30 @@ export function SessionSummary({ state, players, onExport, onDone, speak, canSpe
           </div>
         ) : null}
       </section>
+      {results.length ? (
+        <section className="summary-panel" aria-labelledby="summary-results">
+          <header className="summary-panel-header"><h2 className="display" id="summary-results">Match results</h2></header>
+          <ul className="session-results">
+            {visibleResults.map((game, index) => (
+              <li key={results.length - index}>
+                <div>
+                  <strong>Court {game.court}</strong>
+                  <p>{game.pairs.map((pair) => pair.map(nameOf).join(' and ')).join(' vs ')}</p>
+                </div>
+                <div className="session-result-score">
+                  {game.score ? <strong className="mono">{formatOpenPlayScore(game.score)}</strong> : <span>No score recorded</span>}
+                  <span>{game.winnerPair === undefined ? 'No winner recorded' : `Team ${game.winnerPair + 1} won`}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+          {results.length > RECENT_RESULTS ? <div className="summary-panel-header">
+            <Button variant="ghost" block onClick={() => setShowAllResults(!showAllResults)}>
+              {showAllResults ? 'Show recent results' : `Show all ${results.length} results`}
+            </Button>
+          </div> : null}
+        </section>
+      ) : null}
       <div className="summary-actions">
         <Button size="lg" icon="share-2" onClick={onExport}>Share summary</Button>
         <Button variant="secondary" onClick={onDone}>New session</Button>

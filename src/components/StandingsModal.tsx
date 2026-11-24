@@ -27,7 +27,7 @@ export function StandingsModal({ rows, nameOf, onClose, onRead, canRead }: {
         <p className="setup-hint">
           {decided
             ? 'Ranked by win rate, weighted by games played. Any tiebreak appears beside the player.'
-            : 'Record a winner on a court to start ranking players.'}
+            : 'Record a score on a court to start ranking players.'}
         </p>
         <Button variant="secondary" icon="volume-2" disabled={!canRead || !decided} onClick={onRead}>
           Read top 3
