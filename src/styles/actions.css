@@ -1,0 +1,89 @@
+.action {
+  --action-fill: transparent;
+  --action-hover: var(--gray-100);
+  --action-press: var(--gray-200);
+  --action-color: var(--text);
+  --action-edge: transparent;
+  --action-sheen: none;
+  --action-depth: none;
+  display: inline-flex;
+  min-height: var(--tap-min);
+  max-width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 7px 15px;
+  border: 1px solid var(--action-edge);
+  border-radius: var(--radius-control);
+  background-color: var(--action-fill);
+  background-image: var(--action-sheen);
+  box-shadow: var(--action-depth);
+  color: var(--action-color);
+  font: 640 var(--text-ui)/1.2 var(--font-sans);
+  text-align: center;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.action:hover { text-decoration: none; }
+.action:hover:not(:disabled, :has(> input:disabled)) { background-color: var(--action-hover); }
+.action:active:not(:disabled, :has(> input:disabled)) {
+  background-color: var(--action-press);
+  background-image: none;
+  box-shadow: none;
+}
+.action svg { flex: none; }
+.action:is([data-variant="primary"], [data-size="lg"]) { min-height: var(--tap-primary); font-size: var(--text-body); }
+.action[data-block] { display: flex; width: 100%; }
+.action[data-size="icon"] { width: var(--tap-min); flex: none; padding: 0; }
+
+.action:is([data-variant="primary"], [data-variant="danger"]) {
+  --action-sheen: linear-gradient(to bottom, rgb(255 255 255 / 3%), transparent);
+  --action-depth: 0 1px 2px rgb(20 36 61 / 22%);
+}
+.action[data-variant="primary"] {
+  --action-fill: var(--primary);
+  --action-hover: var(--primary-hover);
+  --action-press: var(--primary-press);
+  --action-color: var(--primary-fg);
+  --action-edge: var(--primary-press);
+}
+.action[data-variant="danger"] {
+  --action-fill: var(--danger);
+  --action-hover: var(--danger-hover);
+  --action-press: var(--danger-press);
+  --action-color: var(--danger-fg);
+  --action-edge: var(--danger-press);
+}
+.action[data-variant="secondary"] {
+  --action-fill: var(--bg);
+  --action-hover: #f7f9fc;
+  --action-press: var(--gray-200);
+  --action-edge: var(--control-edge);
+  --action-sheen: linear-gradient(to bottom, transparent, rgb(20 36 61 / 3%));
+  --action-depth: 0 1px 2px rgb(20 36 61 / 15%);
+}
+.action[data-variant="secondary"]:hover:not(:disabled, :has(> input:disabled)) { border-color: var(--focus-color); }
+.action:where([aria-pressed="true"], [aria-current="page"], [aria-expanded="true"]):is([data-variant="secondary"], [data-variant="ghost"]) {
+  --action-fill: var(--status-blue-bg);
+  --action-hover: #d4e6ff;
+  --action-press: #c5dbfd;
+  --action-color: var(--status-blue-text);
+  --action-edge: var(--link);
+  --action-sheen: none;
+  --action-depth: none;
+}
+.action:disabled, .action:has(> input:disabled) {
+  --action-fill: var(--gray-100);
+  --action-color: var(--text-tertiary);
+  --action-edge: var(--border);
+  --action-sheen: none;
+  --action-depth: none;
+  cursor: default;
+}
+
+@media (forced-colors: active) {
+  .action { border-color: ButtonText; }
+  .action:where([aria-pressed="true"], [aria-current="page"], [aria-expanded="true"]) { border-color: Highlight; }
+  .action:disabled { border-color: GrayText; }
+}

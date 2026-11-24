@@ -58,8 +58,8 @@ export default defineConfig({
         short_name: 'upnext',
         description: 'Courtside pickleball open play and tournaments',
         display: 'standalone',
-        background_color: '#f6f8f2',
-        theme_color: '#f6f8f2',
+        background_color: '#f6f8fc',
+        theme_color: '#f6f8fc',
         start_url: '/app',
         scope: '/app',
         icons: [

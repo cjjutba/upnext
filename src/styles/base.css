@@ -14,7 +14,7 @@ body {
 button, input, select, textarea { font-family: var(--font-sans); }
 button, a, summary, select { touch-action: manipulation; }
 input, textarea { caret-color: var(--primary); }
-::selection { background: var(--accent); color: var(--accent-ink); }
+::selection { background: var(--status-blue-bg); color: var(--status-blue-text); }
 
 .mono, .timer {
   font-family: var(--font-mono);
@@ -40,7 +40,8 @@ h1, h2 { text-wrap: balance; }
 
 a { color: var(--link); text-decoration: none; text-underline-offset: 0.18em; }
 a:hover { text-decoration: underline; }
-:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+:focus-visible { outline: 2px solid var(--focus-color); outline-offset: 3px; }
+input, select, textarea { accent-color: var(--primary); }
 dialog { overscroll-behavior: contain; }
 dialog::backdrop { background: var(--overlay); }
 
@@ -72,6 +73,7 @@ dialog::backdrop { background: var(--overlay); }
 .wordmark:hover { text-decoration: none; }
 
 .court-visual {
+  --focus-color: var(--court-fg);
   position: relative;
   width: 100%;
   aspect-ratio: 860 / 420;
@@ -121,12 +123,12 @@ button.court-chip:hover, button.court-chip:active {
   max-width: 100%;
   padding: 5px 10px;
   border-radius: var(--radius-full);
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--status-blue-bg);
+  color: var(--status-blue-text);
   font-weight: 690;
 }
 .court-seat {
-  border-color: #a5cbbd;
+  border-color: var(--court-mark);
   border-style: dashed;
   background: var(--court-side);
 }

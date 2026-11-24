@@ -859,6 +859,34 @@ describe('App: hiding the check-in rail', () => {
     }
   });
 
+  it('keeps the recent result actions in the phone board before the next match', async () => {
+    Object.defineProperty(window, 'matchMedia', {
+      value: (query: string) => ({
+        matches: query.includes('max-width'),
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }),
+      configurable: true,
+    });
+    try {
+      render(<App />);
+      await startMatch(/^Balanced/);
+      await recordWin(1, 1);
+      const updates = screen.getByRole('group', { name: 'Recent action' });
+      const staged = btn('Start match on court 1');
+      expect(screen.getByRole('main')).toContainElement(updates);
+      expect(updates).not.toHaveAttribute('data-floating');
+      expect(updates.compareDocumentPosition(staged) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+      await click(btn('Undo: court 1 result', updates));
+      expect(await screen.findByRole('button', { name: 'Record score for Court 1' })).toBeEnabled();
+      await click(btn('Redo', updates));
+      expect(await screen.findByRole('button', { name: 'Start match on court 1' })).toBeEnabled();
+    } finally {
+      Reflect.deleteProperty(window, 'matchMedia');
+    }
+  });
+
   it('offers one search field once the roster passes twelve', async () => {
     render(<App />);
     await openBoard(/^Balanced/);

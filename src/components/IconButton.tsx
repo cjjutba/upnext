@@ -10,7 +10,7 @@ export function IconButton({ icon, ariaLabel, onClick, pressed, size = 'md', sty
   style?: CSSProperties;
 }) {
   return (
-    <button type="button" className="app-icon-button" onClick={onClick} aria-label={ariaLabel} title={ariaLabel}
+    <button type="button" className="action" data-variant="ghost" data-size="icon" onClick={onClick} aria-label={ariaLabel} title={ariaLabel}
       aria-pressed={pressed} style={style}>
       <Icon name={icon} size={size === 'sm' ? 18 : 20} />
     </button>

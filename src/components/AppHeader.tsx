@@ -9,8 +9,8 @@ export function AppHeader({ mode, openPlayHref = '/app', children }: { mode: 'op
           <img src="/icon.svg" alt="" width="31" height="31" />upnext
         </a>
         <nav className="app-nav" aria-label="App modes">
-          <a href={openPlayHref} aria-current={mode === 'open-play' ? 'page' : undefined}>Open play</a>
-          <a href="/app/tournament" aria-current={mode === 'tournament' ? 'page' : undefined}>Tournament</a>
+          <a className="action" data-variant="ghost" href={openPlayHref} aria-current={mode === 'open-play' ? 'page' : undefined}>Open play</a>
+          <a className="action" data-variant="ghost" href="/app/tournament" aria-current={mode === 'tournament' ? 'page' : undefined}>Tournament</a>
         </nav>
       </div>
       {children ? <div className="app-header-actions">{children}</div> : null}

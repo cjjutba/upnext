@@ -49,7 +49,8 @@ export function Choices<T extends string>({ label, value, options, onChange, nav
 }) {
   return <div role="group" aria-label={label} className="tournament-choices" data-navigation={navigation || undefined}>
     {options.map((option) => (
-      <button key={option.value} type="button" aria-pressed={value === option.value} onClick={() => onChange(option.value)}>
+      <button key={option.value} type="button" className="action" data-variant={navigation ? "ghost" : "secondary"}
+        aria-pressed={value === option.value} onClick={() => onChange(option.value)}>
         {option.label}
       </button>
     ))}

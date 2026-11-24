@@ -13,16 +13,14 @@ export function QueueRow({ position, name, games, sitOut, onToggleSit, onRemove,
     <div style={{
       display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minHeight: 'var(--tap-min)', padding: '4px var(--space-3)',
       borderRadius: 'var(--radius-control)',
-      opacity: sitOut ? 0.45 : 1,
     }}>
       <span className="mono" style={{ fontSize: '16px', width: '32px', textAlign: 'right', color: 'var(--text-tertiary)' }}>
         {position}
       </span>
       <button
-        type="button" onClick={onOptions} aria-label={name + ', change or remove'}
+        type="button" className="action" data-variant="ghost" onClick={onOptions} aria-label={name + ', change or remove'}
         style={{
-          flex: 1, minWidth: 0, textAlign: 'left', padding: 0, border: 'none', background: 'transparent',
-          color: 'var(--text)', cursor: 'pointer', font: 'inherit',
+          flex: 1, minWidth: 0, textAlign: 'left', paddingInline: '4px', justifyContent: 'start', color: sitOut ? 'var(--text-tertiary)' : undefined,
         }}>
         <span className="display" style={{ fontSize: 'var(--text-queue)', textDecoration: sitOut ? 'line-through' : 'none' }}>
           {name}
