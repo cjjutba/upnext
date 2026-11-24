@@ -16,9 +16,22 @@ const synth = (): SpeechSynthesis | null =>
 
 export const isSupported = (): boolean => synth() !== null;
 
-export function localVoices(s = synth()): SpeechSynthesisVoice[] {
-  return s?.getVoices().filter((voice) => voice.localService === true) ?? [];
+const DANIEL_NAME = /^Daniel(?: \(English \((?:UK|United Kingdom)\)\))?$/;
+const DANIEL_COMPACT_URI = 'com.apple.voice.compact.en-GB.Daniel';
+
+function danielVoice(s = synth()): SpeechSynthesisVoice | undefined {
+  const voices = s?.getVoices().filter((voice) =>
+    voice.localService === true &&
+    voice.lang.toLowerCase().replaceAll('_', '-') === 'en-gb' &&
+    voice.voiceURI !== '' &&
+    DANIEL_NAME.test(voice.name)
+  ) ?? [];
+  // WebKit exposes Apple voice IDs. Chromium may expose the display name.
+  return voices.find((voice) => voice.voiceURI === DANIEL_COMPACT_URI) ??
+    voices.sort((a, b) => a.voiceURI.localeCompare(b.voiceURI, 'en'))[0];
 }
+
+export const isDanielAvailable = (): boolean => danielVoice() !== undefined;
 
 export function watchVoices(onChange: () => void): () => void {
   const s = synth();
@@ -31,20 +44,6 @@ export function watchVoices(onChange: () => void): () => void {
   };
 }
 
-function voiceFor(s: SpeechSynthesis, voiceURI: string): SpeechSynthesisVoice | undefined {
-  const voices = localVoices(s);
-  const lang = (navigator.language || 'en-US').toLowerCase();
-  const language = (voice: SpeechSynthesisVoice) => voice.lang.toLowerCase().replaceAll('_', '-');
-  const base = (tag: string) => tag.split('-')[0];
-  return (
-    voices.find((voice) => voiceURI && voice.voiceURI === voiceURI) ??
-    voices.find((voice) => language(voice) === lang) ??
-    voices.find((voice) => base(language(voice)) === base(lang)) ??
-    voices.find((voice) => base(language(voice)) === 'en') ??
-    voices[0]
-  );
-}
-
 let primed = false;
 
 /**
@@ -52,10 +51,10 @@ let primed = false;
  * gesture, and every announcement here reaches the queue from an effect, one
  * task after the tap. A silent utterance from the first pointerdown unlocks it.
  */
-export function prime(voiceURI = ''): void {
+export function prime(): void {
   const s = synth();
   if (!s || primed) return;
-  const voice = voiceFor(s, voiceURI);
+  const voice = danielVoice(s);
   if (!voice) return; // the next user gesture can retry after the browser lists its voices
   try {
     const u = new SpeechSynthesisUtterance(' ');
@@ -95,7 +94,6 @@ interface Queued {
   text: string;
   key?: string;
   queuedAt: number;
-  voiceURI: string;
 }
 
 let queue: Queued[] = [];
@@ -136,7 +134,7 @@ function pump(): void {
   while (queue.length > 0 && t - queue[0].queuedAt > SHELF_LIFE_MS) emit('dropped', queue.shift()!);
   const item = queue.shift();
   if (!item) return;
-  const voice = voiceFor(s, item.voiceURI);
+  const voice = danielVoice(s);
   if (!voice) {
     // Leaving the voice unset lets the browser select a network voice.
     emit('failed', item);
@@ -173,7 +171,7 @@ function pump(): void {
  * Queue an announcement. Anything already mid sentence is left alone: a call cut
  * off halfway names two of four people, which is worse than the stale one.
  */
-export function speak(text: string, opts: SpeakOptions = {}, voiceURI = ''): void {
+export function speak(text: string, opts: SpeakOptions = {}): void {
   const s = synth();
   if (!s || !text) return;
   if (opts.key !== undefined) {
@@ -183,7 +181,7 @@ export function speak(text: string, opts: SpeakOptions = {}, voiceURI = ''): voi
       return false;
     });
   }
-  const item: Queued = { text, key: opts.key, queuedAt: now(), voiceURI };
+  const item: Queued = { text, key: opts.key, queuedAt: now() };
   queue.push(item);
   emit('queued', item);
   pump();

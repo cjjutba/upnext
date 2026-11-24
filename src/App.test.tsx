@@ -33,7 +33,7 @@ function installSpeechStub() {
     },
     cancel: () => spoken.push('[cancel]'),
     resume: () => {},
-    getVoices: () => [{ voiceURI: 'test-local', name: 'Test', lang: 'en-US', localService: true }],
+    getVoices: () => [{ voiceURI: 'Daniel', name: 'Daniel', lang: 'en-GB', localService: true }],
     addEventListener: () => {},
     removeEventListener: () => {},
   };
@@ -132,6 +132,18 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await reset();
   });
   afterEach(cleanup);
+
+  it('explains why Preview is unavailable in a browser without speech synthesis', async () => {
+    Reflect.deleteProperty(window, 'speechSynthesis');
+    render(<App />);
+    await screen.findByText('Roster');
+    await click(btn('Announcement voice'));
+
+    const preview = within(dialog('Announcement voice'));
+    expect(preview.getByRole('status')).toHaveTextContent('Daniel, English (UK), is unavailable on this device.');
+    expect(preview.getByRole('button', { name: 'Preview' })).toBeDisabled();
+    expect(preview.queryByRole('combobox')).not.toBeInTheDocument();
+  });
 
   it('stages court 1 in silence, calls it on the Start tap, then reads the winner', async () => {
     render(<App />);

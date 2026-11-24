@@ -122,16 +122,18 @@ export default function App() {
     navigate({ name: 'setup' }, { replace: true });
   };
 
-  const announcementControls = speech.supported ? (
+  const announcementControls = (
     <>
       <IconButton icon="megaphone" ariaLabel="Announcement voice" onClick={() => setVoiceOpen(true)} />
-      <IconButton
-        icon={speech.enabled ? 'volume-2' : 'volume-x'}
-        ariaLabel={speech.enabled ? 'Mute announcements' : 'Unmute announcements'}
-        pressed={!speech.enabled}
-        onClick={speech.toggle} />
+      {speech.supported ? (
+        <IconButton
+          icon={speech.enabled ? 'volume-2' : 'volume-x'}
+          ariaLabel={speech.enabled ? 'Mute announcements' : 'Unmute announcements'}
+          pressed={!speech.enabled}
+          onClick={speech.toggle} />
+      ) : null}
     </>
-  ) : null;
+  );
 
   const header = (
     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--space-3)', padding: '12px var(--space-4)', borderBottom: '1px solid var(--border)', background: 'var(--bg)', position: 'sticky', top: 0, zIndex: 10 }}>
@@ -261,10 +263,8 @@ export default function App() {
       ) : null}
       {voiceOpen ? (
         <AnnouncementVoiceModal
-          voices={speech.voices}
-          voiceURI={speech.voiceURI}
+          voiceAvailable={speech.voiceAvailable}
           enabled={speech.enabled}
-          onSelect={speech.setVoiceURI}
           onPreview={() => speech.speak(
             getReadyPhrase([['Mia', 'Carlo'], ['Bea', 'Nico']], (name) => name, 2),
             { key: 'voice-preview' },
