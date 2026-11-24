@@ -16,33 +16,32 @@ const synth = (): SpeechSynthesis | null =>
 
 export const isSupported = (): boolean => synth() !== null;
 
-let cachedVoice: SpeechSynthesisVoice | null = null;
-let watchingVoices = false;
+const DANIEL_NAME = /^Daniel(?: \(English \((?:UK|United Kingdom)\)\))?$/;
+const DANIEL_COMPACT_URI = 'com.apple.voice.compact.en-GB.Daniel';
 
-function pickVoice(s: SpeechSynthesis): SpeechSynthesisVoice | null {
-  const voices = s.getVoices();
-  if (voices.length === 0) return null; // Chrome populates this later and fires voiceschanged
-  const lang = (navigator.language || 'en-US').toLowerCase();
-  const base = lang.split('-')[0];
-  // a local voice keeps working when the gym wifi does not
-  const local = voices.filter((v) => v.localService);
-  const pool = local.length > 0 ? local : voices;
-  return (
-    pool.find((v) => v.lang.toLowerCase().replace('_', '-') === lang) ??
-    pool.find((v) => v.lang.toLowerCase().startsWith(base)) ??
-    pool.find((v) => v.lang.toLowerCase().startsWith('en')) ??
-    pool[0] ??
-    null
-  );
+function danielVoice(s = synth()): SpeechSynthesisVoice | undefined {
+  const voices = s?.getVoices().filter((voice) =>
+    voice.localService === true &&
+    voice.lang.toLowerCase().replaceAll('_', '-') === 'en-gb' &&
+    voice.voiceURI !== '' &&
+    DANIEL_NAME.test(voice.name)
+  ) ?? [];
+  // WebKit exposes Apple voice IDs. Chromium may expose the display name.
+  return voices.find((voice) => voice.voiceURI === DANIEL_COMPACT_URI) ??
+    voices.sort((a, b) => a.voiceURI.localeCompare(b.voiceURI, 'en'))[0];
 }
 
-function voiceFor(s: SpeechSynthesis): SpeechSynthesisVoice | null {
-  if (!watchingVoices) {
-    watchingVoices = true;
-    s.addEventListener?.('voiceschanged', () => { cachedVoice = null; });
-  }
-  if (!cachedVoice) cachedVoice = pickVoice(s);
-  return cachedVoice;
+export const isDanielAvailable = (): boolean => danielVoice() !== undefined;
+
+export function watchVoices(onChange: () => void): () => void {
+  const s = synth();
+  s?.addEventListener('voiceschanged', onChange);
+  window.addEventListener('focus', onChange);
+  onChange();
+  return () => {
+    s?.removeEventListener('voiceschanged', onChange);
+    window.removeEventListener('focus', onChange);
+  };
 }
 
 let primed = false;
@@ -55,11 +54,15 @@ let primed = false;
 export function prime(): void {
   const s = synth();
   if (!s || primed) return;
-  primed = true;
+  const voice = danielVoice(s);
+  if (!voice) return; // the next user gesture can retry after the browser lists its voices
   try {
     const u = new SpeechSynthesisUtterance(' ');
+    u.voice = voice;
+    u.lang = voice.lang;
     u.volume = 0;
     s.speak(u);
+    primed = true;
   } catch {
     // unsupported or blocked: the real calls will be no-ops too
   }
@@ -131,14 +134,18 @@ function pump(): void {
   while (queue.length > 0 && t - queue[0].queuedAt > SHELF_LIFE_MS) emit('dropped', queue.shift()!);
   const item = queue.shift();
   if (!item) return;
+  const voice = danielVoice(s);
+  if (!voice) {
+    // Leaving the voice unset lets the browser select a network voice.
+    emit('failed', item);
+    pump();
+    return;
+  }
   try {
     if (s.paused) s.resume(); // Chrome can strand the queue in a paused state
     const u = new SpeechSynthesisUtterance(item.text);
-    const v = voiceFor(s);
-    if (v) {
-      u.voice = v;
-      u.lang = v.lang;
-    }
+    u.voice = voice;
+    u.lang = voice.lang;
     speaking = true;
     const done = (phase: SpeechPhase) => {
       if (!speaking) return; // end after a cancel, or the watchdog racing a real end

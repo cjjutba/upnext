@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  announceBatch, challengersPhrase, courtKey, courtPhrase, fourNames, getReadyPhrase,
+  announceBatch, challengersPhrase, courtKey, courtPhrase, getReadyPhrase,
   leaderPhrase, matchReadyPhrase, pairPhrase, podiumPhrase,
 } from './announce';
 import { standings } from './standings';
@@ -42,27 +42,26 @@ function startAll(log: SessionEvent[]): { log: SessionEvent[]; batch: SessionEve
 }
 
 describe('phrase builders', () => {
-  it('names a pair, and the four a court call sends over', () => {
+  it('joins the two names on one team', () => {
     expect(pairPhrase(['a', 'b'], nameOf)).toBe('Alice and Bob');
-    expect(fourNames([['a', 'b'], ['c', 'd']], nameOf)).toBe('Alice, Bob, Carol, Dave');
   });
 
   it('calls a court without naming it twice or asking anyone to proceed', () => {
-    expect(courtPhrase(2, [['a', 'b'], ['c', 'd']], nameOf)).toBe('Court 2. Alice, Bob, Carol, Dave.');
+    expect(courtPhrase(2, [['a', 'b'], ['c', 'd']], nameOf)).toBe('Court 2, Alice and Bob versus Carol and Dave.');
   });
 
   it('calls four people to get ready, with and without a court', () => {
     expect(getReadyPhrase([['e', 'f'], ['g', 'h']], nameOf))
-      .toBe('Get ready. Up next. Eve, Frank, Grace, Henry.');
+      .toBe('Up next, Eve and Frank versus Grace and Henry.');
     expect(getReadyPhrase([['e', 'f'], ['g', 'h']], nameOf, 2))
-      .toBe('Get ready. Court 2. Eve, Frank, Grace, Henry.');
+      .toBe('Up next on court 2, Eve and Frank versus Grace and Henry.');
   });
 
   it('names which waiting match it is calling, so three panels do not all say up next', () => {
     expect(matchReadyPhrase([['e', 'f'], ['g', 'h']], nameOf, 0))
       .toBe(getReadyPhrase([['e', 'f'], ['g', 'h']], nameOf));
     expect(matchReadyPhrase([['e', 'f'], ['g', 'h']], nameOf, 1))
-      .toBe('Get ready. Match 2. Eve, Frank, Grace, Henry.');
+      .toBe('Waiting match 2, Eve and Frank versus Grace and Henry.');
   });
 
   it('calls the two challengers a winners template can promise, and says why there are only two', () => {
@@ -80,7 +79,7 @@ describe('announceBatch', () => {
   it('reads the court assignment on the Start tap', () => {
     const { log, batch } = startAll(boot(['a', 'b', 'c', 'd']));
     expect(announceBatch(batch, replay(log), nameOf))
-      .toEqual([{ text: 'Court 1. Alice, Carol, Bob, Dave.', key: 'court-1' }]);
+      .toEqual([{ text: 'Court 1, Alice and Carol versus Bob and Dave.', key: 'court-1' }]);
   });
 
   it('reads the winning pair and stays quiet about the stage it triggered', () => {

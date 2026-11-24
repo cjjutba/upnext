@@ -33,8 +33,9 @@ function installSpeechStub() {
     },
     cancel: () => spoken.push('[cancel]'),
     resume: () => {},
-    getVoices: () => [],
+    getVoices: () => [{ voiceURI: 'Daniel', name: 'Daniel', lang: 'en-GB', localService: true }],
     addEventListener: () => {},
+    removeEventListener: () => {},
   };
   Object.defineProperty(window, 'speechSynthesis', { value: synth, configurable: true, writable: true });
   (globalThis as Record<string, unknown>).SpeechSynthesisUtterance = FakeUtterance;
@@ -132,6 +133,18 @@ describe('App: courtside calls, standings, and the mute switch', () => {
   });
   afterEach(cleanup);
 
+  it('explains why Preview is unavailable in a browser without speech synthesis', async () => {
+    Reflect.deleteProperty(window, 'speechSynthesis');
+    render(<App />);
+    await screen.findByText('Roster');
+    await click(btn('Announcement voice'));
+
+    const preview = within(dialog('Announcement voice'));
+    expect(preview.getByRole('status')).toHaveTextContent('Daniel, English (UK), is unavailable on this device.');
+    expect(preview.getByRole('button', { name: 'Preview' })).toBeDisabled();
+    expect(preview.queryByRole('combobox')).not.toBeInTheDocument();
+  });
+
   it('stages court 1 in silence, calls it on the Start tap, then reads the winner', async () => {
     render(<App />);
     await openBoard(/^Balanced/);
@@ -143,7 +156,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
 
     await click(btn('Start match on court 1'));
     await waitFor(() => expect(said()).toHaveLength(1));
-    expect(said()[0]).toBe('Court 1. Alice, Carol, Bob, Dave.');
+    expect(said()[0]).toBe('Court 1, Alice and Carol versus Bob and Dave.');
     expect(within(courtCard(1)).getByText('Live')).toBeInTheDocument();
 
     await recordWin(1, 1);
@@ -165,6 +178,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await waitFor(() => expect(within(dialog).getAllByText('100%')).toHaveLength(2));
     expect(within(dialog).getAllByText('0%')).toHaveLength(2);
 
+    await waitFor(() => expect(said().at(-1)).toBe('Court 1. Alice and Carol win.'));
     await click(btn(/Read top 3/, dialog));
     expect(said().at(-1)).toContain('Live standings. In first place,');
   });
@@ -240,10 +254,10 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     expect(said()).toEqual([]); // no timer call fires on its own any more
 
     await click(btn('Call players up next'));
-    expect(said()).toEqual(['Get ready. Up next. Eve, Grace, Frank, Henry.']);
+    expect(said()).toEqual(['Up next, Eve and Grace versus Frank and Henry.']);
 
     await click(btn('Call players to court 1'));
-    expect(said().at(-1)).toBe('Get ready. Court 1. Alice, Carol, Bob, Dave.');
+    expect(said().at(-1)).toBe('Up next on court 1, Alice and Carol versus Bob and Dave.');
   });
 
   it('says everything exactly once under StrictMode, which is how main.tsx mounts it', async () => {
@@ -402,6 +416,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     expect(screen.getByText('Next challengers')).toBeInTheDocument();
     expect(screen.queryByText('Up next')).not.toBeInTheDocument();
     expect(within(upNext()).getByText('Winners stay')).toBeInTheDocument();
+    await waitFor(() => expect(said().at(-1)).toBe('Court 1. Alice and Carol win.'));
     await click(btn('Call players up next'));
     expect(said().at(-1)).toMatch(/^Get ready\. Next challengers, \w+ and \w+\. You are on whoever wins\.$/);
   });
@@ -447,7 +462,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await waitFor(() => expect(chipOrder(upNext())).toEqual(['Henry', 'Grace', 'Frank', 'Eve']));
 
     await click(btn('Call players up next'));
-    expect(said().at(-1)).toBe('Get ready. Up next. Henry, Grace, Frank, Eve.');
+    expect(said().at(-1)).toBe('Up next, Henry and Grace versus Frank and Eve.');
   });
 
   it('undoes a win together with the stage it triggered', async () => {
@@ -527,10 +542,10 @@ describe('App: the queue panels track the courts', () => {
     await screen.findByText('Then, match 2');
 
     await click(btn('Call players up next'));
-    expect(said().at(-1)).toMatch(/^Get ready\. Up next\. \w+, \w+, \w+, \w+\.$/);
+    expect(said().at(-1)).toMatch(/^Up next, \w+ and \w+ versus \w+ and \w+\.$/);
 
     await click(btn('Call players for match 2'));
-    expect(said().at(-1)).toMatch(/^Get ready\. Match 2\. \w+, \w+, \w+, \w+\.$/);
+    expect(said().at(-1)).toMatch(/^Waiting match 2, \w+ and \w+ versus \w+ and \w+\.$/);
   });
 });
 

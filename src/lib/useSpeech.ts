@@ -16,6 +16,7 @@ const readStored = (): boolean => {
 export interface SpeechApi {
   enabled: boolean;
   supported: boolean;
+  voiceAvailable: boolean;
   setEnabled: (on: boolean) => void;
   toggle: () => void;
   /** No-op while muted. Referentially stable, so effects can depend on it. */
@@ -26,10 +27,15 @@ export interface SpeechApi {
 export function useSpeech(): SpeechApi {
   const [enabled, setEnabledState] = useState(readStored);
   const enabledRef = useRef(enabled);
+  const [voiceAvailable, setVoiceAvailable] = useState(speech.isDanielAvailable);
+
+  useEffect(() => speech.watchVoices(() => setVoiceAvailable(speech.isDanielAvailable())), []);
 
   useEffect(() => {
-    const onDown = () => speech.prime();
-    window.addEventListener('pointerdown', onDown, { capture: true, once: true });
+    const onDown = () => {
+      if (enabledRef.current) speech.prime();
+    };
+    window.addEventListener('pointerdown', onDown, { capture: true });
     return () => window.removeEventListener('pointerdown', onDown, { capture: true });
   }, []);
 
@@ -53,5 +59,8 @@ export function useSpeech(): SpeechApi {
     if (enabledRef.current) speech.speak(text, opts);
   }, []);
 
-  return { enabled, supported: speech.isSupported(), setEnabled, toggle, speak, cancel: speech.cancel };
+  return {
+    enabled, supported: speech.isSupported(), voiceAvailable,
+    setEnabled, toggle, speak, cancel: speech.cancel,
+  };
 }
