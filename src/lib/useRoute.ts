@@ -5,6 +5,7 @@ export type Route =
   | { name: 'setup' }
   | { name: 'board' }
   | { name: 'summary' }
+  | { name: 'tournament' }
   | { name: 'session'; id: string };
 
 export type Navigate = (r: Route, opts?: { replace?: boolean }) => void;
@@ -14,6 +15,7 @@ export function parse(pathname: string): Route {
   if (pathname === '/app' || pathname === '/app/') return { name: 'resolve' };
   if (pathname === '/app/setup') return { name: 'setup' };
   if (pathname === '/app/board') return { name: 'board' };
+  if (pathname === '/app/tournament') return { name: 'tournament' };
   if (pathname === '/app/summary') return { name: 'summary' };
   const m = /^\/app\/session\/([^/]+)\/?$/.exec(pathname);
   if (m) return { name: 'session', id: decodeURIComponent(m[1]) };
