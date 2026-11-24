@@ -9,11 +9,12 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('parse', () => {
-  it('reads all five route shapes', () => {
+  it('reads the app route shapes', () => {
     expect(parse('/app')).toEqual({ name: 'resolve' });
     expect(parse('/app/')).toEqual({ name: 'resolve' });
     expect(parse('/app/setup')).toEqual({ name: 'setup' });
     expect(parse('/app/board')).toEqual({ name: 'board' });
+    expect(parse('/app/tournament')).toEqual({ name: 'tournament' });
     expect(parse('/app/summary')).toEqual({ name: 'summary' });
     expect(parse('/app/session/abc-123')).toEqual({ name: 'session', id: 'abc-123' });
   });

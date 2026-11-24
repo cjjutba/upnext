@@ -12,8 +12,10 @@ import { SetupRoute } from './routes/SetupRoute';
 import { BoardRoute } from './routes/BoardRoute';
 import { SummaryRoute } from './routes/SummaryRoute';
 import { SessionRoute } from './routes/SessionRoute';
+import { TournamentRoute } from './routes/TournamentRoute';
 import { append, listSessions } from './db/eventStore';
 import { useRoute, useMisrouteGuard } from './lib/useRoute';
+import type { Navigate, Route } from './lib/useRoute';
 import { useSpeech } from './lib/useSpeech';
 import { useNarrow, useReducedMotion } from './lib/useViewport';
 import { useRailCollapsed } from './lib/useRailCollapsed';
@@ -34,10 +36,16 @@ function previewLine(state: SessionState, ratings: Ratings, nameOf: (id: string)
 }
 
 export default function App() {
+  const [route, navigate] = useRoute();
+  return route.name === 'tournament'
+    ? <TournamentRoute onOpenPlay={() => navigate({ name: 'resolve' })} />
+    : <OpenPlay route={route} navigate={navigate} />;
+}
+
+function OpenPlay({ route, navigate }: { route: Exclude<Route, { name: 'tournament' }>; navigate: Navigate }) {
   const session = useSession();
   const roster = useRoster();
   const speech = useSpeech();
-  const [route, navigate] = useRoute();
   const [clock, setClock] = useState(() => Date.now());
   const [resuming, setResuming] = useState(true);
   const [standingsOpen, setStandingsOpen] = useState(false);
@@ -128,6 +136,12 @@ export default function App() {
       onClick={speech.toggle} />
   ) : null;
 
+  const tournamentLink = (
+    <a href="/app/tournament" style={{
+      display: 'inline-flex', alignItems: 'center', minHeight: 'var(--tap-min)',
+      fontSize: 'var(--text-ui)', fontWeight: 500,
+    }}>Tournament</a>
+  );
   const header = (
     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--space-3)', padding: '12px var(--space-4)', borderBottom: '1px solid var(--border)', background: 'var(--bg)', position: 'sticky', top: 0, zIndex: 10 }}>
       <span className="display" style={{ fontSize: '22px', fontWeight: 600 }}>upnext</span>
@@ -145,6 +159,7 @@ export default function App() {
             pressed={rail.collapsed}
             onClick={rail.toggle} />
           <IconButton icon="trophy" ariaLabel="Live standings" onClick={() => setStandingsOpen(true)} />
+          {tournamentLink}
           {muteToggle}
           <Button variant="danger" onClick={() => setEndOpen(true)}>End session</Button>
         </>
@@ -152,6 +167,7 @@ export default function App() {
         <>
           <span className="micro-label">Session summary</span>
           <span style={{ flex: 1 }} />
+          {tournamentLink}
           {muteToggle}
         </>
       ) : (
@@ -161,6 +177,7 @@ export default function App() {
             {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
           </span>
           <span style={{ flex: 1 }} />
+          {tournamentLink}
           {muteToggle}
         </>
       )}
