@@ -55,7 +55,7 @@ export function ModeChangeModal({ from, draft, onDraftChange, previewLine, onCan
                 label="Win cap" value={draft.winCap} min={1} max={5} unit="games"
                 onChange={(winCap) => onDraftChange({ ...draft, winCap })} />
               <Button
-                variant={split ? 'primary' : 'secondary'} ariaLabel="Toggle split winners"
+                variant="secondary" pressed={split} ariaLabel="Toggle split winners"
                 onClick={() => onDraftChange({ ...draft, template: templateForMode('winners', !split) })}>
                 {split ? 'Split winners: on' : 'Split winners: off'}
               </Button>

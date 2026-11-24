@@ -6,13 +6,7 @@ export function RuleCard({ title, description, icon, selected, onSelect, badge }
 }) {
   return (
     <button
-      type="button" onClick={onSelect} aria-pressed={selected}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 'var(--space-3)', textAlign: 'left', width: '100%',
-        minHeight: '72px', padding: 'var(--space-3)', cursor: 'pointer', background: selected ? 'var(--status-green-bg)' : 'var(--bg)',
-        border: selected ? '1px solid var(--border-active)' : '1px solid var(--border)',
-        borderRadius: 'var(--radius-card)', color: 'var(--text)',
-      }}>
+      type="button" className="action rule-choice" data-variant="secondary" onClick={onSelect} aria-pressed={selected}>
       <Icon name={icon} size={20} />
       <span style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
         <span style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)' }}>

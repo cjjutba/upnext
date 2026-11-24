@@ -4,7 +4,7 @@
   padding-inline: var(--page-gutter);
 }
 
-.landing-header { border-bottom: 1px solid var(--border); }
+.landing-header { border-bottom: 1px solid var(--border); background: var(--bg); }
 .landing-nav {
   min-height: 76px;
   display: flex;
@@ -26,7 +26,7 @@
   grid-template-columns: minmax(0, 0.94fr) minmax(0, 1.1fr);
   align-items: center;
   gap: clamp(30px, 6vw, 104px);
-  min-height: clamp(560px, 76vh, 760px);
+  min-height: clamp(530px, 72vh, 720px);
   padding-block: clamp(45px, 7vw, 96px);
 }
 .hero-copy h1 {
@@ -46,21 +46,7 @@
   line-height: 1.55;
 }
 .landing-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 27px; }
-.landing-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: var(--tap-primary);
-  padding: 0 23px;
-  border: 1px solid var(--border-hover);
-  border-radius: var(--radius-control);
-  background: var(--bg);
-  color: var(--text);
-  font-weight: 630;
-}
-.landing-action:hover { background: var(--bg-secondary); text-decoration: none; }
-.landing-action.primary { border-color: transparent; background: var(--primary); color: var(--primary-fg); }
-.landing-action.primary:hover { background: var(--primary-press); }
+.landing-actions .action, .landing-tournament .action { padding-inline: 23px; }
 .hero-copy .hero-offline { margin-top: 16px; font-size: var(--text-ui); }
 
 .landing-board {
@@ -68,18 +54,18 @@
   overflow: hidden;
   border-radius: var(--radius-modal);
   background: var(--bg);
-  box-shadow: 0 14px 40px #23463a20;
+  box-shadow: var(--shadow-preview);
 }
 .preview-bar, .preview-court-head, .preview-queue { display: flex; align-items: center; gap: 10px; }
 .preview-bar {
   justify-content: space-between;
   padding: 16px clamp(14px, 2vw, 25px);
-  background: var(--text);
+  background: var(--navy-panel);
   color: var(--bg);
 }
 .preview-bar h2, .preview-court-head h3 { margin: 0; font-weight: 650; }
 .preview-bar h2 { font-size: var(--text-body); }
-.preview-bar > span { color: #d9e3d9; font-size: var(--text-label); }
+.preview-bar > span { color: var(--navy-panel-muted); font-size: var(--text-label); }
 .preview-content { padding: clamp(14px, 2vw, 25px); }
 .preview-court-head { padding-bottom: 14px; flex-wrap: wrap; }
 .preview-court-head h3 { font-size: var(--text-h2); letter-spacing: var(--tracking-tight); }
@@ -87,17 +73,23 @@
 .preview-live {
   padding: 4px 10px;
   border-radius: var(--radius-full);
-  background: var(--status-green-bg);
-  color: var(--status-green-text);
+  background: var(--status-blue-bg);
+  color: var(--status-blue-text);
   font-size: var(--text-ui);
   font-weight: 620;
 }
-.preview-queue { margin-top: 16px; flex-wrap: wrap; }
+.preview-queue {
+  margin-top: 14px;
+  padding: 10px;
+  flex-wrap: wrap;
+  border-radius: var(--radius-control);
+  background: var(--canvas);
+}
 .preview-pairs { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
 .preview-pairs strong { font-size: var(--text-ui); font-weight: 650; }
 .preview-pairs span { color: var(--text-secondary); font-size: var(--text-ui); }
 
-.landing-tournament { background: var(--bg-secondary); border-block: 1px solid var(--border); }
+.landing-tournament { background: var(--bg); border-block: 1px solid var(--border); }
 .landing-tournament-grid {
   display: grid;
   grid-template-columns: 1fr minmax(0, 0.78fr);
@@ -113,8 +105,8 @@
   letter-spacing: -0.04em;
   line-height: 1.02;
 }
-.landing-tournament .landing-action { margin-top: 20px; }
-.score-example { border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--bg); padding: 23px; }
+.landing-tournament .action { margin-top: 20px; }
+.score-example { border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--canvas); padding: 23px; }
 .score-example header, .score-example > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .score-example header { flex-wrap: wrap; }
 .score-example header span, .score-example p { color: var(--text-secondary); font-size: var(--text-ui); }
@@ -141,7 +133,7 @@
   .landing-nav { min-height: 64px; }
   .landing-hero, .landing-tournament-grid { grid-template-columns: 1fr; }
   .landing-hero { padding-block: 40px 48px; }
-  .hero-copy h1 { max-width: 10ch; font-size: clamp(44px, 10vw, 60px); text-wrap: initial; }
+  .hero-copy h1 { max-width: 13ch; font-size: clamp(42px, 10vw, 60px); }
   .hero-copy > p { margin-top: 18px; }
   .hero-copy .hero-offline { margin-top: 13px; }
 }

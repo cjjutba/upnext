@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f6f8f2" />
+    <meta name="theme-color" content="#f6f8fc" />
     <meta name="description" content="Run pickleball open play and tournaments from one phone or tablet. Check players in, call the next four, and record results courtside." />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Upnext | Pickleball, courtside" />
@@ -13,6 +13,7 @@
     <link rel="preload" href="/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/src/styles/tokens.css" />
     <link rel="stylesheet" href="/src/styles/base.css" />
+    <link rel="stylesheet" href="/src/styles/actions.css" />
     <link rel="stylesheet" href="/src/styles/landing.css" />
     <title>Upnext | Pickleball, courtside</title>
   </head>
@@ -33,8 +34,8 @@
           <h1 id="hero-title">Run pickleball night from one device.</h1>
           <p>Check players in, call the next four, and record results for open play and tournaments.</p>
           <div class="landing-actions">
-            <a class="landing-action primary" href="/app">Open play</a>
-            <a class="landing-action" href="/app/tournament">Tournament</a>
+            <a class="action" data-variant="primary" data-size="lg" href="/app">Open play</a>
+            <a class="action" data-variant="secondary" data-size="lg" href="/app/tournament">Tournament</a>
           </div>
           <p class="hero-offline">No account. Works offline after you open the app.</p>
         </div>
@@ -71,7 +72,7 @@
           <div>
             <h2 id="tournament-title">From first draw to final score.</h2>
             <p>Set up divisions, assign matches to courts, and enter scores as games finish. Follow standings and see how a score correction affects playoff places before you confirm it.</p>
-            <a class="landing-action" href="/app/tournament">Open tournament</a>
+            <a class="action" data-variant="secondary" data-size="lg" href="/app/tournament">Open tournament</a>
           </div>
           <section class="score-example" aria-label="Example mixed doubles result">
             <header><strong>Mixed doubles</strong><span>Example result</span></header>

@@ -151,11 +151,17 @@ export function SessionBoard({
   const positions = (preview: UpNextPreview, i: number) =>
     preview.kind === 'challengers' ? '1 and 2' : `${i * 4 + 1} to ${i * 4 + 4}`;
 
+  const recentAction = fresh && (undoLabel || canRedo) ? (
+    <div className="board-recent-action" data-floating={!narrow || undefined} role="group" aria-label="Recent action">
+      {undoLabel ? <UndoPill label={undoLabel} onUndo={onUndo} /> : null}
+      {canRedo ? <Button variant="secondary" onClick={onRedo}>Redo</Button> : null}
+    </div>
+  ) : null;
+
   return (
     <div style={narrow
       ? { display: 'flex', flexDirection: 'column' }
       : { display: 'flex', flex: 1, minHeight: 0, alignItems: 'stretch' }}>
-      {/* 104px bottom padding keeps the fixed undo pill off the last panel */}
       <main id="app-main" tabIndex={-1} className={narrow ? 'board-main board-main--narrow' : 'board-main'}>
         <section className="board-section" aria-labelledby="courts-title">
           <div className="panel-heading">
@@ -165,7 +171,7 @@ export function SessionBoard({
             </div>
             <div className="board-title">
               {narrow ? (
-                <button type="button" className="board-shortcut" aria-controls="check-in-panel" aria-expanded={!railCollapsed}
+                <button type="button" className="action board-shortcut" data-variant="ghost" aria-controls="check-in-panel" aria-expanded={!railCollapsed}
                   onClick={() => {
                     setJumpToCheckIn(true);
                     onExpandRail();
@@ -175,6 +181,7 @@ export function SessionBoard({
               <Button variant="secondary" icon="plus" onClick={onAddCourt} disabled={courts.length > 0 && eligibleQueue.length < 4} ariaLabel="Add court">Add court</Button>
             </div>
           </div>
+          {narrow ? recentAction : null}
           {nextTeams ? (
             <a href="#board-queue" className="next-match-bar">
               <strong>{firstPreview.kind === 'challengers' ? 'Challengers on deck' : 'Next four'}</strong>
@@ -264,8 +271,7 @@ export function SessionBoard({
         inert={railCollapsed && !narrow ? true : undefined}
         style={narrow
           ? {
-            // the 104px keeps the fixed undo pill off the section, collapsed or not: the count row is the last thing on the page
-            borderTop: '1px solid var(--border)', padding: '20px 16px 104px',
+            borderTop: '1px solid var(--border)', padding: '20px 16px var(--space-5)',
             display: 'flex', flexDirection: 'column', gap: '28px', background: 'var(--bg)',
           }
           : {
@@ -344,12 +350,7 @@ export function SessionBoard({
           onCreate={(name) => { onCreateAndSeat(seating.court, seating.slot, name); setSeating(null); }}
           onClose={() => setSeating(null)} />
       ) : null}
-      {fresh && (undoLabel || canRedo) ? (
-        <div style={{ position: 'fixed', left: 'var(--space-4)', bottom: 'var(--space-4)', zIndex: 50, display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-          {undoLabel ? <UndoPill label={undoLabel} onUndo={onUndo} /> : null}
-          {canRedo ? <Button variant="ghost" onClick={onRedo}>Redo</Button> : null}
-        </div>
-      ) : null}
+      {!narrow ? recentAction : null}
     </div>
   );
 }

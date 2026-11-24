@@ -43,12 +43,8 @@ export function ModeMenu({ rule, onRequestChange }: {
       }
     }}>
       <button
-        ref={trigger} type="button" onClick={() => setOpen(!open)} aria-label="Change matching mode" aria-expanded={open}
-        style={{
-          display: 'inline-flex', alignItems: 'center', minHeight: 'var(--tap-min)', padding: '0 var(--space-3)',
-          background: 'var(--bg)', color: 'var(--text-secondary)', border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-control)', font: '500 14px/1 var(--font-sans)', cursor: 'pointer',
-        }}>
+        ref={trigger} type="button" className="action" data-variant="secondary"
+        onClick={() => setOpen(!open)} aria-label="Change matching mode" aria-expanded={open}>
         {'Mode: ' + modeLabel(rule.template)}
       </button>
       {open ? (
@@ -60,13 +56,8 @@ export function ModeMenu({ rule, onRequestChange }: {
           display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
         }}>
           {MODES.map((m) => (
-            <button key={m.id} type="button" onClick={() => pick(m.id)} aria-pressed={current === m.id}
-              style={{
-                display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'left', width: '100%',
-                padding: 'var(--space-3)', cursor: 'pointer', background: current === m.id ? 'var(--status-green-bg)' : 'var(--bg)', color: 'var(--text)',
-                border: current === m.id ? '1px solid var(--gray-1000)' : '1px solid var(--border)',
-                borderRadius: 'var(--radius-card)',
-              }}>
+            <button key={m.id} type="button" className="action mode-choice" data-variant="secondary"
+              onClick={() => pick(m.id)} aria-pressed={current === m.id}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                 <span style={{ font: '600 16px/1.2 var(--font-sans)' }}>{m.label}</span>
                 {m.recommended ? <StatusBadge status="live" label="Recommended" /> : null}

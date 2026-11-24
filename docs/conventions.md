@@ -11,18 +11,18 @@ preference.
 | Rule | Detail |
 |---|---|
 | Light mode only | One `:root` block. No dark tokens, no theme switcher. Dark mode would be a designed theme, never an inversion |
-| Actions | Use court teal for the primary action, ghost or neutral borders for secondary actions, and red for End session |
-| Structure | Use warm off-white for the workspace, ink for text and the tournament masthead, and simple borders for working panels. Elevated menus, dialogs, and the landing preview can use a shadow |
-| State signals | Court teal marks focus and links. Pickleball lime calls out the first waiting match. Pair every status tint with a readable word |
+| Actions | Use shared blue primary, raised outlined white secondary, red danger, and flat ghost buttons. Use the same variants for landing action links |
+| Structure | Use cool slate for the workspace, navy ink for text, deep navy for the tournament masthead, and single borders for white working panels. Elevated menus, dialogs, and the landing preview can use a shadow |
+| State signals | Blue marks current navigation, selection, Live and Up next. Slate outlines mark keyboard focus, with white outlines on court art. Pair every status tint with a readable word |
 | Text-only badges | A pill with the word alone. No dots, no circles, no icons, ever. Tinted background, dark same-hue text |
 | Near-zero motion | One exception: the check-in rail slides on collapse, 180ms, skipped under `prefers-reduced-motion`. Otherwise no transitions, no easing, no press scale, no shimmer. Press feedback is an instant one-step background or border change |
 | The court is the graphic | A four on a court is drawn on `CourtDiagram`, live or staged or merely next up. The queue section under the courts uses the same graphic on purpose |
 | Type | Locally bundled variable Geist Sans with tabular numerals for every timer, count, position, and stat column, so digits never shift layout |
-| Radii | 9px controls, 15px cards, 19px modals, 9999px pills |
+| Radii | 6px controls, 15px cards, 19px modals, 9999px pills |
 | Spacing | 8pt grid via the `--space-*` tokens |
 | Touch targets | 48px minimum, 56px or more for primary actions. Someone is holding a paddle in the other hand |
 | Icons | Lucide only, 1.5px stroke, labeled except close, back, and overflow |
-| Flat fills | No gradients, no glassmorphism, no glow, no purple, no emoji |
+| Fills | Keep panels flat. Raised buttons can use a slight sheen. Enabled white text on blue or red must reach 4.5:1 across the fill, including hover and press |
 | Buttons say what they do | A label names the action or the outcome it records, never an instruction to the organizer. "Enter the score" on a disabled button tells someone what to do instead of what the button does; helper text under the control is where that belongs |
 | Controls hold their width | A field or chip is the same width empty, focused and filled. Fix the width, and use `minmax(0, 1fr)` where a long name shares a grid row |
 | No dashes | No en dashes and no em dashes in copy, code, comments, commits, or docs. Use a comma, a period, or "to" for ranges |
@@ -38,21 +38,22 @@ change fails that, the color is carrying meaning it should not.
 |---|---|
 | Surfaces | `--canvas`, `--bg`, `--bg-secondary` |
 | Grays | `--gray-100` through `--gray-1000` |
-| Borders | `--border`, `--border-hover`, `--border-active` |
+| Borders | `--border`, `--border-hover`, `--border-active`, `--control-edge` |
 | Text | `--text`, `--text-secondary`, `--text-tertiary` |
-| Interactive | `--primary`, `--primary-press`, `--primary-fg` |
-| Destructive | `--danger`, `--danger-press`, `--danger-fg` |
-| Signals | `--link`, `--focus-ring`, `--accent`, `--accent-ink` |
-| Elevation | `--shadow-menu`, `--shadow-modal` |
-| Status | `--status-{green,amber,red,neutral}-{bg,text}` |
+| Interactive | `--primary`, `--primary-hover`, `--primary-press`, `--primary-fg` |
+| Destructive | `--danger`, `--danger-hover`, `--danger-press`, `--danger-fg` |
+| Signals | `--link`, `--focus-color` |
+| Elevation | `--shadow-menu`, `--shadow-modal`, `--shadow-preview` |
+| Status | `--status-{blue,amber,red,neutral}-{bg,text}` |
 | Type | `--font-sans`, `--font-mono`, ten size tokens, `--tracking-tight` |
 | Layout | `--space-1` to `--space-6`, four radii, `--tap-min`, `--tap-primary` |
 
 ## Styling
 
 Shared classes live in `src/styles/base.css` and `src/styles/app.css`. The
-script-free landing styles live in `src/styles/landing.css`. Use inline styles
-for values derived from state and read colors and spacing from tokens.
+script-free landing styles live in `src/styles/landing.css`. Both entries load
+`src/styles/actions.css` for button variants and states. Use inline styles for
+values derived from state and read colors and spacing from tokens.
 
 | Class | For |
 |---|---|

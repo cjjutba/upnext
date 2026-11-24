@@ -6,12 +6,8 @@ export function Stepper({ label, value, min, max, unit, onChange }: {
   const btn = (name: 'minus' | 'plus', delta: number, disabled: boolean) => (
     <button
       type="button" disabled={disabled} onClick={() => onChange(value + delta)}
-      aria-label={`${label} ${name === 'plus' ? 'up' : 'down'}`}
-      style={{
-        width: 'var(--tap-min)', height: 'var(--tap-min)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-control)',
-        cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.4 : 1, color: 'var(--text)',
-      }}>
+      className="action" data-variant="secondary" data-size="icon"
+      aria-label={`${label} ${name === 'plus' ? 'up' : 'down'}`}>
       <Icon name={name} size={20} />
     </button>
   );

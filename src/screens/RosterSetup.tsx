@@ -109,11 +109,11 @@ export function RosterSetup({
                 key={p.id + ':' + p.updatedAt} defaultValue={p.name} aria-label="Player name"
                 onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== p.name) onUpdatePlayer(p.id, { name: v }); }}
                 style={{ height: 'var(--tap-min)', padding: '0 var(--space-3)', font: '400 16px var(--font-sans)', border: '1px solid var(--border)', borderRadius: 'var(--radius-control)', background: 'var(--bg)', color: 'var(--text)' }} />
-              <div style={{ display: 'flex' }} role="radiogroup" aria-label="Rating">
+              <div style={{ display: 'flex' }} role="group" aria-label="Rating">
                 {[1, 2, 3, 4, 5].map((n) => (
-                  <button key={n} type="button" aria-label={n + ' star rating'}
-                    onClick={() => onUpdatePlayer(p.id, { rating: p.rating === n ? undefined : n })}
-                    style={{ width: 'var(--tap-min)', height: 'var(--tap-min)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', color: (p.rating ?? 0) >= n ? 'var(--gray-1000)' : 'var(--gray-500)' }}>
+                  <button key={n} type="button" className="action rating-choice" data-variant="ghost" data-size="icon"
+                    aria-label={n + ' star rating'} aria-pressed={p.rating === n} data-filled={(p.rating ?? 0) >= n || undefined}
+                    onClick={() => onUpdatePlayer(p.id, { rating: p.rating === n ? undefined : n })}>
                     <Icon name="star" size={20} />
                   </button>
                 ))}
@@ -155,7 +155,7 @@ export function RosterSetup({
             <>
               <Stepper label="Win cap" value={winCap} min={1} max={5} unit="games" onChange={setWinCap} />
               <Button
-                variant={splitWinners ? 'primary' : 'secondary'}
+                variant="secondary" pressed={splitWinners}
                 onClick={() => setSplitWinners(!splitWinners)}
                 ariaLabel="Toggle split winners">
                 {splitWinners ? 'Split winners: on' : 'Split winners: off'}
@@ -173,7 +173,7 @@ export function RosterSetup({
       <section className="setup-panel setup-history" aria-labelledby="history-title">
         <div className="panel-heading">
           <h2 id="history-title" className="display">Session history</h2>
-          <label className="import-control">
+          <label className="action import-control" data-variant="secondary">
             Import session
             <input
               type="file" accept=".json,application/json" disabled={importing}

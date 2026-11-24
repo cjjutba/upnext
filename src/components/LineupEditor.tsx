@@ -5,20 +5,9 @@ import { IconButton } from './IconButton';
 import type { Pairs } from '../domain/types';
 
 function Chip({ name, selected, onTap }: { name: string; selected: boolean; onTap: () => void }) {
-  const [pressed, setPressed] = useState(false);
   return (
     <button
-      type="button" onClick={onTap} aria-pressed={selected}
-      onPointerDown={() => setPressed(true)} onPointerUp={() => setPressed(false)}
-      onPointerLeave={() => setPressed(false)} onPointerCancel={() => setPressed(false)}
-      style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        minHeight: 'var(--tap-min)', padding: '0 var(--space-3)', cursor: 'pointer',
-        borderRadius: 'var(--radius-control)', font: '600 16px/1 var(--font-sans)',
-        background: selected ? 'var(--primary)' : pressed ? 'var(--gray-100)' : 'var(--bg)',
-        color: selected ? 'var(--primary-fg)' : 'var(--text)',
-        border: selected ? '1px solid transparent' : '1px solid var(--border)',
-      }}>
+      type="button" className="action player-choice" data-variant="secondary" onClick={onTap} aria-pressed={selected}>
       {name}
     </button>
   );
