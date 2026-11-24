@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
 import { Button } from './Button';
+import { AppDialog } from './AppDialog';
 import { Stepper } from './Stepper';
 import { MODES, modeForTemplate, modeLabel, templateForMode } from '../domain/modes';
 import type { ModeInfo } from '../domain/modes';
@@ -27,14 +27,6 @@ export function ModeChangeModal({ from, draft, onDraftChange, previewLine, onCan
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onCancel]);
-
   const target = info(draft);
   const sameMode = target.id === info(from).id;
   const unchanged = draft.template === from.template && draft.winCap === from.winCap;
@@ -46,20 +38,7 @@ export function ModeChangeModal({ from, draft, onDraftChange, previewLine, onCan
   );
 
   return (
-    <div
-      onClick={onCancel}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 45, background: 'var(--overlay)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-4)',
-      }}>
-      <div
-        role="dialog" aria-modal="true" aria-label={title}
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '520px', maxWidth: '100%', display: 'flex', flexDirection: 'column',
-          background: 'var(--bg)', border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-modal)', boxShadow: 'var(--shadow-modal)',
-        }}>
+    <AppDialog label={title} onClose={onCancel} width="520px">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', padding: 'var(--space-4)' }}>
           <span className="display" style={{ fontSize: 'var(--text-h2)' }}>{title}</span>
           {line(target.description)}
@@ -83,14 +62,13 @@ export function ModeChangeModal({ from, draft, onDraftChange, previewLine, onCan
             </div>
           ) : null}
         </div>
-        <div style={{ display: 'flex', gap: 'var(--space-2)', padding: '12px var(--space-4)', borderTop: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', padding: '12px var(--space-4)', borderTop: '1px solid var(--border)' }}>
           <span style={{ flex: 1 }} />
           <Button variant="secondary" onClick={onCancel}>Cancel</Button>
           <Button disabled={unchanged} onClick={onConfirm}>
             {sameMode ? 'Apply' : `Switch to ${target.label}`}
           </Button>
         </div>
-      </div>
-    </div>
+    </AppDialog>
   );
 }

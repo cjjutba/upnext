@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CourtCard, type CourtPhase } from '../components/CourtCard';
 import { QueuePanel } from '../components/QueuePanel';
 import { QueueRow } from '../components/QueueRow';
@@ -27,23 +27,6 @@ const RAIL_MOTION = '180ms ease';
  */
 const UNDO_WINDOW_MS = 10000;
 
-/**
- * Court cards, and the waiting panels that mirror them so a panel is a court
- * card's width. Two columns cost twice the minimum plus one gap, so 420 asks
- * for 864px of content where 480 asked for 984: at 480 a 1280 board with the
- * rail open fell to one column and four courts took six screens of scrolling.
- *
- * auto-fill, not auto-fit. auto-fit collapses the tracks nothing landed in and
- * lets one card stretch the whole column, which is how hiding the rail at 1024
- * made the board taller rather than shorter. The max stays 1fr on purpose: a
- * definite max is what auto-fill counts repetitions by, so capping it here puts
- * 1280 straight back to one column.
- */
-const BOARD_GRID = {
-  display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 420px), 1fr))',
-  gap: 'var(--space-4)', alignContent: 'start',
-} as const;
-
 const fmt = (totalSeconds: number): string => {
   const s = Math.max(0, Math.floor(totalSeconds));
   const h = Math.floor(s / 3600);
@@ -56,7 +39,7 @@ export { fmt };
 export function SessionBoard({
   state, players, undoLabel, actionId, onUndo, canRedo, onRedo, onWin, onCloseCourt,
   onToggleSit, onToggleCheck, onAddCourt, onAddPlayer, onRemovePlayer, onCourtPlayerTap, onQueuePlayerTap,
-  onStart, onStage, onCallCourt, onCallPreview, onEditLineup, previews, narrow, railCollapsed, motion, recency,
+  onStart, onStage, onCallCourt, onCallPreview, onEditLineup, previews, narrow, railCollapsed, onExpandRail, motion, recency,
   onSeatPlayer, onCreateAndSeat, onFillCourt,
 }: {
   state: SessionState;
@@ -94,6 +77,7 @@ export function SessionBoard({
   narrow: boolean;
   /** The organizer hid check-in to give the courts the full width. Wide slides the rail out; narrow keeps its header. */
   railCollapsed: boolean;
+  onExpandRail: () => void;
   /** False when the device asks for reduced motion, which drops the rail transition. */
   motion: boolean;
   /** startedAt of the newest ended session each player attended; regulars sort first. */
@@ -106,6 +90,14 @@ export function SessionBoard({
   const [now, setNow] = useState(() => Date.now());
   const [newName, setNewName] = useState('');
   const [query, setQuery] = useState('');
+  const checkInHeading = useRef<HTMLHeadingElement>(null);
+  const [jumpToCheckIn, setJumpToCheckIn] = useState(false);
+  useLayoutEffect(() => {
+    if (!jumpToCheckIn || railCollapsed) return;
+    checkInHeading.current?.focus({ preventScroll: true });
+    checkInHeading.current?.scrollIntoView({ block: 'start' });
+    setJumpToCheckIn(false);
+  }, [jumpToCheckIn, railCollapsed]);
   // which open seat the organizer is filling. View state, not session truth, so it never outlives a tap
   const [seating, setSeating] = useState<{ court: number; slot: SlotIndex } | null>(null);
   useEffect(() => {
@@ -138,6 +130,10 @@ export function SessionBoard({
   const present = state.checkedIn.filter((id) => !state.departed.includes(id));
   const previewed = new Set(previews.flatMap((p) => (p.kind === 'lineup' ? [...p.pairs[0], ...p.pairs[1]] : p.pair)));
   const leftovers = state.queue.filter((id) => !previewed.has(id));
+  const firstPreview = previews[0];
+  const nextTeams = firstPreview?.kind === 'lineup'
+    ? firstPreview.pairs.map((pair) => pair.map(nameOf).join(' & ')).join('  vs  ')
+    : firstPreview?.pair.map(nameOf).join(' & ');
   const grid = [...players]
     .sort((a, b) =>
       Number(state.checkedIn.includes(b.id)) - Number(state.checkedIn.includes(a.id)) ||
@@ -160,22 +156,38 @@ export function SessionBoard({
       ? { display: 'flex', flexDirection: 'column' }
       : { display: 'flex', flex: 1, minHeight: 0, alignItems: 'stretch' }}>
       {/* 104px bottom padding keeps the fixed undo pill off the last panel */}
-      <main style={narrow
-        ? { minWidth: 0, padding: '16px', display: 'flex', flexDirection: 'column', gap: '28px' }
-        : { flex: 1, minWidth: 0, padding: '24px 24px 104px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '28px' }}>
-        <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-            <span className="micro-label">Courts</span>
-            <span style={{ flex: 1 }} />
-            {/* with no courts open there is nothing left to undo into, so the button has to stay live even for a short queue */}
-            <Button variant="primary" icon="plus" onClick={onAddCourt} disabled={courts.length > 0 && eligibleQueue.length < 4} ariaLabel="Add court">Add court</Button>
+      <main id="app-main" tabIndex={-1} className={narrow ? 'board-main board-main--narrow' : 'board-main'}>
+        <section className="board-section" aria-labelledby="courts-title">
+          <div className="panel-heading">
+            <div className="board-title">
+              <h1 id="courts-title" className="display">Courts</h1>
+              <span className="count-label mono">{Object.keys(state.games).length} live</span>
+            </div>
+            <div className="board-title">
+              {narrow ? (
+                <button type="button" className="board-shortcut" aria-controls="check-in-panel" aria-expanded={!railCollapsed}
+                  onClick={() => {
+                    setJumpToCheckIn(true);
+                    onExpandRail();
+                  }}>Check-in</button>
+              ) : null}
+              {/* With no courts open, the action stays available even for a short queue. */}
+              <Button variant="secondary" icon="plus" onClick={onAddCourt} disabled={courts.length > 0 && eligibleQueue.length < 4} ariaLabel="Add court">Add court</Button>
+            </div>
           </div>
+          {nextTeams ? (
+            <a href="#board-queue" className="next-match-bar">
+              <strong>{firstPreview.kind === 'challengers' ? 'Challengers on deck' : 'Next four'}</strong>
+              <span>{nextTeams}</span>
+              <span>View queue</span>
+            </a>
+          ) : null}
           {courts.length === 0 ? (
             <div style={{ padding: 'var(--space-3)', font: '400 15px var(--font-sans)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-card)' }}>
               No courts open. Add a court to keep playing.
             </div>
           ) : (
-            <div style={BOARD_GRID}>
+            <div className="board-grid">
               {courts.map((n) => {
                 const game = state.games[n];
                 const staged = state.staged[n];
@@ -200,15 +212,15 @@ export function SessionBoard({
 
         {/* the queue exists because courts do: with none open there is nothing for a waiting four to be waiting for */}
         {courts.length === 0 ? null : (
-          <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-              <span className="micro-label">Queue</span>
-              {/* the pairings below are a mode's decision, so the mode is named next to them */}
-              <span style={{ font: '400 13px/1 var(--font-sans)', color: 'var(--text-tertiary)' }}>{modeLabel(state.rule.template)}</span>
-              <span style={{ flex: 1 }} />
-              <span className="mono" style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>{eligibleQueue.length} waiting</span>
+          <section id="board-queue" className="board-section" aria-labelledby="queue-title">
+            <div className="panel-heading">
+              <div className="board-title">
+                <h2 id="queue-title" className="display">Queue</h2>
+                <span className="micro-label">{modeLabel(state.rule.template)}</span>
+              </div>
+              <span className="count-label mono">{eligibleQueue.length} waiting</span>
             </div>
-            <div style={BOARD_GRID}>
+            <div className="board-grid">
               {previews.length === 0 ? (
                 <div style={{ padding: 'var(--space-3)', font: '400 15px var(--font-sans)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-card)' }}>
                   {state.queue.length === 0
@@ -218,13 +230,13 @@ export function SessionBoard({
               ) : previews.map((preview, i) => (
                 <QueuePanel key={positions(preview, i)} positions={positions(preview, i)}
                   title={preview.kind === 'challengers' ? 'Next challengers' : i === 0 ? 'Up next' : `Then, match ${i + 1}`}
-                  preview={preview} nameOf={nameOf} onPlayerTap={onQueuePlayerTap}
+                  next={i === 0} preview={preview} nameOf={nameOf} onPlayerTap={onQueuePlayerTap}
                   onCall={() => onCallPreview(i)}
                   callLabel={i === 0 ? 'Call players up next' : `Call players for match ${i + 1}`} />
               ))}
             </div>
             {leftovers.length > 0 ? (
-              <div style={BOARD_GRID}>
+              <div className="board-grid">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                   <span className="micro-label">Also waiting</span>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -247,6 +259,7 @@ export function SessionBoard({
         keeps the hidden copy out of the tab order and the screen reader.
       */}
       <aside
+        id="check-in"
         aria-label="Check-in"
         inert={railCollapsed && !narrow ? true : undefined}
         style={narrow
@@ -256,7 +269,7 @@ export function SessionBoard({
             display: 'flex', flexDirection: 'column', gap: '28px', background: 'var(--bg)',
           }
           : {
-            width: railCollapsed ? '0px' : '360px', flex: 'none', overflow: 'hidden',
+            width: railCollapsed ? '0px' : 'var(--rail-width)', flex: 'none', overflow: 'hidden',
             borderLeft: 'solid var(--border)', borderLeftWidth: railCollapsed ? '0px' : '1px',
             background: 'var(--bg)',
             transition: motion ? `width ${RAIL_MOTION}, border-left-width ${RAIL_MOTION}` : undefined,
@@ -264,10 +277,10 @@ export function SessionBoard({
         <div style={narrow
           ? { display: 'flex', flexDirection: 'column', gap: '28px' }
           // a fixed width keeps the names from rewrapping while the rail slides
-          : { width: '360px', height: '100%', padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '28px' }}>
+          : { width: 'var(--rail-width)', height: '100%', padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '28px' }}>
           <section style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-              <span className="micro-label">Check-in</span>
+              <h2 ref={checkInHeading} tabIndex={-1} className="display board-checkin-title">Check-in</h2>
               {/* on a phone the count is all that is left, so it has to say who is actually still here */}
               {narrow && railCollapsed ? (
                 <>
@@ -278,10 +291,12 @@ export function SessionBoard({
             </div>
             {/* 0fr to 1fr is the one way to animate a height the content decides */}
             <div
+              id="check-in-panel"
               inert={railCollapsed ? true : undefined}
               style={{
                 display: 'grid', gridTemplateRows: narrow && railCollapsed ? '0fr' : '1fr',
-                transition: motion && narrow ? `grid-template-rows ${RAIL_MOTION}` : undefined,
+                // The shortcut needs the panel's full height before scrolling to it.
+                transition: motion && narrow && !jumpToCheckIn ? `grid-template-rows ${RAIL_MOTION}` : undefined,
               }}>
               <div style={{ minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <form
@@ -303,7 +318,7 @@ export function SessionBoard({
                       border: '1px solid var(--border)', borderRadius: 'var(--radius-control)', background: 'var(--bg)', color: 'var(--text)',
                     }} />
                 ) : null}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 'var(--space-2)' }}>
                   {grid.map((p) => (
                     <CheckinTile key={p.id} name={p.name} state={tileState(p)}
                       games={state.checkedIn.includes(p.id) ? state.gamesPlayed[p.id] ?? 0 : undefined}

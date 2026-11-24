@@ -18,7 +18,7 @@ const MODE_ICON: Record<MatchingMode, IconName> = {
 
 export function RosterSetup({
   players, onAddPlayer, selected, onToggle, onStart, onResume, onReopen, onView, onImport,
-  onSelectAll, onClearAll, returning, onCheckInReturning, onUpdatePlayer, narrow,
+  onSelectAll, onClearAll, returning, onCheckInReturning, onUpdatePlayer, importError, importing, narrow,
 }: {
   players: Player[];
   onAddPlayer: (name: string) => void;
@@ -29,6 +29,8 @@ export function RosterSetup({
   onReopen: (sessionId: string) => void;
   onView: (sessionId: string) => void;
   onImport: (file: File) => void;
+  importError: string | null;
+  importing: boolean;
   onSelectAll: () => void;
   onClearAll: () => void;
   returning: Player[];
@@ -51,12 +53,17 @@ export function RosterSetup({
   const fmtDate = (ts: number) => new Date(ts).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : '1fr 420px', gap: 'var(--space-4)', padding: 'var(--space-4)', alignItems: 'start' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-          <span className="display" style={{ fontSize: 'var(--text-h1)' }}>Roster</span>
-          <span className="mono" style={{ fontSize: '16px', color: 'var(--text-secondary)' }}>{selected.length} checked in</span>
-          <span style={{ flex: 1 }} />
+    <main id="app-main" tabIndex={-1} className={narrow ? 'setup-layout setup-layout--narrow' : 'setup-layout'}>
+      <header className="setup-intro">
+        <h1 className="display">Open play setup</h1>
+        <p>Check players in, choose your courts, and start the session.</p>
+      </header>
+      <section className="setup-panel setup-roster" aria-labelledby="roster-title">
+        <div className="panel-heading">
+          <h2 id="roster-title" className="display">Roster</h2>
+          <span className="count-label mono">{selected.length} checked in</span>
+        </div>
+        <div className="setup-roster-actions">
           <Button variant="ghost" onClick={onSelectAll} disabled={players.length > 0 && selected.length === players.length}>Check in all</Button>
           {selected.length > 0 ? <Button variant="ghost" onClick={onClearAll}>Clear</Button> : null}
           <Button variant="ghost" onClick={() => { setEditing(!editing); setEditingId(null); }}>
@@ -67,9 +74,9 @@ export function RosterSetup({
           style={{ display: 'flex', gap: 'var(--space-2)' }}
           onSubmit={(e) => { e.preventDefault(); if (name.trim()) { onAddPlayer(name.trim()); setName(''); } }}>
           <input
-            value={name} onChange={(e) => setName(e.target.value)} placeholder="Add player" aria-label="Player name"
+            name="player-name" autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} placeholder="Add player" aria-label="Player name"
             style={{
-              flex: 1, height: 'var(--tap-min)', padding: '0 var(--space-3)', font: '400 16px var(--font-sans)',
+              flex: 1, minWidth: 0, height: 'var(--tap-min)', padding: '0 var(--space-3)', font: '400 16px var(--font-sans)',
               border: '1px solid var(--border)', borderRadius: 'var(--radius-control)', background: 'var(--bg)', color: 'var(--text)',
             }} />
           <Button variant="secondary" icon="user-plus" onClick={() => { if (name.trim()) { onAddPlayer(name.trim()); setName(''); } }}>Add</Button>
@@ -115,9 +122,9 @@ export function RosterSetup({
             </div>
           );
         })() : null}
-        <span style={{ font: '400 14px var(--font-sans)', color: 'var(--text-secondary)' }}>
-          {editing ? 'Tap a name to edit.' : 'Tap a name to check in.'}
-        </span>
+        <p className="setup-hint">
+          {players.length === 0 ? 'Add the first player to build your roster.' : editing ? 'Tap a name to edit.' : 'Tap a name to check in.'}
+        </p>
         {returning.length > 0 ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
             <span className="micro-label">Returning players ({returning.length})</span>
@@ -127,36 +134,9 @@ export function RosterSetup({
             <Button variant="secondary" onClick={onCheckInReturning}>Check in returning</Button>
           </div>
         ) : null}
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span className="micro-label" style={{ flex: 1 }}>Session history</span>
-            <label style={{ font: '500 14px var(--font-sans)', color: 'var(--blue)', cursor: 'pointer' }}>
-              Import session
-              <input
-                type="file" accept="application/json"
-                style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, overflow: 'hidden', clipPath: 'inset(50%)' }}
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = ''; }} />
-            </label>
-          </div>
-          {history.map((h, i) => (
-            <div key={h.sessionId} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minHeight: 'var(--tap-min)', padding: '0 var(--space-3)', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-control)' }}>
-              <span style={{ font: '600 16px var(--font-sans)', flex: 1 }}>{fmtDate(h.startedAt)}</span>
-              {h.endedAt === null ? (
-                <Button variant="ghost" onClick={() => onResume(h.sessionId)}>Resume</Button>
-              ) : (
-                <>
-                  {/* only the newest session can reopen: reviving an older one would race the night's real log */}
-                  {i === 0 ? <Button variant="ghost" onClick={() => onReopen(h.sessionId)}>Reopen</Button> : null}
-                  <Button variant="ghost" onClick={() => onView(h.sessionId)}>View</Button>
-                </>
-              )}
-            </div>
-          ))}
-          {history.length === 0 ? <span style={{ font: '400 14px var(--font-sans)', color: 'var(--text-tertiary)' }}>No sessions yet.</span> : null}
-        </div>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-card)', padding: 'var(--space-4)' }}>
-        <span className="display" style={{ fontSize: 'var(--text-h2)' }}>Tonight</span>
+      </section>
+      <section className="setup-panel setup-settings" aria-labelledby="setup-title">
+        <h2 id="setup-title" className="display">Session settings</h2>
         <Stepper label="Courts" value={courts} min={1} max={8} onChange={setCourts} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           <span className="micro-label">Matching mode</span>
@@ -189,7 +169,36 @@ export function RosterSetup({
           Start session
         </Button>
         {selected.length < 4 ? <span style={{ font: '400 14px var(--font-sans)', color: 'var(--text-secondary)', textAlign: 'center' }}>Check in at least 4 players</span> : null}
-      </div>
-    </div>
+      </section>
+      <section className="setup-panel setup-history" aria-labelledby="history-title">
+        <div className="panel-heading">
+          <h2 id="history-title" className="display">Session history</h2>
+          <label className="import-control">
+            Import session
+            <input
+              type="file" accept=".json,application/json" disabled={importing}
+              style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, overflow: 'hidden', clipPath: 'inset(50%)' }}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = ''; }} />
+          </label>
+        </div>
+        {importing ? <p role="status" className="app-notice">Importing session…</p> : null}
+        {importError ? <p role="alert" className="app-notice" data-kind="error">{importError}</p> : null}
+        {history.map((h, i) => (
+          <div key={h.sessionId} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minHeight: 'var(--tap-min)', padding: '0 var(--space-3)', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-control)' }}>
+            <span style={{ fontWeight: 600, flex: 1 }}>{fmtDate(h.startedAt)}</span>
+            {h.endedAt === null ? (
+              <Button variant="ghost" onClick={() => onResume(h.sessionId)}>Resume</Button>
+            ) : (
+              <>
+                {/* only the newest session can reopen: reviving an older one would race the night's real log */}
+                {i === 0 ? <Button variant="ghost" onClick={() => onReopen(h.sessionId)}>Reopen</Button> : null}
+                <Button variant="ghost" onClick={() => onView(h.sessionId)}>View</Button>
+              </>
+            )}
+          </div>
+        ))}
+        {history.length === 0 ? <span style={{ font: '400 14px var(--font-sans)', color: 'var(--text-tertiary)' }}>No sessions yet.</span> : null}
+      </section>
+    </main>
   );
 }

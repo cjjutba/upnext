@@ -16,8 +16,8 @@ Written against the shipped code and kept current. Start here.
 
 ## Visual contract
 
-Still authoritative for anything the eye sees. Predates the code but has not
-drifted, because the code was built to it.
+See [DESIGN.md](../DESIGN.md) for the current courtside design. The original
+monochrome design material below is historical.
 
 | File | Covers |
 |---|---|

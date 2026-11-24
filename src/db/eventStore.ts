@@ -1,8 +1,7 @@
-import Dexie from 'dexie';
-import { db as defaultDb, UpnextDB } from './db';
+import { db as defaultDb, type UpnextDB } from './db';
 import { newId, getDeviceId } from '../lib/ids';
 import type { Player, SessionEvent } from '../domain/types';
-import { replay } from '../domain/reducer';
+import { computeSkipped, replay } from '../domain/reducer';
 
 /** Omit that distributes over a union, so each SessionEvent variant keeps its own payload fields. */
 type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never;
@@ -28,10 +27,12 @@ export async function append(input: EventInput, db: UpnextDB = defaultDb, ts?: n
   });
 }
 
+const byEventId = (a: SessionEvent, b: SessionEvent) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
 /** Canonical replay order: ULID id ascending. */
 export async function loadSession(sessionId: string, db: UpnextDB = defaultDb): Promise<SessionEvent[]> {
   const events = await db.sessionEvents.where('sessionId').equals(sessionId).toArray();
-  return events.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return events.sort(byEventId);
 }
 
 export interface SessionListing {
@@ -40,20 +41,46 @@ export interface SessionListing {
   endedAt: number | null;
 }
 
-/** Uses the [type+sessionId] index; there is no sessions table by design. */
+function sessionLifecycle(events: SessionEvent[]) {
+  const skipped = computeSkipped(events);
+  const start = events.find((e) => e.type === 'session-started' && !skipped.has(e.id));
+  const ends = start
+    ? events.filter((e) => e.type === 'session-ended' && e.id > start.id && !skipped.has(e.id))
+    : [];
+  return { start, ends };
+}
+
+/** Read lifecycle events and their undo chains without loading historic gameplay. */
 export async function listSessions(db: UpnextDB = defaultDb): Promise<SessionListing[]> {
-  const starts = await db.sessionEvents
-    .where('[type+sessionId]')
-    .between(['session-started', Dexie.minKey], ['session-started', Dexie.maxKey])
+  const events = await db.sessionEvents
+    .where('type')
+    .anyOf('session-started', 'session-ended', 'event-undone')
     .toArray();
-  const ends = await db.sessionEvents
-    .where('[type+sessionId]')
-    .between(['session-ended', Dexie.minKey], ['session-ended', Dexie.maxKey])
-    .toArray();
-  const endBy = new Map(ends.map((e) => [e.sessionId, e.ts]));
-  return starts
-    .sort((a, b) => b.ts - a.ts)
-    .map((s) => ({ sessionId: s.sessionId, startedAt: s.ts, endedAt: endBy.get(s.sessionId) ?? null }));
+  const logs = new Map<string, SessionEvent[]>();
+  for (const event of events) {
+    const log = logs.get(event.sessionId);
+    if (log) log.push(event);
+    else logs.set(event.sessionId, [event]);
+  }
+  const sessions: SessionListing[] = [];
+  for (const log of logs.values()) {
+    const { start, ends } = sessionLifecycle(log.sort(byEventId));
+    if (start) sessions.push({ sessionId: start.sessionId, startedAt: start.ts, endedAt: ends[0]?.ts ?? null });
+  }
+  return sessions.sort((a, b) => b.startedAt - a.startedAt);
+}
+
+/** Recheck the saved log inside the write transaction so a stale Reopen is harmless. */
+export async function reopenSession(sessionId: string, db: UpnextDB = defaultDb): Promise<SessionEvent[]> {
+  return db.transaction('rw', db.sessionEvents, db.meta, async () => {
+    const events = await loadSession(sessionId, db);
+    const { ends } = sessionLifecycle(events);
+    // Undo repeated ends too, so a duplicate end cannot take effect as soon as the first is undone.
+    for (const end of ends) {
+      events.push(await append({ type: 'event-undone', targetEventId: end.id, sessionId }, db));
+    }
+    return events.sort(byEventId);
+  });
 }
 
 /** Player ids who checked in to the most recent ended session. Powers the returning players shortcut. */

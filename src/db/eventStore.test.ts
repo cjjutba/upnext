@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { replay } from '../domain/reducer';
 import { UpnextDB } from './db';
 import {
   append,
   loadSession,
   listSessions,
+  reopenSession,
   exportSession,
   importSession,
   lastSessionAttendees,
@@ -54,6 +56,62 @@ describe('listSessions', () => {
     expect(list[0].endedAt).toBeNull();
     expect(list[1].endedAt).toBe(2000);
   });
+
+  it('tracks end, reopen, redo and end again after a v1 export is imported', async () => {
+    await append({ type: 'session-started', sessionId: SID, courts: 1, template: 'all-off', config: { winCap: 3 } }, db, 1000);
+    const end = await append({ type: 'session-ended', sessionId: SID }, db, 2000);
+    const reopen = await append({ type: 'event-undone', targetEventId: end.id, sessionId: SID }, db, 3000);
+    expect((await listSessions(db))[0].endedAt).toBeNull();
+    const restored = new UpnextDB(`upnext-test-import-${n}`);
+    await importSession(await exportSession(SID, db), restored);
+    expect(await listSessions(restored)).toEqual([{ sessionId: SID, startedAt: 1000, endedAt: null }]);
+
+    const redo = await append({ type: 'event-undone', targetEventId: reopen.id, sessionId: SID }, db, 4000);
+    expect((await listSessions(db))[0].endedAt).toBe(2000);
+
+    await append({ type: 'event-undone', targetEventId: redo.id, sessionId: SID }, db, 5000);
+    await append({ type: 'session-ended', sessionId: SID }, db, 6000);
+    await importSession(await exportSession(SID, db), restored);
+    expect(await listSessions(restored)).toEqual([{ sessionId: SID, startedAt: 1000, endedAt: 6000 }]);
+  });
+});
+
+describe('reopenSession', () => {
+  it('only undoes the saved end, even with simultaneous taps or a retry after play resumes', async () => {
+    await append({ type: 'session-started', sessionId: SID, courts: 1, template: 'all-off', config: { winCap: 3 } }, db);
+    for (const playerId of ['p1', 'p2', 'p3', 'p4']) {
+      await append({ type: 'player-checked-in', sessionId: SID, playerId }, db);
+    }
+    const end = await append({ type: 'session-ended', sessionId: SID }, db);
+    const otherTab = new UpnextDB(db.name);
+    const [first, second] = await Promise.all([reopenSession(SID, db), reopenSession(SID, otherTab)]);
+    expect(second).toEqual(first);
+    expect(first.slice(-1)).toEqual([expect.objectContaining({ type: 'event-undone', targetEventId: end.id })]);
+    expect(first).toHaveLength(7);
+    expect(replay(first).ended).toBe(false);
+    otherTab.close();
+
+    const match = await append({
+      type: 'game-started', sessionId: SID, court: 1, pairs: [['p1', 'p2'], ['p3', 'p4']],
+    }, db);
+    const afterRetry = await reopenSession(SID, db);
+    expect(afterRetry).toEqual([...first, match]);
+    expect(replay(afterRetry).games[1]?.pairs).toEqual([['p1', 'p2'], ['p3', 'p4']]);
+    expect(await loadSession(SID, db)).toEqual(afterRetry);
+  });
+
+  it('reopens a log with repeated ends in one transaction', async () => {
+    await append({ type: 'session-started', sessionId: SID, courts: 1, template: 'all-off', config: { winCap: 3 } }, db);
+    const end = await append({ type: 'session-ended', sessionId: SID }, db, 1000);
+    const duplicate = await append({ type: 'session-ended', sessionId: SID }, db, 2000);
+    expect((await listSessions(db))[0].endedAt).toBe(1000);
+    const reopened = await reopenSession(SID, db);
+    expect(reopened.slice(-2)).toEqual([
+      expect.objectContaining({ type: 'event-undone', targetEventId: end.id }),
+      expect.objectContaining({ type: 'event-undone', targetEventId: duplicate.id }),
+    ]);
+    expect(replay(reopened).ended).toBe(false);
+  });
 });
 
 describe('export and import', () => {
@@ -95,8 +153,13 @@ describe('lastSessionAttendees', () => {
     await append({ type: 'session-started', sessionId: 'new', courts: 1, template: 'all-off', config: { winCap: 3 } }, db, 2000);
     await append({ type: 'player-checked-in', sessionId: 'new', playerId: 'p2' }, db, 2001);
     await append({ type: 'player-checked-in', sessionId: 'new', playerId: 'p3' }, db, 2002);
-    await append({ type: 'session-ended', sessionId: 'new' }, db, 2003);
+    const end = await append({ type: 'session-ended', sessionId: 'new' }, db, 2003);
     await append({ type: 'session-started', sessionId: 'live', courts: 1, template: 'all-off', config: { winCap: 3 } }, db, 3000);
+    expect(await lastSessionAttendees(db)).toEqual(['p2', 'p3']);
+    await append({ type: 'event-undone', targetEventId: end.id, sessionId: 'new' }, db);
+    expect(await lastSessionAttendees(db)).toEqual(['p1']);
+    expect(await attendanceRecency(db)).toEqual({ p1: 1000 });
+    await append({ type: 'session-ended', sessionId: 'new' }, db);
     expect(await lastSessionAttendees(db)).toEqual(['p2', 'p3']);
   });
 

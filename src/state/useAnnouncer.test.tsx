@@ -33,7 +33,7 @@ describe('useAnnouncer', () => {
   it('reads a batch this device just appended, keyed to the court it is about', () => {
     const { speak } = setup({ lastBatch: START });
     expect(speak).toHaveBeenCalledTimes(1);
-    expect(speak.mock.calls[0][0]).toBe('Court 1. A, C, B, D.');
+    expect(speak.mock.calls[0][0]).toBe('Court 1, A and C versus B and D.');
     expect(speak.mock.calls[0][1]).toEqual({ key: 'court-1' });
   });
 

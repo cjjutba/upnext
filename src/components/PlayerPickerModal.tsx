@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Button } from './Button';
+import { AppDialog } from './AppDialog';
 import { IconButton } from './IconButton';
 import { CheckinTile, type TileState } from './CheckinTile';
 
@@ -30,14 +31,6 @@ export function PlayerPickerModal({
 }) {
   const [newName, setNewName] = useState('');
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
   const sections: Section[] = ([
     { label: 'Waiting', hint: 'Front of the queue first.', ids: waiting, tile: 'in' },
     { label: 'Sitting out', hint: 'Picking one brings them back in.', ids: sittingOut, tile: 'sitting' },
@@ -52,21 +45,8 @@ export function PlayerPickerModal({
   };
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 40, background: 'rgba(0, 0, 0, 0.32)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-4)',
-      }}>
-      <div
-        role="dialog" aria-modal="true" aria-label={title}
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '560px', maxWidth: '100%', maxHeight: '82vh', display: 'flex', flexDirection: 'column',
-          background: 'var(--bg)', border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-modal)', boxShadow: 'var(--shadow-modal)',
-        }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '12px var(--space-4)', borderBottom: '1px solid var(--border)' }}>
+    <AppDialog label={title} onClose={onClose} width="560px">
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)', padding: '12px var(--space-4)', borderBottom: '1px solid var(--border)' }}>
           <span className="display" style={{ fontSize: 'var(--text-h2)' }}>{title}</span>
           <span style={{ flex: 1 }} />
           <IconButton icon="x" ariaLabel="Close player picker" onClick={onClose} size="sm" />
@@ -97,7 +77,7 @@ export function PlayerPickerModal({
                 <span className="micro-label">{s.label}</span>
                 <span style={{ font: '400 13px/1.4 var(--font-sans)', color: 'var(--text-tertiary)' }}>{s.hint}</span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 'var(--space-2)' }}>
                 {s.ids.map((id) => (
                   <CheckinTile key={id} name={nameOf(id)} state={s.tile} games={gamesOf(id)} onTap={() => onPick(id)} />
                 ))}
@@ -105,7 +85,6 @@ export function PlayerPickerModal({
             </section>
           ))}
         </div>
-      </div>
-    </div>
+    </AppDialog>
   );
 }

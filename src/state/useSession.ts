@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { append, loadSession } from '../db/eventStore';
+import { append, loadSession, reopenSession } from '../db/eventStore';
 import { replay } from '../domain/reducer';
 import { describeEvent, redoTarget, undoTarget, type CommandEvent } from '../domain/commands';
 import type { SessionEvent, SessionState } from '../domain/types';
@@ -19,7 +19,7 @@ export interface SessionApi {
   redo: () => Promise<void>;
   undoLabel: string | null;
   canRedo: boolean;
-  loadById: (sessionId: string) => Promise<void>;
+  loadById: (sessionId: string, options?: { reopen?: boolean }) => Promise<void>;
   reset: () => void;
 }
 
@@ -94,9 +94,9 @@ export function useSession(): SessionApi {
   const redoId = useMemo(() => redoTarget(events), [events]);
 
   const loadById = useCallback(
-    (sessionId: string) =>
+    (sessionId: string, { reopen = false } = {}) =>
       enqueue(async () => {
-        logRef.current = await loadSession(sessionId);
+        logRef.current = await (reopen ? reopenSession(sessionId) : loadSession(sessionId));
         setEvents(logRef.current);
         setLastBatch([]);
       }),

@@ -8,6 +8,7 @@ import { registerSW } from 'virtual:pwa-register';
 import App from './App';
 import './styles/tokens.css';
 import './styles/base.css';
+import './styles/app.css';
 
 if (navigator.storage?.persist) {
   void navigator.storage.persist();

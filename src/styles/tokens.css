@@ -1,71 +1,85 @@
-/* upnext tokens. Light mode only: monochrome, near-black on white. */
+@font-face {
+  font-family: Geist;
+  src: url('/fonts/Geist-Variable.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
 :root {
-  --bg: #ffffff;
-  --bg-secondary: #fafafa;
-  --gray-100: #f2f2f2;
-  --gray-200: #ebebeb;
-  --gray-300: #e6e6e6;
-  --gray-500: #c9c9c9;
-  --gray-600: #a8a8a8;
-  --gray-700: #8f8f8f;
-  --gray-900: #4d4d4d;
-  --gray-1000: #171717;
-  /* borders come from black alpha, never gray fills */
-  --border: #00000014;
-  --border-hover: #00000036;
-  --border-active: #0000003d;
-  --text: #171717;
-  --text-secondary: #4d4d4d;
-  --text-tertiary: #8f8f8f;
-  /* interactive elements are monochrome */
-  --primary: #171717;
-  --primary-press: #383838;
+  color-scheme: light;
+  --canvas: #f6f8f2;
+  --bg: #fffefb;
+  --bg-secondary: #edf1e8;
+  --gray-100: #edf1e8;
+  --gray-200: #e5ebe0;
+  --gray-300: #d9e3d9;
+  --gray-500: #c3d0c4;
+  --gray-600: #93a69a;
+  --gray-700: #63796d;
+  --gray-900: #38564a;
+  --gray-1000: #152f2a;
+  --border: #d5dfd4;
+  --border-hover: #a6b9ad;
+  --border-active: #7b9c8e;
+  --text: #152f2a;
+  --text-secondary: #38564a;
+  --text-tertiary: #506b5e;
+  --primary: #006b60;
+  --primary-press: #00564c;
   --primary-fg: #ffffff;
-  /* destructive actions are the one colored button in the system */
-  --danger: #c33236;
-  --danger-press: #a62a2e;
+  --accent: #d7f464;
+  --accent-ink: #243923;
+  --danger: #a52d35;
+  --danger-press: #84242a;
   --danger-fg: #ffffff;
-  /* blue is a state signal only: focus rings and text links */
-  --blue: #006bff;
-  --focus-ring: 0 0 0 2px #ffffff, 0 0 0 4px #006bff;
-  /* shadows exist only on menus and modals */
-  --shadow-menu: 0 4px 12px rgba(0, 0, 0, 0.1);
-  --shadow-modal: 0 16px 48px rgba(0, 0, 0, 0.16);
-  --overlay: rgba(0, 0, 0, 0.32);
-  /* status hues live only inside badges, always with the word */
-  --status-green-bg: #effbef;
-  --status-green-text: #297a3a;
-  --status-amber-bg: #fff6e5;
-  --status-amber-text: #a35200;
-  --status-red-bg: #ffeeef;
-  --status-red-text: #c33236;
-  --status-neutral-bg: #f2f2f2;
-  --status-neutral-text: #4d4d4d;
-  /* type */
-  --font-sans: 'Geist', 'Helvetica Neue', sans-serif;
-  --font-mono: 'Geist Mono', 'SFMono-Regular', monospace;
+  --link: #006257;
+  --focus-ring: 0 0 0 2px #fffefb, 0 0 0 4px #006b60;
+  --shadow-menu: 0 5px 15px #152f2a1f;
+  --shadow-modal: 0 20px 64px #152f2a33;
+  --overlay: #152f2a65;
+  --status-green-bg: #dcf2e8;
+  --status-green-text: #15564a;
+  --status-amber-bg: #fff0d6;
+  --status-amber-text: #674715;
+  --status-red-bg: #fbe9e7;
+  --status-red-text: #912831;
+  --status-neutral-bg: #eaf0e8;
+  --status-neutral-text: #465f52;
+  --court-side: #164d43;
+  --court-chip: #173e35;
+  --court-fg: #fffefb;
+  --font-sans: Geist, system-ui, sans-serif;
+  --font-mono: var(--font-sans);
   --text-timer-lg: 96px;
   --text-timer: 64px;
   --text-court-num: 36px;
-  --text-h1: 28px;
-  --text-h2: 24px;
+  --text-h1: 36px;
+  --text-h2: 25px;
   --text-h3: 20px;
   --text-queue: 18px;
   --text-body: 16px;
   --text-ui: 14px;
   --text-label: 13px;
-  --tracking-tight: -0.02em;
-  /* spacing and shape */
+  --tracking-tight: -0.035em;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 16px;
   --space-4: 24px;
   --space-5: 32px;
   --space-6: 48px;
-  --radius-control: 6px;
-  --radius-card: 8px;
-  --radius-modal: 12px;
+  --radius-control: 9px;
+  --radius-card: 15px;
+  --radius-modal: 19px;
   --radius-full: 9999px;
   --tap-min: 48px;
   --tap-primary: 56px;
+  --page-gutter: clamp(16px, 3.5vw, 44px);
+}
+
+@media (max-width: 600px) {
+  :root {
+    --text-h1: 30px;
+    --text-h2: 22px;
+  }
 }

@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
 import { Button } from './Button';
+import { AppDialog } from './AppDialog';
 
 const TITLE = 'Are you sure you want to end the session?';
 
@@ -24,14 +24,6 @@ export function EndSessionModal({ liveCourts, gamesPlayed, elapsed, onCancel, on
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onCancel]);
-
   const line = (text: string) => (
     <span key={text} style={{ font: '400 15px/1.5 var(--font-sans)', color: 'var(--text-secondary)' }}>{text}</span>
   );
@@ -41,20 +33,7 @@ export function EndSessionModal({ liveCourts, gamesPlayed, elapsed, onCancel, on
     : `${gamesPlayed} ${gamesPlayed === 1 ? 'game' : 'games'} recorded so far.`;
 
   return (
-    <div
-      onClick={onCancel}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 45, background: 'var(--overlay)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-4)',
-      }}>
-      <div
-        role="dialog" aria-modal="true" aria-label={TITLE}
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '520px', maxWidth: '100%', display: 'flex', flexDirection: 'column',
-          background: 'var(--bg)', border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-modal)', boxShadow: 'var(--shadow-modal)',
-        }}>
+    <AppDialog label={TITLE} onClose={onCancel} width="520px">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', padding: 'var(--space-4)' }}>
           <span className="display" style={{ fontSize: 'var(--text-h2)' }}>{TITLE}</span>
           {line('This closes the log and takes you to the final standings.')}
@@ -72,12 +51,11 @@ export function EndSessionModal({ liveCourts, gamesPlayed, elapsed, onCancel, on
             {line('You can reopen this session from history if you end it early.')}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 'var(--space-2)', padding: '12px var(--space-4)', borderTop: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', padding: '12px var(--space-4)', borderTop: '1px solid var(--border)' }}>
           <span style={{ flex: 1 }} />
           <Button variant="secondary" onClick={onCancel}>Keep playing</Button>
           <Button variant="danger" onClick={onConfirm}>End session</Button>
         </div>
-      </div>
-    </div>
+    </AppDialog>
   );
 }

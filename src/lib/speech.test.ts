@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { speak, cancel, isSupported, SHELF_LIFE_MS } from './speech';
+import { speak, cancel, isSupported, prime, SHELF_LIFE_MS } from './speech';
 
 /** Minimal stand-in for the Web Speech API. The test decides when a sentence ends. */
 class FakeUtterance {
@@ -13,6 +13,12 @@ class FakeUtterance {
   fire(type: string) { for (const fn of this.listeners[type] ?? []) fn(); }
 }
 
+const daniel = { voiceURI: 'Daniel', name: 'Daniel', lang: 'en-GB', localService: true };
+const compactDaniel = { ...daniel, voiceURI: 'com.apple.voice.compact.en-GB.Daniel' };
+const superCompactDaniel = { ...daniel, voiceURI: 'com.apple.voice.super-compact.en-GB.Daniel' };
+const otherVoice = { ...daniel, voiceURI: 'Oliver', name: 'Oliver' };
+const remoteDaniel = { ...daniel, localService: false };
+
 class FakeSynth {
   spoken: FakeUtterance[] = [];
   paused = false;
@@ -23,8 +29,8 @@ class FakeSynth {
   speak(u: FakeUtterance) { this.spoken.push(u); this.speaking = true; u.fire('start'); }
   resume() { this.resumes += 1; this.paused = false; }
   cancel() { this.cancels += 1; this.speaking = false; }
-  getVoices() { return []; }
-  addEventListener() { /* voiceschanged never fires here */ }
+  voices = [daniel];
+  getVoices() { return this.voices; }
 }
 
 let synth: FakeSynth;
@@ -59,6 +65,51 @@ afterEach(() => {
 describe('speech queue', () => {
   it('reports support from the browser it is given', () => {
     expect(isSupported()).toBe(true);
+  });
+
+  it('prefers compact Daniel when multiple Daniel voices are available in any order', () => {
+    synth.voices = [superCompactDaniel, compactDaniel, otherVoice];
+    speak('first');
+    expect(synth.spoken[0].voice).toBe(compactDaniel);
+    endLast();
+    synth.voices.reverse();
+    speak('second');
+    expect(synth.spoken[1].voice).toBe(compactDaniel);
+  });
+
+  it('stays silent without local UK Daniel and uses Daniel when he arrives later', () => {
+    synth.voices = [remoteDaniel, otherVoice, { ...daniel, lang: 'en-US' }];
+    speak('missing');
+    synth.voices = [];
+    speak('empty');
+    expect(said()).toEqual([]);
+    expect(phasesOf('failed')).toEqual(['missing', 'empty']);
+    const ukDaniel = { ...daniel, name: 'Daniel (English (UK))', lang: 'en_GB' };
+    synth.voices = [otherVoice, ukDaniel];
+    speak('fresh');
+    expect(said()).toEqual(['fresh']);
+    expect(synth.spoken[0].voice).toBe(ukDaniel);
+  });
+
+  it('waits to unlock speech until local Daniel is available on a gesture', () => {
+    synth.voices = [remoteDaniel, otherVoice];
+    prime();
+    expect(said()).toEqual([]);
+    synth.voices = [daniel];
+    prime();
+    prime();
+    expect(said()).toEqual([' ']);
+    expect(synth.spoken[0].voice).toBe(daniel);
+    expect(synth.spoken[0].volume).toBe(0);
+  });
+
+  it('rechecks the local flag before handing off a waiting call', () => {
+    speak('first');
+    speak('waiting');
+    synth.voices = [remoteDaniel];
+    endLast();
+    expect(said()).toEqual(['first']);
+    expect(phasesOf('failed')).toEqual(['waiting']);
   });
 
   it('hands the browser one utterance at a time, in order', () => {

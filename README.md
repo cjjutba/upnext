@@ -13,7 +13,7 @@ survives a reload. Every mode records a winner, so the trophy opens a live
 standings table with wins, losses, and win rate for everyone checked in.
 
 - Spec: docs/superpowers/specs/2026-08-26-upnext-open-play-design.md
-- Design: docs/design/claude-design-brief.md (light mode only, monochrome, zero motion)
+- Design: DESIGN.md and docs/conventions.md
 - Event sourced: all state replays from an append-only log in IndexedDB.
   Cloud sync later is an event upload; nothing here needs rework for it.
 

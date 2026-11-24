@@ -6,20 +6,24 @@ import { ModeMenu } from './components/ModeMenu';
 import { ModeChangeModal } from './components/ModeChangeModal';
 import { EndSessionModal } from './components/EndSessionModal';
 import { Button } from './components/Button';
+import { AppHeader } from './components/AppHeader';
 import { IconButton } from './components/IconButton';
+import { AnnouncementVoiceModal } from './components/AnnouncementVoiceModal';
 import { StandingsModal } from './components/StandingsModal';
 import { SetupRoute } from './routes/SetupRoute';
 import { BoardRoute } from './routes/BoardRoute';
 import { SummaryRoute } from './routes/SummaryRoute';
 import { SessionRoute } from './routes/SessionRoute';
+import { TournamentRoute } from './routes/TournamentRoute';
 import { append, listSessions } from './db/eventStore';
 import { useRoute, useMisrouteGuard } from './lib/useRoute';
+import type { Navigate, Route } from './lib/useRoute';
 import { useSpeech } from './lib/useSpeech';
 import { useNarrow, useReducedMotion } from './lib/useViewport';
 import { useRailCollapsed } from './lib/useRailCollapsed';
 import * as cmd from './domain/commands';
 import { upNextPreview } from './domain/templates';
-import { leaderPhrase } from './domain/announce';
+import { getReadyPhrase, leaderPhrase } from './domain/announce';
 import { standings } from './domain/standings';
 import type { RuleConfig, RuleTemplate, SessionState } from './domain/types';
 import type { Ratings } from './domain/templates';
@@ -34,13 +38,20 @@ function previewLine(state: SessionState, ratings: Ratings, nameOf: (id: string)
 }
 
 export default function App() {
+  const [route, navigate] = useRoute();
+  return route.name === 'tournament'
+    ? <TournamentRoute />
+    : <OpenPlay route={route} navigate={navigate} />;
+}
+
+function OpenPlay({ route, navigate }: { route: Exclude<Route, { name: 'tournament' }>; navigate: Navigate }) {
   const session = useSession();
   const roster = useRoster();
   const speech = useSpeech();
-  const [route, navigate] = useRoute();
   const [clock, setClock] = useState(() => Date.now());
   const [resuming, setResuming] = useState(true);
   const [standingsOpen, setStandingsOpen] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
   /** The rule the organizer is proposing. Nothing is appended until the modal confirms it. */
   const [pendingRule, setPendingRule] = useState<RuleConfig | null>(null);
@@ -106,8 +117,7 @@ export default function App() {
   };
 
   const reopen = async (sessionId: string) => {
-    await session.loadById(sessionId);
-    await session.undo(); // the newest effective event of an ended log is session-ended
+    await session.loadById(sessionId, { reopen: true });
     navigate({ name: 'board' }, { replace: true });
   };
 
@@ -120,60 +130,48 @@ export default function App() {
     navigate({ name: 'setup' }, { replace: true });
   };
 
-  const muteToggle = speech.supported ? (
-    <IconButton
-      icon={speech.enabled ? 'volume-2' : 'volume-x'}
-      ariaLabel={speech.enabled ? 'Mute announcements' : 'Unmute announcements'}
-      pressed={!speech.enabled}
-      onClick={speech.toggle} />
-  ) : null;
-
-  const header = (
-    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--space-3)', padding: '12px var(--space-4)', borderBottom: '1px solid var(--border)', background: 'var(--bg)', position: 'sticky', top: 0, zIndex: 10 }}>
-      <span className="display" style={{ fontSize: '22px', fontWeight: 600 }}>upnext</span>
-      {route.name === 'board' ? (
-        <>
-          <ModeMenu rule={state.rule} onRequestChange={(template, winCap) => setPendingRule({ template, winCap })} />
-          <span style={{ flex: 1 }} />
-          <span className="mono" style={{ fontSize: '20px' }}>
-            {fmt((clock - state.startedAt) / 1000)}
-          </span>
-          {/* mid session the organizer is looking at courts, so the rail is the 360px worth giving up */}
-          <IconButton
-            icon={rail.collapsed ? 'panel-right-open' : 'panel-right-close'}
-            ariaLabel={rail.collapsed ? 'Show check-in' : 'Hide check-in'}
-            pressed={rail.collapsed}
-            onClick={rail.toggle} />
-          <IconButton icon="trophy" ariaLabel="Live standings" onClick={() => setStandingsOpen(true)} />
-          {muteToggle}
-          <Button variant="danger" onClick={() => setEndOpen(true)}>End session</Button>
-        </>
-      ) : route.name === 'summary' || route.name === 'session' ? (
-        <>
-          <span className="micro-label">Session summary</span>
-          <span style={{ flex: 1 }} />
-          {muteToggle}
-        </>
-      ) : (
-        <>
-          <span className="micro-label">Open play</span>
-          <span className="mono" style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-            {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-          </span>
-          <span style={{ flex: 1 }} />
-          {muteToggle}
-        </>
-      )}
-    </div>
+  const announcementControls = (
+    <>
+      <IconButton icon="megaphone" ariaLabel="Announcement voice" onClick={() => setVoiceOpen(true)} />
+      {speech.supported ? (
+        <IconButton
+          icon={speech.enabled ? 'volume-2' : 'volume-x'}
+          ariaLabel={speech.enabled ? 'Mute announcements' : 'Unmute announcements'}
+          pressed={!speech.enabled}
+          onClick={speech.toggle} />
+      ) : null}
+    </>
   );
 
-  if (resuming || resolveTarget) return <div style={{ minHeight: '100vh', background: 'var(--bg)' }} />;
+  const header = (
+    <AppHeader mode="open-play" openPlayHref={route.name === 'board' ? '/app/board' : '/app/setup'}>
+      {route.name === 'board' ? (
+        <>
+          <div className="session-mode">
+            <ModeMenu rule={state.rule} onRequestChange={(template, winCap) => setPendingRule({ template, winCap })} />
+            <span className="mono session-elapsed" aria-label="Session elapsed time">{fmt((clock - state.startedAt) / 1000)}</span>
+          </div>
+          <div className="session-actions">
+            <IconButton
+              icon={rail.collapsed ? 'panel-right-open' : 'panel-right-close'}
+              ariaLabel={rail.collapsed ? 'Show check-in' : 'Hide check-in'}
+              pressed={rail.collapsed} onClick={rail.toggle} />
+            <IconButton icon="trophy" ariaLabel="Live standings" onClick={() => setStandingsOpen(true)} />
+            {announcementControls}
+            <Button variant="danger" onClick={() => setEndOpen(true)}>End session</Button>
+          </div>
+        </>
+      ) : announcementControls}
+    </AppHeader>
+  );
+
+  if (resuming || resolveTarget) return <div style={{ minHeight: '100vh', background: 'var(--canvas)' }} />;
 
   return (
     /* the wide board pins to the viewport so the courts area and the rail scroll independently; narrow stacks and keeps page scroll */
     <div style={route.name === 'board' && !narrow
-      ? { height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)' }
-      : { minHeight: '100vh', background: 'var(--bg)' }}>
+      ? { height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--canvas)' }
+      : { minHeight: '100vh', background: 'var(--canvas)' }}>
       {header}
       {route.name === 'setup' ? (
         <SetupRoute
@@ -203,6 +201,7 @@ export default function App() {
           navigate={navigate}
           narrow={narrow}
           railCollapsed={rail.collapsed}
+          onExpandRail={rail.expand}
           motion={motion}
         />
       ) : route.name === 'summary' ? (
@@ -215,7 +214,6 @@ export default function App() {
           canSpeak={speech.supported && speech.enabled}
           resuming={resuming}
           navigate={navigate}
-          narrow={narrow}
         />
       ) : route.name === 'session' ? (
         <SessionRoute
@@ -229,7 +227,6 @@ export default function App() {
           canSpeak={speech.supported && speech.enabled}
           resuming={resuming}
           navigate={navigate}
-          narrow={narrow}
         />
       ) : null}
       {pendingRule && !state.ended ? (
@@ -252,6 +249,17 @@ export default function App() {
           elapsed={fmt((clock - state.startedAt) / 1000)}
           onCancel={() => setEndOpen(false)}
           onConfirm={() => void end()}
+        />
+      ) : null}
+      {voiceOpen ? (
+        <AnnouncementVoiceModal
+          voiceAvailable={speech.voiceAvailable}
+          enabled={speech.enabled}
+          onPreview={() => speech.speak(
+            getReadyPhrase([['Mia', 'Carlo'], ['Bea', 'Nico']], (name) => name, 2),
+            { key: 'voice-preview' },
+          )}
+          onClose={() => setVoiceOpen(false)}
         />
       ) : null}
       {standingsOpen ? (

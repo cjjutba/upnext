@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 
-const sizes = { xl: 'var(--text-timer-lg)', lg: 'var(--text-timer)', md: '32px', sm: '16px' } as const;
+const sizes = { xl: 'var(--text-timer-lg)', lg: 'var(--text-timer)', md: 'var(--text-timer-md, 32px)', sm: '16px' } as const;
 
 export function TimerDisplay({ value, size = 'lg', label, muted, style }: {
   value: string; size?: keyof typeof sizes; label?: string; muted?: boolean; style?: CSSProperties;

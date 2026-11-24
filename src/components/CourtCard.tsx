@@ -6,7 +6,7 @@ import { fullLineup, type Lineup, type SlotIndex } from '../domain/types';
 
 export type CourtPhase = 'live' | 'staged' | 'empty';
 
-const badge: Record<CourtPhase, BadgeStatus> = { live: 'live', staged: 'neutral', empty: 'neutral' };
+const badge: Record<CourtPhase, BadgeStatus> = { live: 'live', staged: 'ready', empty: 'neutral' };
 
 export function CourtCard({
   court, phase, pairs, elapsed, nameOf,
@@ -52,23 +52,20 @@ export function CourtCard({
   );
 
   return (
-    <div data-court={court} style={{
-      display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', padding: '20px',
-      background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-card)',
-    }}>
+    <article data-court={court} data-phase={phase} className="court-card">
       {/* wraps on phone-width cards, where the timer and controls take a second row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px 14px', flexWrap: 'wrap' }}>
-        <span className="display" style={{ fontSize: 'var(--text-h2)', lineHeight: 1, whiteSpace: 'nowrap' }}>Court {court}</span>
+      <div className="court-card-heading">
+        <h2 className="display">Court {court}</h2>
         <StatusBadge
           status={badge[phase]}
-          label={phase === 'staged' ? 'Staged' : phase === 'empty' ? 'Open' : undefined} />
+          label={phase === 'staged' ? 'Ready to start' : phase === 'empty' ? 'Open' : undefined} />
         {/* one cluster so the timer and controls wrap together, right-aligned on either line */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginLeft: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'auto' }}>
           {phase === 'live' ? (
             <span className="mono" style={{ fontSize: '15px', color: 'var(--text-secondary)', lineHeight: 1 }}>{elapsed}</span>
           ) : null}
           {/* the icon row itself stays tight: these two or three are one toolbar, not separate controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
             {pairs ? <IconButton icon="megaphone" ariaLabel={'Call players to court ' + court} onClick={onCall} /> : null}
             <IconButton icon="x" ariaLabel={'Close court ' + court} onClick={onClose} />
           </div>
@@ -91,20 +88,20 @@ export function CourtCard({
           ) : full ? (
             /* Left button under team 1, right button under team 2, each the same
                width, so the row reads as the two halves of the court above it. */
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px' }}>
+            <div className="court-card-actions">
               {resultButton(0)}
               {resultButton(1)}
             </div>
           ) : (
             // Start match stays the primary action; Choose players matches its height and width for a balanced row
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="court-card-actions">
               <Button size="lg" icon="play" onClick={onStart} ariaLabel={'Start match on court ' + court}>Start match</Button>
-              <Button variant="secondary" size="lg" icon="arrow-left-right" onClick={onEdit} ariaLabel={'Choose players on court ' + court}>Choose players</Button>
+              <Button variant="secondary" size="lg" onClick={onEdit} ariaLabel={'Choose players on court ' + court}>Choose players</Button>
             </div>
           )}
         </>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-4) 0' }}>
+        <div className="court-card-empty">
           <span style={{ font: '400 16px/1.4 var(--font-sans)', color: 'var(--text-tertiary)' }}>
             Waiting for players
           </span>
@@ -113,6 +110,6 @@ export function CourtCard({
           ) : null}
         </div>
       )}
-    </div>
+    </article>
   );
 }
