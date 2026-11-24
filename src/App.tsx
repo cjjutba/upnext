@@ -7,6 +7,7 @@ import { ModeChangeModal } from './components/ModeChangeModal';
 import { EndSessionModal } from './components/EndSessionModal';
 import { Button } from './components/Button';
 import { IconButton } from './components/IconButton';
+import { AnnouncementVoiceModal } from './components/AnnouncementVoiceModal';
 import { StandingsModal } from './components/StandingsModal';
 import { SetupRoute } from './routes/SetupRoute';
 import { BoardRoute } from './routes/BoardRoute';
@@ -19,7 +20,7 @@ import { useNarrow, useReducedMotion } from './lib/useViewport';
 import { useRailCollapsed } from './lib/useRailCollapsed';
 import * as cmd from './domain/commands';
 import { upNextPreview } from './domain/templates';
-import { leaderPhrase } from './domain/announce';
+import { getReadyPhrase, leaderPhrase } from './domain/announce';
 import { standings } from './domain/standings';
 import type { RuleConfig, RuleTemplate, SessionState } from './domain/types';
 import type { Ratings } from './domain/templates';
@@ -41,6 +42,7 @@ export default function App() {
   const [clock, setClock] = useState(() => Date.now());
   const [resuming, setResuming] = useState(true);
   const [standingsOpen, setStandingsOpen] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
   /** The rule the organizer is proposing. Nothing is appended until the modal confirms it. */
   const [pendingRule, setPendingRule] = useState<RuleConfig | null>(null);
@@ -120,12 +122,15 @@ export default function App() {
     navigate({ name: 'setup' }, { replace: true });
   };
 
-  const muteToggle = speech.supported ? (
-    <IconButton
-      icon={speech.enabled ? 'volume-2' : 'volume-x'}
-      ariaLabel={speech.enabled ? 'Mute announcements' : 'Unmute announcements'}
-      pressed={!speech.enabled}
-      onClick={speech.toggle} />
+  const announcementControls = speech.supported ? (
+    <>
+      <IconButton icon="megaphone" ariaLabel="Announcement voice" onClick={() => setVoiceOpen(true)} />
+      <IconButton
+        icon={speech.enabled ? 'volume-2' : 'volume-x'}
+        ariaLabel={speech.enabled ? 'Mute announcements' : 'Unmute announcements'}
+        pressed={!speech.enabled}
+        onClick={speech.toggle} />
+    </>
   ) : null;
 
   const header = (
@@ -145,14 +150,14 @@ export default function App() {
             pressed={rail.collapsed}
             onClick={rail.toggle} />
           <IconButton icon="trophy" ariaLabel="Live standings" onClick={() => setStandingsOpen(true)} />
-          {muteToggle}
+          {announcementControls}
           <Button variant="danger" onClick={() => setEndOpen(true)}>End session</Button>
         </>
       ) : route.name === 'summary' || route.name === 'session' ? (
         <>
           <span className="micro-label">Session summary</span>
           <span style={{ flex: 1 }} />
-          {muteToggle}
+          {announcementControls}
         </>
       ) : (
         <>
@@ -161,7 +166,7 @@ export default function App() {
             {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
           </span>
           <span style={{ flex: 1 }} />
-          {muteToggle}
+          {announcementControls}
         </>
       )}
     </div>
@@ -252,6 +257,19 @@ export default function App() {
           elapsed={fmt((clock - state.startedAt) / 1000)}
           onCancel={() => setEndOpen(false)}
           onConfirm={() => void end()}
+        />
+      ) : null}
+      {voiceOpen ? (
+        <AnnouncementVoiceModal
+          voices={speech.voices}
+          voiceURI={speech.voiceURI}
+          enabled={speech.enabled}
+          onSelect={speech.setVoiceURI}
+          onPreview={() => speech.speak(
+            getReadyPhrase([['Mia', 'Carlo'], ['Bea', 'Nico']], (name) => name, 2),
+            { key: 'voice-preview' },
+          )}
+          onClose={() => setVoiceOpen(false)}
         />
       ) : null}
       {standingsOpen ? (

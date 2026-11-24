@@ -41,3 +41,7 @@ a:hover {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+
+.announcement-voice::backdrop {
+  background: var(--overlay);
+}
