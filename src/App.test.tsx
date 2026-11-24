@@ -362,6 +362,35 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await waitFor(() => expect(within(dialog).getAllByText('100%')).toHaveLength(2)); // the win survived
   });
 
+  it('keeps a match started after Reopen when returning from Tournament or reloading the board', async () => {
+    const app = render(<App />);
+    await startMatch(/^Balanced/);
+    await recordWin(1, 1);
+    await endSession();
+    await screen.findByText('Session summary');
+    await click(btn('New session'));
+
+    const reopen = await screen.findByRole('button', { name: 'Reopen' });
+    await click(reopen);
+    await screen.findByRole('button', { name: 'Start match on court 1' });
+    await click(btn('Start match on court 1'));
+    await screen.findByRole('button', { name: 'Team 1 wins on court 1' });
+    const names = chipOrder(courtCard(1));
+
+    await click(screen.getByRole('link', { name: 'Tournament' }));
+    expect(window.location.pathname).toBe('/app/tournament');
+    await click(screen.getByRole('link', { name: 'Open play' }));
+    await screen.findByRole('button', { name: 'Team 1 wins on court 1' });
+    expect(chipOrder(courtCard(1))).toEqual(names);
+    expect(window.location.pathname).toBe('/app/board');
+
+    app.unmount();
+    render(<App />);
+    await screen.findByRole('button', { name: 'Team 1 wins on court 1' });
+    expect(chipOrder(courtCard(1))).toEqual(names);
+    expect(window.location.pathname).toBe('/app/board');
+  });
+
   it('opens an old session summary from history silently, with export still offered', async () => {
     render(<App />);
     await startMatch(/^Balanced/);

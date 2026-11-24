@@ -117,8 +117,7 @@ function OpenPlay({ route, navigate }: { route: Exclude<Route, { name: 'tourname
   };
 
   const reopen = async (sessionId: string) => {
-    await session.loadById(sessionId);
-    await session.undo(); // the newest effective event of an ended log is session-ended
+    await session.loadById(sessionId, { reopen: true });
     navigate({ name: 'board' }, { replace: true });
   };
 
