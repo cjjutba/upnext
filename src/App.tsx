@@ -130,16 +130,18 @@ function OpenPlay({ route, navigate }: { route: Exclude<Route, { name: 'tourname
     navigate({ name: 'setup' }, { replace: true });
   };
 
-  const announcementControls = speech.supported ? (
+  const announcementControls = (
     <>
       <IconButton icon="megaphone" ariaLabel="Announcement voice" onClick={() => setVoiceOpen(true)} />
-      <IconButton
-        icon={speech.enabled ? 'volume-2' : 'volume-x'}
-        ariaLabel={speech.enabled ? 'Mute announcements' : 'Unmute announcements'}
-        pressed={!speech.enabled}
-        onClick={speech.toggle} />
+      {speech.supported ? (
+        <IconButton
+          icon={speech.enabled ? 'volume-2' : 'volume-x'}
+          ariaLabel={speech.enabled ? 'Mute announcements' : 'Unmute announcements'}
+          pressed={!speech.enabled}
+          onClick={speech.toggle} />
+      ) : null}
     </>
-  ) : null;
+  );
 
   const tournamentLink = (
     <a href="/app/tournament" style={{
@@ -278,10 +280,8 @@ function OpenPlay({ route, navigate }: { route: Exclude<Route, { name: 'tourname
       ) : null}
       {voiceOpen ? (
         <AnnouncementVoiceModal
-          voices={speech.voices}
-          voiceURI={speech.voiceURI}
+          voiceAvailable={speech.voiceAvailable}
           enabled={speech.enabled}
-          onSelect={speech.setVoiceURI}
           onPreview={() => speech.speak(
             getReadyPhrase([['Mia', 'Carlo'], ['Bea', 'Nico']], (name) => name, 2),
             { key: 'voice-preview' },

@@ -2,19 +2,16 @@ import { useEffect, useRef } from 'react';
 import { Button } from './Button';
 import { IconButton } from './IconButton';
 
-export function AnnouncementVoiceModal({ voices, voiceURI, enabled, onSelect, onPreview, onClose }: {
-  voices: SpeechSynthesisVoice[];
-  voiceURI: string;
+export function AnnouncementVoiceModal({ voiceAvailable, enabled, onPreview, onClose }: {
+  voiceAvailable: boolean;
   enabled: boolean;
-  onSelect: (uri: string) => void;
   onPreview: () => void;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const savedVoiceMissing = voiceURI !== '' && !voices.some((voice) => voice.voiceURI === voiceURI);
-  const status = voices.length === 0
-    ? 'No device voice is available yet.'
-    : savedVoiceMissing ? 'Using Automatic until your saved voice is available.' : null;
+  const status = !voiceAvailable
+    ? 'Daniel, English (UK), is unavailable on this device. Announcements are silent.'
+    : enabled ? 'Daniel, English (UK)' : 'Daniel, English (UK). Announcements are muted.';
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -32,6 +29,7 @@ export function AnnouncementVoiceModal({ voices, voiceURI, enabled, onSelect, on
       ref={dialogRef}
       className="announcement-voice"
       aria-labelledby="announcement-voice-title"
+      aria-describedby="announcement-voice-status"
       onCancel={(event) => { event.preventDefault(); close(); }}
       onClick={(event) => { if (event.target === event.currentTarget) close(); }}
       style={{
@@ -45,28 +43,10 @@ export function AnnouncementVoiceModal({ voices, voiceURI, enabled, onSelect, on
         <IconButton icon="x" ariaLabel="Close announcement voice" onClick={close} />
       </div>
       <div style={{ display: 'grid', gap: 'var(--space-2)', padding: 'var(--space-4)' }}>
-        <label className="micro-label" htmlFor="announcement-voice-select">Device voice</label>
-        <select
-          id="announcement-voice-select"
-          value={voiceURI}
-          onChange={(event) => onSelect(event.target.value)}
-          aria-describedby="announcement-voice-status"
-          style={{
-            width: '100%', minHeight: 'var(--tap-min)', padding: '0 var(--space-2)',
-            color: 'var(--text)', background: 'var(--bg)', border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-control)', font: '500 16px var(--font-sans)',
-          }}
-        >
-          <option value="">Automatic</option>
-          {savedVoiceMissing ? <option value={voiceURI} disabled>Saved voice unavailable</option> : null}
-          {voices.map((voice) => (
-            <option key={voice.voiceURI} value={voice.voiceURI}>{voice.name} ({voice.lang})</option>
-          ))}
-        </select>
-        <p id="announcement-voice-status" role="status" className="micro-label" style={{ margin: 0 }}>
-          {[status, !enabled ? 'Announcements are muted.' : null].filter(Boolean).join(' ')}
+        <p id="announcement-voice-status" role="status" style={{ margin: 0, color: 'var(--text-secondary)' }}>
+          {status}
         </p>
-        <Button variant="secondary" icon="volume-2" disabled={!enabled || voices.length === 0} onClick={onPreview}>
+        <Button variant="secondary" icon="volume-2" disabled={!enabled || !voiceAvailable} onClick={onPreview}>
           Preview
         </Button>
       </div>
