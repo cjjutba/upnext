@@ -63,20 +63,16 @@ that is wrong gets unstaged rather than emptied. `game-started` still carries
 four real players, and a court with an open seat cannot record a winner. See the
 open seats section of `docs/event-model.md`.
 
-### One tap ends a match
+### Open play records a final score
 
-A live court draws two buttons under the diagram, Team 1 wins on the left and
-Team 2 wins on the right, each under the half of the diagram that names those
-two players. Tapping one emits `game-finished` with that `winnerPair` and
-rotates the court. There is no
-confirmation and nothing to fill in; the undo pill is the way back, and it now
-times out after ten seconds so it stops reading as the state of the court.
+A full live court offers Record score. The dialog shows the current pairs and
+requires two different nonnegative whole numbers. `finishScoredGame()` derives
+the winner, stores the points in team order, and runs the same rotation as
+before. The undo pill can reverse the result and its automatic stage together.
 
-No screen records a score. `game-finished` still carries an optional `score` and
-`finishGame()` still accepts one, because an imported log may have it and the
-point margin tiebreak in `standings()` still reads it, but nothing in the UI
-writes one. Do not add a score field back to a court card without asking.
-Decision 17 in `docs/decisions.md` has the reasoning.
+A score stays optional in the event model so older results can still replay.
+Point margin uses recorded scores. Tied players need complete scores and the
+same number of games before point margin can break the tie.
 
 ### The queue mirrors the courts
 

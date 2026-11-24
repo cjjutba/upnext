@@ -214,6 +214,9 @@ carries the name of the tiebreak that placed it.
 
 ## 17. The winner is a tap, and no screen records a score
 
+This decision describes the original open play interface. See the event model
+for the current final score flow.
+
 Ending a match used to mean typing two numbers. The button under the court read
 "Enter the score" until both were filled, then flipped to "Team 1 wins". Two
 problems came out of that. The organizer is courtside with a paddle in one hand

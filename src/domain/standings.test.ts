@@ -67,19 +67,21 @@ describe('standings', () => {
     expect(rows[1].brokenBy).toBe('head to head');
   });
 
-  it('breaks on point margin when everyone still level recorded a score', () => {
+  it('breaks on point margin within a tied group with complete, equal game counts', () => {
     const state = build({
-      checkedIn: ['a', 'b'],
-      gamesPlayed: { a: 1, b: 1 },
+      checkedIn: ['a', 'b', 'c'],
+      gamesPlayed: { a: 1, b: 1, c: 2 },
       finishedGames: [
-        finished([['a', 'x'], ['c', 'd']], 0, '11-3'),
-        finished([['b', 'y'], ['e', 'f']], 0, '11-9'),
+        finished([['d', 'e'], ['a', 'x']], 1, '3-11'),
+        finished([['b', 'y'], ['f', 'g']], 0, '11-9'),
+        finished([['c', 'h'], ['i', 'j']], 0),
+        finished([['c', 'h'], ['i', 'j']], 0),
       ],
     });
     const rows = standings(state, nameOf);
-    expect(rows.map((r) => r.playerId)).toEqual(['a', 'b']);
-    expect(rows.map((r) => r.pointDiff)).toEqual([8, 2]);
-    expect(rows[1].brokenBy).toBe('point margin');
+    expect(rows.map((r) => r.playerId)).toEqual(['c', 'a', 'b']);
+    expect(rows.map((r) => r.pointDiff)).toEqual([null, 8, 2]);
+    expect(rows[2].brokenBy).toBe('point margin');
   });
 
   it('leaves point margin out of it when only some of the level players have a score', () => {
@@ -156,7 +158,7 @@ describe('standings', () => {
     expect(standings(state, nameOf)[0].oppRate).toBe((3 * 1 + 3 * 0.5) / 6);
   });
 
-  it('averages the point margin, so typing more scores is not itself a result', () => {
+  it('skips point margin when a tied player has a mixture of scored and scoreless games', () => {
     const state = build({
       checkedIn: ['a', 'b'],
       gamesPlayed: { a: 2, b: 2 },
@@ -169,9 +171,41 @@ describe('standings', () => {
     });
     const rows = standings(state, nameOf);
     expect(rows.map((r) => [r.pointDiff, r.scoredGames])).toEqual([[8, 1], [10, 2]]);
-    // b has the bigger total and the smaller margin per game
-    expect(rows.map((r) => r.playerId)).toEqual(['a', 'b']);
-    expect(rows[1].brokenBy).toBe('point margin');
+    expect(rows.map((r) => [r.rank, r.brokenBy])).toEqual([[1, null], [1, null]]);
+  });
+
+  it('skips point margin with unequal game counts even when every score was recorded', () => {
+    const a = [['a', 'x'], ['p', 'q']] as Pairs;
+    const b = [['b', 'y'], ['r', 's']] as Pairs;
+    const state = build({
+      checkedIn: ['a', 'b'],
+      gamesPlayed: { a: 2, b: 4 },
+      finishedGames: [
+        finished(a, 0, '11-9'), finished(a, 1, '9-11'),
+        finished(b, 0, '11-0'), finished(b, 1, '9-11'),
+        finished(b, 0, '11-0'), finished(b, 1, '9-11'),
+      ],
+    });
+    const rows = standings(state, nameOf);
+    expect(rows.map((r) => [r.pointDiff, r.scoredGames])).toEqual([[0, 2], [18, 4]]);
+    expect(rows.map((r) => [r.rank, r.brokenBy])).toEqual([[1, null], [1, null]]);
+  });
+
+  it('compares exact margins when adding safe scores exceeds the safe integer range', () => {
+    const a: Pairs = [['a', 'x'], ['p', 'q']];
+    const b: Pairs = [['b', 'y'], ['r', 's']];
+    const largeScore = `${Number.MAX_SAFE_INTEGER}-0`;
+    const rows = standings(build({
+      checkedIn: ['a', 'b'],
+      gamesPlayed: { a: 2, b: 2 },
+      finishedGames: [
+        finished(a, 0, largeScore), finished(a, 0, '11-10'),
+        finished(b, 0, largeScore), finished(b, 0, '11-9'),
+      ],
+    }), nameOf);
+    expect(rows.map((r) => [r.playerId, r.rank, r.brokenBy])).toEqual([
+      ['b', 1, null], ['a', 2, 'point margin'],
+    ]);
   });
 
   it('players the cascade cannot separate share a rank and the next rank skips', () => {
@@ -229,16 +263,27 @@ describe('standings', () => {
     expect(standings(state, nameOf).find((r) => r.playerId === 'a')!.streak).toBe(2);
   });
 
-  it('reads a score whichever way round it was typed, and ignores one it cannot parse', () => {
-    const margin = (score: string | undefined) => standings(build({
-      checkedIn: ['a'],
+  it.each(['11-7', '7-11', '11 7', ' 11 : 7 ', '11\u20137'])('reads legacy score %s using the saved winner', (score) => {
+    const rows = standings(build({
+      checkedIn: ['a', 'c'],
+      gamesPlayed: { a: 1, c: 1 },
       finishedGames: [finished([['a', 'x'], ['c', 'd']], 0, score)],
-    }), nameOf)[0].pointDiff;
-    expect(margin('11-7')).toBe(4);
-    expect(margin('7-11')).toBe(4);
-    expect(margin('11 7')).toBe(4);
-    expect(margin('close one')).toBe(null);
-    expect(margin(undefined)).toBe(null);
+    }), nameOf);
+    expect(rows.map((r) => [r.wins, r.losses, r.pointDiff, r.scoredGames])).toEqual([
+      [1, 0, 4, 1], [0, 1, -4, 1],
+    ]);
+  });
+
+  it.each([
+    undefined, 'close one', '11-11', '0-0', '-11-7', '11--7', '11 - -7',
+    '11.5-7', 'won 11-7', '11/7', '11-7-5', '11-9007199254740992',
+  ])('counts the legacy winner and ignores unreadable or tied score %s', (score) => {
+    const [row] = standings(build({
+      checkedIn: ['a'],
+      gamesPlayed: { a: 1 },
+      finishedGames: [finished([['a', 'x'], ['c', 'd']], 0, score)],
+    }), nameOf);
+    expect(row).toMatchObject({ wins: 1, decided: 1, games: 1, pointDiff: null, scoredGames: 0 });
   });
 
   it('is stable: the same log always produces the same order', () => {

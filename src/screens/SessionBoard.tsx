@@ -37,7 +37,7 @@ const fmt = (totalSeconds: number): string => {
 export { fmt };
 
 export function SessionBoard({
-  state, players, undoLabel, actionId, onUndo, canRedo, onRedo, onWin, onCloseCourt,
+  state, players, undoLabel, actionId, onUndo, canRedo, onRedo, onRecordScore, onCloseCourt,
   onToggleSit, onToggleCheck, onAddCourt, onAddPlayer, onRemovePlayer, onCourtPlayerTap, onQueuePlayerTap,
   onStart, onStage, onCallCourt, onCallPreview, onEditLineup, previews, narrow, railCollapsed, onExpandRail, motion, recency,
   onSeatPlayer, onCreateAndSeat, onFillCourt,
@@ -54,7 +54,7 @@ export function SessionBoard({
   onUndo: () => void;
   canRedo: boolean;
   onRedo: () => void;
-  onWin: (court: number, winnerPair: 0 | 1) => void;
+  onRecordScore: (court: number) => void;
   onCloseCourt: (court: number) => void;
   onToggleSit: (playerId: string) => void;
   onToggleCheck: (playerId: string) => void;
@@ -160,7 +160,7 @@ export function SessionBoard({
         <section className="board-section" aria-labelledby="courts-title">
           <div className="panel-heading">
             <div className="board-title">
-              <h1 id="courts-title" className="display">Courts</h1>
+              <h1 id="courts-title" tabIndex={-1} className="display">Courts</h1>
               <span className="count-label mono">{Object.keys(state.games).length} live</span>
             </div>
             <div className="board-title">
@@ -194,12 +194,12 @@ export function SessionBoard({
                 const elapsed = game ? (now - game.startedAt) / 1000 : 0;
                 const phase: CourtPhase = game ? 'live' : staged ? 'staged' : 'empty';
                 return (
-                  // keyed by the game so the score field starts blank on every refill
                   <CourtCard key={n + ':' + (game?.startedEventId ?? 'open')} court={n} phase={phase}
                     pairs={game?.pairs ?? staged ?? null}
                     elapsed={fmt(elapsed)} nameOf={nameOf} canStage={eligibleQueue.length >= 4}
                     canFill={eligibleQueue.length > 0}
-                    onWin={(w) => onWin(n, w)} onStart={() => onStart(n)} onCall={() => onCallCourt(n)}
+                    lastScore={state.finishedGames.findLast((finished) => finished.court === n)?.score}
+                    onRecordScore={() => onRecordScore(n)} onStart={() => onStart(n)} onCall={() => onCallCourt(n)}
                     onStage={() => onStage(n)}
                     onPlayerTap={(id) => onCourtPlayerTap(n, id)} onEdit={() => onEditLineup(n)}
                     onSeatTap={(slot) => setSeating({ court: n, slot })} onFill={() => onFillCourt(n)}

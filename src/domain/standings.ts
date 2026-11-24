@@ -26,9 +26,9 @@ export interface Standing {
   oppRate: number;
   /** Longest run of wins over decided games, in the order they finished. */
   bestRun: number;
-  /** Points won minus points lost, over games whose score was readable. Null when none was. */
+  /** Points won minus points lost for display. Null when no score was readable. */
   pointDiff: number | null;
-  /** How many of this player's games had a readable score. The margin key averages over it. */
+  /** Games with a recorded winner and readable final score. Compare with games for coverage. */
   scoredGames: number;
   /** Consecutive wins on court right now. Only the winners templates grow it. */
   streak: number;
@@ -40,9 +40,12 @@ export interface Standing {
 /** Two keys closer than this are the same number. Rates are divisions, not counts. */
 const EPSILON = 1e-9;
 
+type Grade = number | bigint;
+
 interface Key {
   /** Higher ranks higher. Reads the tied group too, which is what head to head needs. */
-  of: (row: Standing, group: readonly Standing[]) => number;
+  of: (row: Standing, group: readonly Standing[]) => Grade;
+  applies?: (group: readonly Standing[]) => boolean;
   /** Named on the row it separates. Null where the visible columns already explain the order. */
   label: string | null;
 }
@@ -62,13 +65,16 @@ function bump(table: Pairwise, a: string, b: string): void {
 }
 
 /**
- * "11-7" and "11 7" both read as a four point win. The field is free text and the
- * organizer may type the loser first, so the margin is the gap, never the order.
+ * Older score text may list the loser first. The saved winner sets the sign.
  */
 function pointMargin(score: string | undefined): number | null {
-  const parts = score?.match(/\d+/g);
-  if (!parts || parts.length !== 2) return null;
-  return Math.abs(Number(parts[0]) - Number(parts[1]));
+  if (typeof score !== 'string') return null;
+  const parts = /^(\d+)(?:[ \t]*[-:\u2013\u2014][ \t]*|[ \t]+)(\d+)$/.exec(score.trim());
+  if (!parts) return null;
+  const first = Number(parts[1]);
+  const second = Number(parts[2]);
+  if (!Number.isSafeInteger(first) || !Number.isSafeInteger(second) || first === second) return null;
+  return Math.abs(first - second);
 }
 
 /**
@@ -91,7 +97,8 @@ export function standings(state: SessionState, nameOf: (id: string) => string): 
   /** met[p][o] is games p played against o, won[p][o] is how many of them p won. */
   const met: Pairwise = {};
   const won: Pairwise = {};
-  const margin: Record<string, number> = {};
+  // A sum can exceed the safe integer range even when each score is safe.
+  const margin: Record<string, bigint> = {};
   const scoredCount: Record<string, number> = {};
   const run: Record<string, number> = {};
   const best: Record<string, number> = {};
@@ -117,14 +124,15 @@ export function standings(state: SessionState, nameOf: (id: string) => string): 
         bump(won, w, l);
       }
     }
-    const m = pointMargin(g.score);
-    if (m === null) continue;
+    const difference = pointMargin(g.score);
+    if (difference === null) continue;
+    const m = BigInt(difference);
     for (const p of winners) {
-      margin[p] = (margin[p] ?? 0) + m;
+      margin[p] = (margin[p] ?? 0n) + m;
       scoredCount[p] = (scoredCount[p] ?? 0) + 1;
     }
     for (const p of losers) {
-      margin[p] = (margin[p] ?? 0) - m;
+      margin[p] = (margin[p] ?? 0n) - m;
       scoredCount[p] = (scoredCount[p] ?? 0) + 1;
     }
   }
@@ -153,7 +161,7 @@ export function standings(state: SessionState, nameOf: (id: string) => string): 
         ? 0
         : faced.reduce((sum, [o, count]) => sum + count * rateApartFrom(o, playerId), 0) / meetings,
       bestRun: best[playerId] ?? 0,
-      pointDiff: scoredCount[playerId] ? margin[playerId] ?? 0 : null,
+      pointDiff: scoredCount[playerId] ? Number(margin[playerId]) : null,
       scoredGames: scoredCount[playerId] ?? 0,
       streak: state.consecutiveWins[playerId] ?? 0,
       brokenBy: null,
@@ -171,11 +179,11 @@ export function standings(state: SessionState, nameOf: (id: string) => string): 
         - (won[other.playerId]?.[row.playerId] ?? 0), 0),
       label: 'head to head',
     },
-    // scores are optional, so this key stays out of it unless everyone still tied
-    // has one. It averages, because who typed more scores is not a result
+    // Comparing totals is fair here because every tied player has the same number of scored games.
     {
-      of: (row, group) =>
-        group.every((r) => r.scoredGames > 0) ? (row.pointDiff ?? 0) / row.scoredGames : 0,
+      applies: (group) => group[0].games > 0
+        && group.every((row) => row.games === group[0].games && row.scoredGames === row.games),
+      of: (row) => margin[row.playerId],
       label: 'point margin',
     },
     { of: (row) => row.oppRate, label: 'opponents faced' },
@@ -185,13 +193,17 @@ export function standings(state: SessionState, nameOf: (id: string) => string): 
   const resolve = (group: Standing[], from: number, because: string | null): Bucket[] => {
     if (group.length === 1 || from === keys.length) return [{ rows: group, because }];
     const key = keys[from];
-    const graded = group.map((row) => ({ row, k: key.of(row, group) })).sort((a, b) => b.k - a.k);
-    const parts: { rows: Standing[]; k: number }[] = [];
+    if (key.applies && !key.applies(group)) return resolve(group, from + 1, because);
+    const graded = group.map((row) => ({ row, k: key.of(row, group) }))
+      .sort((a, b) => a.k > b.k ? -1 : a.k < b.k ? 1 : 0);
+    const parts: { rows: Standing[]; k: Grade }[] = [];
     for (const { row, k } of graded) {
       const open = parts[parts.length - 1];
       // compare against the part, not the last row, so epsilon cannot drift down a long run
-      if (open && Math.abs(open.k - k) < EPSILON) open.rows.push(row);
-      else parts.push({ rows: [row], k });
+      if (open && (open.k === k
+        || (typeof open.k === 'number' && typeof k === 'number' && Math.abs(open.k - k) < EPSILON))) {
+        open.rows.push(row);
+      } else parts.push({ rows: [row], k });
     }
     if (parts.length === 1) return resolve(group, from + 1, because);
     return parts.flatMap((part, i) => resolve(part.rows, 0, i === 0 ? because : key.label));

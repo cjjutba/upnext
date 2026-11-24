@@ -190,6 +190,7 @@ function OpenPlay({ route, navigate }: { route: Exclude<Route, { name: 'tourname
           players={roster.players}
           ratings={roster.ratings}
           dispatch={dispatch}
+          dispatchLatest={session.dispatchLatest}
           addPlayer={roster.addPlayer}
           undoLabel={session.undoLabel}
           onUndo={() => void session.undo()}

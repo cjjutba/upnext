@@ -44,17 +44,14 @@ another device or a newer build must never crash replay.
 | `event-undone` | `targetEventId` | none | No direct effect. `replay()` handles it through `computeSkipped()` |
 | `session-ended` | none | started, not ended | `ended = true`, `endedAt = ts` |
 
-`winnerPair` comes from a tap. A live `CourtCard` draws two buttons, Team 1 wins
-and Team 2 wins, one under each half of the diagram that names those players.
-One tap emits `game-finished` and rotates the court: no confirmation, no number,
-and the undo pill is the way back.
+For a new Open play result, `finishScoredGame()` validates both teams' final
+points, derives `winnerPair`, and writes a team-ordered score such as `"11-7"`.
+Saving the result emits `game-finished` and queues any automatic stage. Undo
+reverses both together.
 
-`score` stays on the payload and `finishGame()` still accepts it, but no screen
-writes one any more. A recorded score is a string like `"11-7"` that
-`standings()` reads two numbers out of with a regex, so an imported log keeps
-feeding the point margin tiebreak; a session played on this build simply sits
-that tiebreak out. Keep the field: removing it would change the meaning of an
-event type, and old logs have to replay identically.
+Older events and imports can omit `score`. They still count toward standings
+for games and wins. For a point margin tiebreak, all players still tied need
+readable scores for every game and the same number of games.
 
 `winnerPair` and `score` are independent, so a log where the numbers disagree
 with the winner replays exactly as written. The reducer reads `winnerPair` and
@@ -70,8 +67,8 @@ organizer's own edits produce one. `game-started` still carries four real
 players, because a matching mode never picks fewer.
 
 A court with an open seat is live but unfinishable. `game-finished` no-ops on
-it and `finishGame()` refuses, which is why the board swaps the two result
-buttons for a single Fill court button. Everything else works normally: the timer keeps
+it and `finishScoredGame()` refuses. The board offers Fill court until all
+four seats are filled. Everything else works normally: the timer keeps
 running from the original `game-started`, closing the court sends whoever is
 seated to the queue front, and `isPlaying()` reads only real players.
 

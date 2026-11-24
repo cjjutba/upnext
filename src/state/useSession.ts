@@ -15,6 +15,8 @@ export interface SessionApi {
   lastBatch: SessionEvent[];
   /** Append command events. Accepts null so callers can pass a command result directly. */
   dispatch: (commands: CommandEvent[] | null) => Promise<void>;
+  /** Decide against the latest replayed log inside the action queue. */
+  dispatchLatest: (command: (state: SessionState) => CommandEvent[] | null) => Promise<boolean>;
   undo: () => Promise<void>;
   redo: () => Promise<void>;
   undoLabel: string | null;
@@ -35,8 +37,8 @@ export function useSession(): SessionApi {
    * target the same event twice, which breaks the redo chain.
    */
   const logRef = useRef<SessionEvent[]>([]);
-  const queueRef = useRef<Promise<void>>(Promise.resolve());
-  const enqueue = useCallback((job: () => Promise<void>): Promise<void> => {
+  const queueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const enqueue = useCallback(<T,>(job: () => Promise<T>): Promise<T> => {
     const run = queueRef.current.then(job, job);
     queueRef.current = run;
     return run;
@@ -57,6 +59,17 @@ export function useSession(): SessionApi {
 
   const dispatch = useCallback(
     (commands: CommandEvent[] | null) => enqueue(() => appendCommands(commands)),
+    [enqueue, appendCommands],
+  );
+
+  const dispatchLatest = useCallback(
+    (command: Parameters<SessionApi['dispatchLatest']>[0]) =>
+      enqueue(async () => {
+        const commands = command(replay(logRef.current));
+        if (!commands?.length) return false;
+        await appendCommands(commands);
+        return true;
+      }),
     [enqueue, appendCommands],
   );
 
@@ -116,6 +129,7 @@ export function useSession(): SessionApi {
     state,
     lastBatch,
     dispatch,
+    dispatchLatest,
     undo,
     redo,
     undoLabel: undoInfo?.label ?? null,

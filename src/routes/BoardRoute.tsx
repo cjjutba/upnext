@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { SessionBoard } from '../screens/SessionBoard';
 import { PlayerPicker } from '../components/PlayerPicker';
 import { LineupEditor } from '../components/LineupEditor';
+import { OpenPlayScoreDialog } from '../components/OpenPlayScoreDialog';
 import { attendanceRecency } from '../db/eventStore';
 import { useAnnouncer } from '../state/useAnnouncer';
+import type { SessionApi } from '../state/useSession';
 import { useWakeLock } from '../lib/useWakeLock';
 import { useMisrouteGuard, type Navigate } from '../lib/useRoute';
 import * as cmd from '../domain/commands';
@@ -13,13 +15,21 @@ import { challengersPhrase, courtKey, getReadyPhrase, matchReadyPhrase } from '.
 import type { SpeakOptions } from '../lib/speech';
 import { isStaged, stagedCourtOf } from '../domain/reducer';
 import { fullLineup, slotAt } from '../domain/types';
-import type { Player, SessionEvent, SessionState, SlotIndex } from '../domain/types';
+import type { Pairs, Player, SessionEvent, SessionState, SlotIndex } from '../domain/types';
+
+interface ScoreMatch {
+  court: number;
+  sessionId: string;
+  startedEventId: string;
+  pairs: Pairs;
+}
 
 interface BoardRouteProps {
   state: SessionState;
   players: Player[];
   ratings: Ratings;
   dispatch: (commands: CommandEvent[] | null) => Promise<void>;
+  dispatchLatest: SessionApi['dispatchLatest'];
   addPlayer: (name: string) => Promise<Player | null>;
   undoLabel: string | null;
   onUndo: () => void;
@@ -36,12 +46,27 @@ interface BoardRouteProps {
 }
 
 export function BoardRoute({
-  state, players, ratings, dispatch, addPlayer, undoLabel, onUndo, canRedo, onRedo, lastBatch, speak,
+  state, players, ratings, dispatch, dispatchLatest, addPlayer, undoLabel, onUndo, canRedo, onRedo, lastBatch, speak,
   resuming, navigate, narrow, railCollapsed, onExpandRail, motion,
 }: BoardRouteProps) {
   const [picking, setPicking] = useState<{ playerId: string; court: number | null } | null>(null);
   const [editingCourt, setEditingCourt] = useState<number | null>(null);
   const [recency, setRecency] = useState<Record<string, number>>({});
+  const [scoring, setScoring] = useState<ScoreMatch | null>(null);
+  const restoreScoreFocus = useRef<{ match: ScoreMatch; saved: boolean } | null>(null);
+
+  useLayoutEffect(() => {
+    const pending = restoreScoreFocus.current;
+    if (scoring || !pending) return;
+    const { match, saved } = pending;
+    const sameGame = state.games[match.court]?.startedEventId === match.startedEventId;
+    if (saved && sameGame) return;
+    restoreScoreFocus.current = null;
+    const card = document.querySelector(`#app-main [data-court="${match.court}"]`);
+    const trigger = sameGame ? card?.querySelector<HTMLButtonElement>(`button[aria-label="Record score for Court ${match.court}"]`) : null;
+    const destination = trigger ?? card?.querySelector('h2') ?? document.getElementById('courts-title');
+    destination?.focus();
+  }, [scoring, state.games]);
 
   useEffect(() => {
     void attendanceRecency().then(setRecency);
@@ -111,6 +136,20 @@ export function BoardRoute({
     if (player) await dispatch(cmd.seatPlayer(state, court, slot, player.id, ratings));
   };
 
+  const openScore = (court: number) => {
+    const game = state.games[court];
+    const pairs = game && fullLineup(game.pairs);
+    if (state.sessionId && pairs) setScoring({ court, sessionId: state.sessionId, startedEventId: game.startedEventId, pairs });
+  };
+
+  const saveScore = (match: ScoreMatch, team1: number, team2: number) =>
+    dispatchLatest((current) => {
+      const live = current.games[match.court];
+      if (current.sessionId !== match.sessionId || live?.startedEventId !== match.startedEventId) return null;
+      if (match.pairs.some((side, i) => side.some((id, j) => id !== live.pairs[i][j]))) return null;
+      return cmd.finishScoredGame(current, match.court, team1, team2, ratings);
+    });
+
   return (
     <>
       <SessionBoard
@@ -121,7 +160,7 @@ export function BoardRoute({
         onUndo={onUndo}
         canRedo={canRedo}
         onRedo={onRedo}
-        onWin={(court, w) => void dispatch(cmd.finishGame(state, court, w, ratings))}
+        onRecordScore={openScore}
         onCloseCourt={(court) => void dispatch(cmd.closeCourt(state, court, ratings))}
         onToggleSit={(id) => void dispatch(state.sittingOut.includes(id) ? cmd.returnPlayer(state, id, ratings) : cmd.sitOutPlayer(state, id))}
         onToggleCheck={toggleBoardCheck}
@@ -152,6 +191,14 @@ export function BoardRoute({
         onCreateAndSeat={(court, slot, name) => void createAndSeat(court, slot, name)}
         onFillCourt={(court) => void dispatch(cmd.fillCourt(state, court, ratings))}
       />
+      {scoring ? (
+        <OpenPlayScoreDialog court={scoring.court} pairs={scoring.pairs} nameOf={nameOf}
+          onSave={(team1, team2) => saveScore(scoring, team1, team2)}
+          onClose={(saved) => {
+            restoreScoreFocus.current = { match: scoring, saved };
+            setScoring(null);
+          }} />
+      ) : null}
       {picking ? (
         <PlayerPicker
           name={nameOf(picking.playerId)}

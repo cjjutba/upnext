@@ -104,6 +104,16 @@ export function finishGame(state: SessionState, court: number, winnerPair?: 0 | 
   return [e, ...stageEvents(after, { pairs: lineup, winnerPair: e.winnerPair }, court, ratings)];
 }
 
+export function finishScoredGame(
+  state: SessionState, court: number, team1Points: number, team2Points: number, ratings?: Ratings,
+): CommandEvent[] | null {
+  if (!Number.isSafeInteger(team1Points) || team1Points < 0) return null;
+  if (!Number.isSafeInteger(team2Points) || team2Points < 0) return null;
+  if (team1Points === team2Points) return null;
+  const winnerPair = team1Points > team2Points ? 0 : 1;
+  return finishGame(state, court, winnerPair, ratings, `${team1Points}-${team2Points}`);
+}
+
 export function checkInPlayer(state: SessionState, playerId: string, ratings: Ratings = {}): CommandEvent[] | null {
   if (!state.sessionId || state.ended) return null;
   if (state.queue.includes(playerId) || isPlaying(state, playerId)) return null;

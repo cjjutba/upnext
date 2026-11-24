@@ -445,11 +445,84 @@
 .session-standings th:first-child, .session-standings td:first-child { padding-left: clamp(7px, 1.6vw, 20px); }
 .session-standings th:last-child, .session-standings td:last-child { padding-right: clamp(7px, 1.6vw, 20px); }
 .session-standings thead { background: var(--bg-secondary); color: var(--text-secondary); font-size: var(--text-label); }
-.session-standings thead th:nth-child(odd) { width: clamp(27px, 5.5vw, 54px); }
-.session-standings thead th:nth-child(4) { width: clamp(27px, 5.5vw, 54px); }
-.session-standings thead th:nth-child(3) { width: clamp(40px, 7vw, 76px); }
-.session-standings thead th:last-child { width: clamp(52px, 10vw, 92px); }
+.session-standings thead th { overflow-wrap: normal; }
+.session-standings thead th:first-child { width: clamp(24px, 5.5vw, 54px); }
+.session-standings thead th:nth-child(3) { width: clamp(50px, 7vw, 76px); }
+.session-standings thead th:is(:nth-child(4), :nth-child(5)) { width: clamp(21px, 5.5vw, 54px); }
+.session-standings thead th:nth-last-child(2) { width: clamp(54px, 9vw, 76px); }
+.session-standings thead th:last-child { width: clamp(65px, 13vw, 91px); }
 .session-standings :is(th, td):nth-child(n + 3):not([colspan]) { text-align: right; }
+.session-standings td.mono { white-space: nowrap; }
 .standings-player, .standings-tiebreak { display: block; }
 .standings-player { font-weight: 650; }
 .standings-tiebreak { margin-block: 2px; }
+
+.open-play-score {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: clamp(14px, 3vw, 24px);
+}
+.open-play-score h2 { margin: 0; font-size: var(--text-h2); }
+.open-play-score-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 10px;
+}
+.open-play-score-fields label {
+  display: grid;
+  grid-row: span 3;
+  grid-template-rows: subgrid;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.open-play-score-fields input {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--tap-primary);
+  padding: 0 10px;
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius-control);
+  background: var(--canvas);
+  color: var(--text);
+  font: 650 24px var(--font-sans);
+}
+.open-play-score-fields input[aria-invalid="true"] { border-color: var(--danger); }
+.open-play-score-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.court-last-score {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: var(--text-ui);
+  overflow-wrap: anywhere;
+}
+
+.standings-score-coverage { display: block; font-size: 12px; }
+.standings-score-note {
+  margin: 0;
+  padding: 10px clamp(10px, 2.5vw, 22px);
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: var(--text-label);
+  line-height: 1.45;
+}
+.session-results { margin: 0; padding: 0; list-style: none; }
+.session-results li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(75px, auto);
+  gap: 8px 16px;
+  padding: 12px clamp(10px, 2.5vw, 22px);
+  border-top: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.session-results p, .session-result-score span {
+  margin: 3px 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-ui);
+}
+.session-result-score { display: grid; align-content: start; text-align: right; }

@@ -3,6 +3,7 @@ import { StrictMode } from 'react';
 import { render, screen, waitFor, within, cleanup, fireEvent, act } from '@testing-library/react';
 import App from './App';
 import { db } from './db/db';
+import { append } from './db/eventStore';
 
 /** Records every utterance the app hands the browser, in queue order. */
 const spoken: string[] = [];
@@ -81,22 +82,31 @@ async function openBoard(mode: RegExp) {
 async function startMatch(mode: RegExp) {
   await openBoard(mode);
   await click(btn('Start match on court 1'));
-  await waitFor(() => expect(resultButtons(1)).toHaveLength(2)); // the dispatch is async; wait for the clock
+  await waitFor(() => expect(scoreAction(1)).toBeInTheDocument()); // the dispatch is async; wait for the clock
 }
 
 /** The card div that owns a court's close button. */
 const courtCard = (n: number) => screen.getByLabelText(`Close court ${n}`).closest('[data-court]') as HTMLElement;
 
-/**
- * The two winner buttons on a live court, left then right, which is team 1 then
- * team 2. Empty on a staged court and on a live one holding an open seat.
- */
-const resultButtons = (court: number) =>
-  within(courtCard(court)).queryAllByRole('button', { name: new RegExp(`^Team [12] wins on court ${court}$`) });
+/** Available only on a full live court. */
+const scoreAction = (court: number) =>
+  within(courtCard(court)).queryByRole('button', { name: `Record score for Court ${court}` });
 
-/** Taps the team that won, which is the whole gesture: one tap ends the match. */
+const openScore = async (court: number) => {
+  await click(btn(`Record score for Court ${court}`, courtCard(court)));
+  return screen.findByRole('dialog', { name: `Record score for Court ${court}` });
+};
+
+const enterScore = (editor: HTMLElement, team1: string, team2: string) => act(() => {
+  fireEvent.change(within(editor).getByRole('textbox', { name: /^Team 1 score/ }), { target: { value: team1 } });
+  fireEvent.change(within(editor).getByRole('textbox', { name: /^Team 2 score/ }), { target: { value: team2 } });
+});
+
 async function recordWin(court: number, team: 1 | 2) {
-  await click(btn(`Team ${team} wins on court ${court}`, courtCard(court)));
+  const editor = await openScore(court);
+  await enterScore(editor, team === 1 ? '11' : '0', team === 2 ? '11' : '3');
+  await click(btn('Save score', editor));
+  await waitFor(() => expect(editor).not.toBeInTheDocument());
 }
 
 /** The queue panel under the courts: the next four, or the challengers a winners template promises. */
@@ -180,6 +190,75 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await waitFor(() => expect(said().at(-1)).toBe('Court 1. Alice and Carol win.'));
     await click(btn(/Read top 3/, dialog));
     expect(said().at(-1)).toContain('Live standings. In first place,');
+  });
+
+  it('validates both scores and saves one Team 2 result even if submitted twice', async () => {
+    render(<App />);
+    await startMatch(/^Balanced/);
+    let editor = await openScore(1);
+    expect(within(editor).getByRole('textbox', { name: 'Team 1 score Alice and Carol' })).toHaveAttribute('inputmode', 'numeric');
+    expect(within(editor).getByRole('textbox', { name: 'Team 2 score Bob and Dave' })).toHaveAttribute('inputmode', 'numeric');
+    await enterScore(editor, '1.5', '11');
+    await click(btn('Save score', editor));
+    expect(within(editor).getByRole('alert')).toHaveTextContent('Enter a whole number');
+    expect(within(editor).getByRole('textbox', { name: /^Team 1 score/ })).toHaveFocus();
+    await enterScore(editor, '11', '11');
+    await click(btn('Save score', editor));
+    expect(within(editor).getByRole('alert')).toHaveTextContent('Final scores must have a winner');
+    expect((await db.sessionEvents.toArray()).some((event) => event.type === 'game-finished')).toBe(false);
+    await click(btn('Cancel', editor));
+    expect(scoreAction(1)).toHaveFocus();
+
+    editor = await openScore(1);
+    expect(within(editor).getByRole('textbox', { name: /^Team 1 score/ })).toHaveValue('');
+    await enterScore(editor, '0', '11');
+    const form = editor.querySelector('form')!;
+    await act(() => { fireEvent.submit(form); fireEvent.submit(form); });
+    await waitFor(() => expect(within(courtCard(1)).getByText('0 to 11')).toBeInTheDocument());
+    expect(within(courtCard(1)).getByRole('heading', { name: 'Court 1' })).toHaveFocus();
+    const finished = (await db.sessionEvents.toArray()).filter((event) => event.type === 'game-finished');
+    expect(finished).toHaveLength(1);
+    expect(finished[0]).toMatchObject({ winnerPair: 1, score: '0-11' });
+    const ranks = await openStandings();
+    const bob = within(ranks).getByRole('row', { name: /Bob/ });
+    expect(within(bob).getByRole('cell', { name: '+11' })).toBeInTheDocument();
+  });
+
+  it('refuses a score queued behind undo and never applies its draft to the replacement game', async () => {
+    render(<App />);
+    await startMatch(/^Balanced/);
+    const undo = btn('Undo: court 1 started');
+    const editor = await openScore(1);
+    await enterScore(editor, '11', '3');
+
+    // Model an undo already queued when the score reaches the action queue.
+    await act(() => {
+      fireEvent.click(undo);
+      fireEvent.submit(editor.querySelector('form')!);
+    });
+    await waitFor(() => expect(within(editor).getByRole('alert')).toHaveTextContent('This match or its lineup changed'));
+    await click(btn('Start match on court 1'));
+    await waitFor(() => expect(scoreAction(1)).toBeInTheDocument());
+    await click(btn('Save score', editor));
+    expect(within(editor).getByRole('alert')).toHaveTextContent('This match or its lineup changed');
+    await click(btn('Cancel', editor));
+    expect(within(courtCard(1)).getByText('Live')).toBeInTheDocument();
+    expect((await db.sessionEvents.toArray()).some((event) => event.type === 'game-finished')).toBe(false);
+  });
+
+  it('shows scoreless legacy games without assigning them a point margin', async () => {
+    const sessionId = 'legacy-scoreless';
+    await append({ type: 'session-started', sessionId, courts: 1, template: 'all-off', config: { winCap: 3 } });
+    for (const playerId of ['p-0', 'p-1', 'p-2', 'p-3']) await append({ type: 'player-checked-in', sessionId, playerId });
+    await append({ type: 'game-started', sessionId, court: 1, pairs: [['p-0', 'p-2'], ['p-1', 'p-3']] });
+    await append({ type: 'game-finished', sessionId, court: 1, winnerPair: 0 });
+    await append({ type: 'session-ended', sessionId });
+    render(<App />);
+    await click(await screen.findByRole('button', { name: 'View' }));
+    await screen.findByText('Final standings');
+    expect(screen.getByText('No score recorded')).toBeInTheDocument();
+    expect(screen.getByRole('row', { name: /Alice/ })).toHaveTextContent('100%No score0 of 1 scored');
+    expect(screen.getByText(/every game has a score/)).toBeInTheDocument();
   });
 
   it('mutes on the speaker tap, keeps the win, and holds the preference across a remount', async () => {
@@ -276,7 +355,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
   it('lifts a player off a live court, offers the open seat, and seats whoever is picked', async () => {
     render(<App />);
     await startMatch(/^Balanced/);
-    expect(resultButtons(1)).toHaveLength(2);
+    expect(scoreAction(1)).toBeInTheDocument();
 
     await click(chip('Alice', courtCard(1)));
     await click(btn('Off the court', dialog(/Change Alice/)));
@@ -284,7 +363,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
 
     const opened = courtCard(1);
     expect(within(opened).getByText('Tap to add player')).toBeInTheDocument();
-    expect(resultButtons(1)).toHaveLength(0); // no winner to record while a seat is open
+    expect(scoreAction(1)).not.toBeInTheDocument(); // no score to record while a seat is open
     expect(btn('Fill court 1', opened)).toBeInTheDocument();
     expect(chipOrder(opened)).toEqual(['Carol', 'Bob', 'Dave']); // three left on court
 
@@ -293,7 +372,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await click(within(picker).getByText('Eve').closest('button')!);
 
     await waitFor(() => expect(chipOrder(courtCard(1))).toEqual(['Eve', 'Carol', 'Bob', 'Dave']));
-    expect(resultButtons(1)).toHaveLength(2);
+    expect(scoreAction(1)).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: /Add a player/ })).not.toBeInTheDocument();
   });
 
@@ -308,7 +387,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
 
     // Bob went to the queue front when he came off, so filling puts him straight back
     await waitFor(() => expect(chipOrder(courtCard(1))).toEqual(['Alice', 'Carol', 'Bob', 'Dave']));
-    expect(resultButtons(1)).toHaveLength(2);
+    expect(scoreAction(1)).toBeInTheDocument();
   });
 
   it('offers Off the court only on a live court, never on a staged one', async () => {
@@ -322,7 +401,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await click(btn('Close player options', staged));
 
     await click(btn('Start match on court 1'));
-    await waitFor(() => expect(resultButtons(1)).toHaveLength(2));
+    await waitFor(() => expect(scoreAction(1)).toBeInTheDocument());
     await click(chip('Alice', courtCard(1)));
     expect(btn('Off the court', dialog(/Change Alice/))).toBeInTheDocument();
   });
@@ -339,7 +418,7 @@ describe('App: courtside calls, standings, and the mute switch', () => {
 
     await click(btn('Keep playing', asking));
     expect(screen.queryByRole('dialog', { name: /end the session/ })).not.toBeInTheDocument();
-    expect(resultButtons(1)).toHaveLength(2); // still live
+    expect(scoreAction(1)).toBeInTheDocument(); // still live
 
     await endSession();
     await screen.findByText('Session summary');
@@ -374,19 +453,19 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await click(reopen);
     await screen.findByRole('button', { name: 'Start match on court 1' });
     await click(btn('Start match on court 1'));
-    await screen.findByRole('button', { name: 'Team 1 wins on court 1' });
+    await screen.findByRole('button', { name: 'Record score for Court 1' });
     const names = chipOrder(courtCard(1));
 
     await click(screen.getByRole('link', { name: 'Tournament' }));
     expect(window.location.pathname).toBe('/app/tournament');
     await click(screen.getByRole('link', { name: 'Open play' }));
-    await screen.findByRole('button', { name: 'Team 1 wins on court 1' });
+    await screen.findByRole('button', { name: 'Record score for Court 1' });
     expect(chipOrder(courtCard(1))).toEqual(names);
     expect(window.location.pathname).toBe('/app/board');
 
     app.unmount();
     render(<App />);
-    await screen.findByRole('button', { name: 'Team 1 wins on court 1' });
+    await screen.findByRole('button', { name: 'Record score for Court 1' });
     expect(chipOrder(courtCard(1))).toEqual(names);
     expect(window.location.pathname).toBe('/app/board');
   });
@@ -498,10 +577,14 @@ describe('App: courtside calls, standings, and the mute switch', () => {
     await startMatch(/^Balanced/);
     await recordWin(1, 1);
     await waitFor(() => expect(within(courtCard(1)).getByText('Ready to start')).toBeInTheDocument());
+    expect(within(courtCard(1)).getByText('11 to 3')).toBeInTheDocument();
 
     await click(btn(/Undo: court 1 result/));
     await waitFor(() => expect(within(courtCard(1)).getByText('Live')).toBeInTheDocument());
     expect(chipOrder(courtCard(1))).toContain('Alice');
+    expect(within(courtCard(1)).queryByText('11 to 3')).not.toBeInTheDocument();
+    await click(btn('Redo'));
+    await waitFor(() => expect(within(courtCard(1)).getByText('11 to 3')).toBeInTheDocument());
   });
 
   it('removes a closed court card and leaves no chip to reopen it', async () => {
@@ -584,7 +667,7 @@ describe('App: switching matching mode mid-session', () => {
   });
   afterEach(cleanup);
 
-  /** The four names showing on a court right now. A live card prints each of them twice: on the diagram and on that team's result button. */
+  /** The four names on the court diagram. */
   const lineup = (n: number) => NAMES.filter((name) => within(courtCard(n)).queryAllByText(name).length > 0);
 
   const openMenu = async () => {
