@@ -16,33 +16,33 @@ const synth = (): SpeechSynthesis | null =>
 
 export const isSupported = (): boolean => synth() !== null;
 
-let cachedVoice: SpeechSynthesisVoice | null = null;
-let watchingVoices = false;
-
-function pickVoice(s: SpeechSynthesis): SpeechSynthesisVoice | null {
-  const voices = s.getVoices();
-  if (voices.length === 0) return null; // Chrome populates this later and fires voiceschanged
-  const lang = (navigator.language || 'en-US').toLowerCase();
-  const base = lang.split('-')[0];
-  // a local voice keeps working when the gym wifi does not
-  const local = voices.filter((v) => v.localService);
-  const pool = local.length > 0 ? local : voices;
-  return (
-    pool.find((v) => v.lang.toLowerCase().replace('_', '-') === lang) ??
-    pool.find((v) => v.lang.toLowerCase().startsWith(base)) ??
-    pool.find((v) => v.lang.toLowerCase().startsWith('en')) ??
-    pool[0] ??
-    null
-  );
+export function localVoices(s = synth()): SpeechSynthesisVoice[] {
+  return s?.getVoices().filter((voice) => voice.localService === true) ?? [];
 }
 
-function voiceFor(s: SpeechSynthesis): SpeechSynthesisVoice | null {
-  if (!watchingVoices) {
-    watchingVoices = true;
-    s.addEventListener?.('voiceschanged', () => { cachedVoice = null; });
-  }
-  if (!cachedVoice) cachedVoice = pickVoice(s);
-  return cachedVoice;
+export function watchVoices(onChange: () => void): () => void {
+  const s = synth();
+  s?.addEventListener('voiceschanged', onChange);
+  window.addEventListener('focus', onChange);
+  onChange();
+  return () => {
+    s?.removeEventListener('voiceschanged', onChange);
+    window.removeEventListener('focus', onChange);
+  };
+}
+
+function voiceFor(s: SpeechSynthesis, voiceURI: string): SpeechSynthesisVoice | undefined {
+  const voices = localVoices(s);
+  const lang = (navigator.language || 'en-US').toLowerCase();
+  const language = (voice: SpeechSynthesisVoice) => voice.lang.toLowerCase().replaceAll('_', '-');
+  const base = (tag: string) => tag.split('-')[0];
+  return (
+    voices.find((voice) => voiceURI && voice.voiceURI === voiceURI) ??
+    voices.find((voice) => language(voice) === lang) ??
+    voices.find((voice) => base(language(voice)) === base(lang)) ??
+    voices.find((voice) => base(language(voice)) === 'en') ??
+    voices[0]
+  );
 }
 
 let primed = false;
@@ -52,14 +52,18 @@ let primed = false;
  * gesture, and every announcement here reaches the queue from an effect, one
  * task after the tap. A silent utterance from the first pointerdown unlocks it.
  */
-export function prime(): void {
+export function prime(voiceURI = ''): void {
   const s = synth();
   if (!s || primed) return;
-  primed = true;
+  const voice = voiceFor(s, voiceURI);
+  if (!voice) return; // the next user gesture can retry after the browser lists its voices
   try {
     const u = new SpeechSynthesisUtterance(' ');
+    u.voice = voice;
+    u.lang = voice.lang;
     u.volume = 0;
     s.speak(u);
+    primed = true;
   } catch {
     // unsupported or blocked: the real calls will be no-ops too
   }
@@ -91,6 +95,7 @@ interface Queued {
   text: string;
   key?: string;
   queuedAt: number;
+  voiceURI: string;
 }
 
 let queue: Queued[] = [];
@@ -131,14 +136,18 @@ function pump(): void {
   while (queue.length > 0 && t - queue[0].queuedAt > SHELF_LIFE_MS) emit('dropped', queue.shift()!);
   const item = queue.shift();
   if (!item) return;
+  const voice = voiceFor(s, item.voiceURI);
+  if (!voice) {
+    // Leaving the voice unset lets the browser select a network voice.
+    emit('failed', item);
+    pump();
+    return;
+  }
   try {
     if (s.paused) s.resume(); // Chrome can strand the queue in a paused state
     const u = new SpeechSynthesisUtterance(item.text);
-    const v = voiceFor(s);
-    if (v) {
-      u.voice = v;
-      u.lang = v.lang;
-    }
+    u.voice = voice;
+    u.lang = voice.lang;
     speaking = true;
     const done = (phase: SpeechPhase) => {
       if (!speaking) return; // end after a cancel, or the watchdog racing a real end
@@ -164,7 +173,7 @@ function pump(): void {
  * Queue an announcement. Anything already mid sentence is left alone: a call cut
  * off halfway names two of four people, which is worse than the stale one.
  */
-export function speak(text: string, opts: SpeakOptions = {}): void {
+export function speak(text: string, opts: SpeakOptions = {}, voiceURI = ''): void {
   const s = synth();
   if (!s || !text) return;
   if (opts.key !== undefined) {
@@ -174,7 +183,7 @@ export function speak(text: string, opts: SpeakOptions = {}): void {
       return false;
     });
   }
-  const item: Queued = { text, key: opts.key, queuedAt: now() };
+  const item: Queued = { text, key: opts.key, queuedAt: now(), voiceURI };
   queue.push(item);
   emit('queued', item);
   pump();

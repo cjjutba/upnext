@@ -13,6 +13,10 @@ class FakeUtterance {
   fire(type: string) { for (const fn of this.listeners[type] ?? []) fn(); }
 }
 
+const localVoice = { voiceURI: 'local', name: 'Local', lang: 'en-US', localService: true };
+const otherVoice = { voiceURI: 'other', name: 'Other', lang: 'en-GB', localService: true };
+const remoteVoice = { ...localVoice, voiceURI: 'remote', name: 'Remote', localService: false };
+
 class FakeSynth {
   spoken: FakeUtterance[] = [];
   paused = false;
@@ -23,8 +27,8 @@ class FakeSynth {
   speak(u: FakeUtterance) { this.spoken.push(u); this.speaking = true; u.fire('start'); }
   resume() { this.resumes += 1; this.paused = false; }
   cancel() { this.cancels += 1; this.speaking = false; }
-  getVoices() { return []; }
-  addEventListener() { /* voiceschanged never fires here */ }
+  voices = [localVoice];
+  getVoices() { return this.voices; }
 }
 
 let synth: FakeSynth;
@@ -59,6 +63,38 @@ afterEach(() => {
 describe('speech queue', () => {
   it('reports support from the browser it is given', () => {
     expect(isSupported()).toBe(true);
+  });
+
+  it('uses the selected local voice and falls back only to another local voice', () => {
+    synth.voices = [remoteVoice, localVoice, otherVoice];
+    speak('selected', {}, 'other');
+    expect(synth.spoken[0].voice).toBe(otherVoice);
+    endLast();
+    synth.voices = [remoteVoice, localVoice];
+    speak('missing', {}, 'other');
+    expect(synth.spoken[1].voice).toBe(localVoice);
+  });
+
+  it('stays silent with no verified local voice and uses a voice that arrives later', () => {
+    synth.voices = [remoteVoice];
+    speak('remote only');
+    synth.voices = [];
+    speak('empty');
+    expect(said()).toEqual([]);
+    expect(phasesOf('failed')).toEqual(['remote only', 'empty']);
+    synth.voices = [localVoice];
+    speak('fresh');
+    expect(said()).toEqual(['fresh']);
+    expect(synth.spoken[0].voice).toBe(localVoice);
+  });
+
+  it('rechecks the local flag before handing off a waiting call', () => {
+    speak('first');
+    speak('waiting');
+    synth.voices = [remoteVoice];
+    endLast();
+    expect(said()).toEqual(['first']);
+    expect(phasesOf('failed')).toEqual(['waiting']);
   });
 
   it('hands the browser one utterance at a time, in order', () => {

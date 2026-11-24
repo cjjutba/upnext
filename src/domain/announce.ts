@@ -12,39 +12,22 @@ export function pairPhrase(pair: Pair, nameOf: NameOf): string {
 const matchup = (pairs: Pairs, nameOf: NameOf): string =>
   pairPhrase(pairs[0], nameOf) + ' versus ' + pairPhrase(pairs[1], nameOf);
 
-/**
- * "Alice, Bob, Carol, Dan", in team order. A call has one job, which is to get
- * four named people walking. Who partners whom is on the court graphic they are
- * walking towards, and spelling it out doubles the time the call occupies the
- * only speaker in the gym.
- */
-export function fourNames(pairs: Pairs, nameOf: NameOf): string {
-  return [...pairs[0], ...pairs[1]].map(nameOf).join(', ');
-}
-
-/** The call that sends four people to a court. */
+/** The call that marks a match starting on a court. */
 export function courtPhrase(court: number, pairs: Pairs, nameOf: NameOf): string {
-  return `Court ${court}. ${fourNames(pairs, nameOf)}.`;
+  return `Court ${court}, ${matchup(pairs, nameOf)}.`;
 }
 
-/**
- * The Call players button. Staging is silent, so this is the only way four
- * people hear their names before a match starts.
- */
+/** The manual call for a staged court or the first waiting match. */
 export function getReadyPhrase(pairs: Pairs, nameOf: NameOf, court?: number): string {
-  const who = fourNames(pairs, nameOf);
-  return court === undefined ? `Get ready. Up next. ${who}.` : `Get ready. Court ${court}. ${who}.`;
+  const lead = court === undefined ? 'Up next' : `Up next on court ${court}`;
+  return `${lead}, ${matchup(pairs, nameOf)}.`;
 }
 
-/**
- * Every waiting panel has its own call button, so a later one has to name
- * itself. Three calls that all opened with "Up next" would send twelve people
- * to the same court.
- */
+/** Name the later waiting match so its players know which call is theirs. */
 export function matchReadyPhrase(pairs: Pairs, nameOf: NameOf, index: number): string {
   return index === 0
     ? getReadyPhrase(pairs, nameOf)
-    : `Get ready. Match ${index + 1}. ${fourNames(pairs, nameOf)}.`;
+    : `Waiting match ${index + 1}, ${matchup(pairs, nameOf)}.`;
 }
 
 /**
