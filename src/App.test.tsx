@@ -700,6 +700,53 @@ describe('App: hiding the check-in rail', () => {
     }
   });
 
+  it.each([false, true])('opens and focuses phone check-in without navigation (reduced motion: %s)', async (reducedMotion) => {
+    const matchMedia = (query: string) => ({
+      matches: query.includes('max-width') || (reducedMotion && query.includes('reduced-motion')),
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    });
+    Object.defineProperty(window, 'matchMedia', { value: matchMedia, configurable: true });
+    try {
+      render(<App />);
+      await startMatch(/^Balanced/);
+      const shortcut = btn('Check-in');
+      const heading = screen.getByRole('heading', { name: 'Check-in' });
+      const panel = document.getElementById('check-in-panel')!;
+      const historyLength = window.history.length;
+      const url = window.location.href;
+      let scrollCount = 0;
+      Object.defineProperty(heading, 'scrollIntoView', {
+        value: () => {
+          expect(panel).not.toHaveAttribute('inert');
+          expect(panel).toHaveStyle({ gridTemplateRows: '1fr' });
+          expect(panel.style.transition).toBe('');
+          expect(heading).toHaveFocus();
+          scrollCount += 1;
+        },
+      });
+
+      await click(btn('Hide check-in'));
+      expect(panel).toHaveAttribute('inert');
+      expect(shortcut).toHaveAttribute('aria-expanded', 'false');
+      expect(panel.style.transition).toBe(reducedMotion ? '' : 'grid-template-rows 180ms ease');
+
+      await click(shortcut);
+      await click(shortcut);
+      expect(scrollCount).toBe(2);
+      expect(shortcut).toHaveAttribute('aria-expanded', 'true');
+      expect(heading).toHaveFocus();
+      expect(within(panel).getByRole('textbox', { name: 'Add player' })).toBeEnabled();
+      expect(panel.style.transition).toBe(reducedMotion ? '' : 'grid-template-rows 180ms ease');
+      expect(window.localStorage.getItem('upnext.rail.collapsed')).toBe('off');
+      expect(window.history.length).toBe(historyLength);
+      expect(window.location.href).toBe(url);
+      expect(within(courtCard(1)).getByText('Live')).toBeInTheDocument();
+    } finally {
+      Reflect.deleteProperty(window, 'matchMedia');
+    }
+  });
+
   it('offers one search field once the roster passes twelve', async () => {
     render(<App />);
     await openBoard(/^Balanced/);

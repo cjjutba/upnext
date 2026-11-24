@@ -144,14 +144,19 @@
 .board-title h1, .board-title h2, .board-checkin-title { margin: 0; }
 .board-title h1 { font-size: var(--text-h1); line-height: 1.05; }
 .board-title h2, .board-checkin-title { font-size: var(--text-h2); }
-.board-anchor {
+.board-shortcut {
   display: inline-flex;
   align-items: center;
   min-height: var(--tap-min);
   padding-inline: 5px;
+  border: 0;
+  background: transparent;
+  color: var(--link);
   font-size: var(--text-ui);
   font-weight: 620;
+  cursor: pointer;
 }
+.board-shortcut:hover { text-decoration: underline; }
 .next-match-bar {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;

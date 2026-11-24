@@ -31,12 +31,13 @@ interface BoardRouteProps {
   navigate: Navigate;
   narrow: boolean;
   railCollapsed: boolean;
+  onExpandRail: () => void;
   motion: boolean;
 }
 
 export function BoardRoute({
   state, players, ratings, dispatch, addPlayer, undoLabel, onUndo, canRedo, onRedo, lastBatch, speak,
-  resuming, navigate, narrow, railCollapsed, motion,
+  resuming, navigate, narrow, railCollapsed, onExpandRail, motion,
 }: BoardRouteProps) {
   const [picking, setPicking] = useState<{ playerId: string; court: number | null } | null>(null);
   const [editingCourt, setEditingCourt] = useState<number | null>(null);
@@ -144,6 +145,7 @@ export function BoardRoute({
         previews={previews}
         narrow={narrow}
         railCollapsed={railCollapsed}
+        onExpandRail={onExpandRail}
         motion={motion}
         recency={recency}
         onSeatPlayer={(court, slot, id) => void dispatch(cmd.seatPlayer(state, court, slot, id, ratings))}

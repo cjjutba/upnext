@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CourtCard, type CourtPhase } from '../components/CourtCard';
 import { QueuePanel } from '../components/QueuePanel';
 import { QueueRow } from '../components/QueueRow';
@@ -39,7 +39,7 @@ export { fmt };
 export function SessionBoard({
   state, players, undoLabel, actionId, onUndo, canRedo, onRedo, onWin, onCloseCourt,
   onToggleSit, onToggleCheck, onAddCourt, onAddPlayer, onRemovePlayer, onCourtPlayerTap, onQueuePlayerTap,
-  onStart, onStage, onCallCourt, onCallPreview, onEditLineup, previews, narrow, railCollapsed, motion, recency,
+  onStart, onStage, onCallCourt, onCallPreview, onEditLineup, previews, narrow, railCollapsed, onExpandRail, motion, recency,
   onSeatPlayer, onCreateAndSeat, onFillCourt,
 }: {
   state: SessionState;
@@ -77,6 +77,7 @@ export function SessionBoard({
   narrow: boolean;
   /** The organizer hid check-in to give the courts the full width. Wide slides the rail out; narrow keeps its header. */
   railCollapsed: boolean;
+  onExpandRail: () => void;
   /** False when the device asks for reduced motion, which drops the rail transition. */
   motion: boolean;
   /** startedAt of the newest ended session each player attended; regulars sort first. */
@@ -89,6 +90,14 @@ export function SessionBoard({
   const [now, setNow] = useState(() => Date.now());
   const [newName, setNewName] = useState('');
   const [query, setQuery] = useState('');
+  const checkInHeading = useRef<HTMLHeadingElement>(null);
+  const [jumpToCheckIn, setJumpToCheckIn] = useState(false);
+  useLayoutEffect(() => {
+    if (!jumpToCheckIn || railCollapsed) return;
+    checkInHeading.current?.focus({ preventScroll: true });
+    checkInHeading.current?.scrollIntoView({ block: 'start' });
+    setJumpToCheckIn(false);
+  }, [jumpToCheckIn, railCollapsed]);
   // which open seat the organizer is filling. View state, not session truth, so it never outlives a tap
   const [seating, setSeating] = useState<{ court: number; slot: SlotIndex } | null>(null);
   useEffect(() => {
@@ -155,7 +164,13 @@ export function SessionBoard({
               <span className="count-label mono">{Object.keys(state.games).length} live</span>
             </div>
             <div className="board-title">
-              {narrow ? <a className="board-anchor" href="#check-in">Check-in</a> : null}
+              {narrow ? (
+                <button type="button" className="board-shortcut" aria-controls="check-in-panel" aria-expanded={!railCollapsed}
+                  onClick={() => {
+                    setJumpToCheckIn(true);
+                    onExpandRail();
+                  }}>Check-in</button>
+              ) : null}
               {/* With no courts open, the action stays available even for a short queue. */}
               <Button variant="secondary" icon="plus" onClick={onAddCourt} disabled={courts.length > 0 && eligibleQueue.length < 4} ariaLabel="Add court">Add court</Button>
             </div>
@@ -265,7 +280,7 @@ export function SessionBoard({
           : { width: 'var(--rail-width)', height: '100%', padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '28px' }}>
           <section style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-              <h2 className="display board-checkin-title">Check-in</h2>
+              <h2 ref={checkInHeading} tabIndex={-1} className="display board-checkin-title">Check-in</h2>
               {/* on a phone the count is all that is left, so it has to say who is actually still here */}
               {narrow && railCollapsed ? (
                 <>
@@ -276,10 +291,12 @@ export function SessionBoard({
             </div>
             {/* 0fr to 1fr is the one way to animate a height the content decides */}
             <div
+              id="check-in-panel"
               inert={railCollapsed ? true : undefined}
               style={{
                 display: 'grid', gridTemplateRows: narrow && railCollapsed ? '0fr' : '1fr',
-                transition: motion && narrow ? `grid-template-rows ${RAIL_MOTION}` : undefined,
+                // The shortcut needs the panel's full height before scrolling to it.
+                transition: motion && narrow && !jumpToCheckIn ? `grid-template-rows ${RAIL_MOTION}` : undefined,
               }}>
               <div style={{ minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <form

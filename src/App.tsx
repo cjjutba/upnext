@@ -202,6 +202,7 @@ function OpenPlay({ route, navigate }: { route: Exclude<Route, { name: 'tourname
           navigate={navigate}
           narrow={narrow}
           railCollapsed={rail.collapsed}
+          onExpandRail={rail.expand}
           motion={motion}
         />
       ) : route.name === 'summary' ? (

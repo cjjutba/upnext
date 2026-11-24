@@ -16,11 +16,12 @@ const readStored = (): boolean => {
  * session truth: it never belongs in the event log, so it lives beside the
  * mute switch in localStorage.
  */
-export function useRailCollapsed(): { collapsed: boolean; toggle: () => void } {
+export function useRailCollapsed(): { collapsed: boolean; toggle: () => void; expand: () => void } {
   const [collapsed, setCollapsed] = useState(readStored);
-  const toggle = useCallback(() => {
+  const update = useCallback((next?: boolean) => {
     setCollapsed((was) => {
-      const now = !was;
+      const now = next ?? !was;
+      if (now === was) return was;
       try {
         window.localStorage.setItem(KEY, now ? 'on' : 'off');
       } catch {
@@ -29,5 +30,7 @@ export function useRailCollapsed(): { collapsed: boolean; toggle: () => void } {
       return now;
     });
   }, []);
-  return { collapsed, toggle };
+  const toggle = useCallback(() => update(), [update]);
+  const expand = useCallback(() => update(false), [update]);
+  return { collapsed, toggle, expand };
 }
